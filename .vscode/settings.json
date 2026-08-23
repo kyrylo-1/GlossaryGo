@@ -1,0 +1,18 @@
+{
+    "cSpell.words": [
+        "glossarygo"
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/bin": true,
+        "**/dist": true,
+        "**/node_modules": true,
+        "**/obj": true,
+        "**/TestResults": true,
+        "LICENSE": true
+    }
+}
