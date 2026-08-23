@@ -20,7 +20,7 @@ async function writeGlossary(contents: string | Uint8Array, filename = "glossary
 }
 
 afterEach(async () => {
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })));
 });
 
 describe("loadGlossary", () => {
@@ -37,10 +37,10 @@ terms:
 `);
 
     await expect(loadGlossary(path)).resolves.toEqual([
-      { term: "API", definition: "Application Programming Interface" },
+      { definition: "Application Programming Interface", term: "API" },
       {
-        term: "ADR",
         definition: "A short record of an architectural decision\nand the reasons behind it.\n",
+        term: "ADR",
       },
     ]);
   });
@@ -246,7 +246,7 @@ terms:
 `);
 
     await expect(loadGlossary(path)).resolves.toEqual([
-      { term: "API", definition: "Application Programming Interface" },
+      { definition: "Application Programming Interface", term: "API" },
     ]);
   });
 
@@ -266,7 +266,7 @@ terms:
     const terms = await loadGlossary(path);
 
     expect(terms).toHaveLength(3_000);
-    expect(terms.at(-1)).toEqual({ term: "Term 2999", definition: "Definition 2999" });
+    expect(terms.at(-1)).toEqual({ definition: "Definition 2999", term: "Term 2999" });
   });
 
   test.each([

@@ -263,7 +263,7 @@ export async function loadGlossary(path: string): Promise<readonly Term[]> {
       );
     }
 
-    terms.push(Object.freeze({ term: termValue, definition: definitionNode.value }));
+    terms.push(Object.freeze({ definition: definitionNode.value, term: termValue }));
   }
 
   return Object.freeze(terms);

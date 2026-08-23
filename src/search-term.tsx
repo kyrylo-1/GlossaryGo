@@ -87,7 +87,7 @@ export default function Command() {
       }
     } catch (error: unknown) {
       if (sequence === loadSequence.current) {
-        setState({ status: "error", message: getSafeErrorMessage(error) });
+        setState({ message: getSafeErrorMessage(error), status: "error" });
       }
     }
   }, [glossaryFile]);

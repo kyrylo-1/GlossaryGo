@@ -4,7 +4,7 @@ import type { Term } from "./glossary";
 import { searchTerms } from "./search";
 
 function term(name: string, definition = `${name} definition`): Term {
-  return { term: name, definition };
+  return { definition, term: name };
 }
 
 describe("searchTerms", () => {
