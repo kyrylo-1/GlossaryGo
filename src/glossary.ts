@@ -110,7 +110,7 @@ export async function loadGlossary(path: string): Promise<readonly Term[]> {
 
   let source: string;
   try {
-    source = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    source = new TextDecoder("utf8", { fatal: true }).decode(bytes);
   } catch {
     throw new GlossaryError("invalid-encoding", "The glossary file must use valid UTF-8.");
   }
