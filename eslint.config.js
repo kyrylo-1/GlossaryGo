@@ -13,7 +13,7 @@ const reactRefresh = reactRefreshModule.default ?? reactRefreshModule;
 const unicorn = unicornModule.default ?? unicornModule;
 
 const typescriptFiles = ["**/*.ts", "**/*.tsx"];
-const testFiles = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"];
+const testFiles = ["**/*.test.ts", "**/*.test.tsx"];
 
 module.exports = defineConfig([
   ...raycastConfig,
