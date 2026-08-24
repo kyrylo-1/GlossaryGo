@@ -1,8 +1,8 @@
-import { Action, ActionPanel, getPreferenceValues, Icon, List, openExtensionPreferences } from "@raycast/api";
-import { useMemo, useState, type ReactElement } from "react";
+import { Action, ActionPanel, Icon, List, openExtensionPreferences } from "@raycast/api";
+import type { ReactElement } from "react";
 
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
-import { searchTerms, type SearchResult } from "./search";
+import type { SearchResult } from "./search";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
 import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 import type { Term } from "./utils/types";
@@ -114,13 +114,7 @@ const CommandContent = ({
 };
 
 export default function Command(): ReactElement {
-  const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();
-  const { reload, state } = useGlossary(glossaryFile);
-  const [query, setQuery] = useState("");
-  const result = useMemo(
-    () => (state.status === "ready" ? searchTerms(state.terms, query) : { terms: [], totalMatchCount: 0 }),
-    [query, state],
-  );
+  const { query, reload, result, setQuery, state } = useGlossary();
 
   return (
     <List

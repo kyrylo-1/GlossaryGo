@@ -1,24 +1,32 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { getPreferenceValues } from "@raycast/api";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
 import { GlossaryError, loadGlossary } from "../glossary";
-import type { Term } from "../utils/types";
+import { searchTerms, type SearchResult } from "../search";
+import { glossaryReducer, type CommandState } from "./glossary-reducer";
 
-type GlossaryState = Readonly<{
+export type { CommandState } from "./glossary-reducer";
+
+type GlossaryController = Readonly<{
+  query: string;
   reload: () => Promise<void>;
+  result: SearchResult;
+  setQuery: (query: string) => void;
   state: CommandState;
 }>;
 
-export type CommandState =
-  | Readonly<{ status: "loading" }>
-  | Readonly<{ status: "ready"; terms: readonly Term[] }>
-  | Readonly<{ status: "error"; message: string }>;
+const EMPTY_SEARCH_RESULT: SearchResult = Object.freeze({
+  terms: Object.freeze([]),
+  totalMatchCount: 0,
+});
 
 const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
 };
 
-export const useGlossary = (glossaryFile: string): GlossaryState => {
-  const [state, setState] = useState<CommandState>({ status: "loading" });
+export const useGlossary = (): GlossaryController => {
+  const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();
+  const [model, dispatch] = useReducer(glossaryReducer, { query: "", state: { status: "loading" } });
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -26,19 +34,24 @@ export const useGlossary = (glossaryFile: string): GlossaryState => {
     if (sequence !== loadSequence.current) {
       return;
     }
-    setState({ status: "loading" });
+    dispatch({ type: "loadStarted" });
 
     try {
       const terms = await loadGlossary(glossaryFile);
       if (sequence === loadSequence.current) {
-        setState({ status: "ready", terms });
+        dispatch({ terms, type: "loadSucceeded" });
       }
     } catch (error: unknown) {
       if (sequence === loadSequence.current) {
-        setState({ message: getSafeErrorMessage(error), status: "error" });
+        dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
       }
     }
   }, [glossaryFile]);
+  const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
+  const result = useMemo(
+    () => (model.state.status === "ready" ? searchTerms(model.state.terms, model.query) : EMPTY_SEARCH_RESULT),
+    [model.query, model.state],
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -53,5 +66,5 @@ export const useGlossary = (glossaryFile: string): GlossaryState => {
     };
   }, [reload]);
 
-  return { reload, state };
+  return { query: model.query, reload, result, setQuery, state: model.state };
 };
