@@ -12,7 +12,7 @@ import {
 import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlossaryError, loadGlossary, type Term } from "./glossary";
-import { searchTerms } from "./search";
+import { searchTerms, type SearchResult } from "./search";
 
 type CommandState =
   | Readonly<{ status: "loading" }>
@@ -82,6 +82,73 @@ const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => 
   );
 };
 
+const ResultSection = ({
+  onReload,
+  result,
+}: Readonly<{ onReload: () => Promise<void>; result: SearchResult }>): ReactElement => {
+  return (
+    <List.Section
+      {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}
+    >
+      {result.terms.map((term) => (
+        <List.Item
+          key={term.term}
+          id={term.term}
+          title={term.term}
+          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
+          actions={<TermActions term={term} onReload={onReload} />}
+        />
+      ))}
+    </List.Section>
+  );
+};
+
+const CommandContent = ({
+  onReload,
+  result,
+  state,
+}: Readonly<{ onReload: () => Promise<void>; result: SearchResult; state: CommandState }>): ReactElement | null => {
+  if (state.status === "error") {
+    return (
+      <List.EmptyView
+        title="Glossary Could Not Be Loaded"
+        description={state.message}
+        actions={<RecoveryActions onReload={onReload} />}
+      />
+    );
+  }
+
+  if (state.status === "loading") {
+    return null;
+  }
+
+  if (state.terms.length === 0) {
+    return (
+      <List.EmptyView
+        title="No Terms in Glossary"
+        description="Add terms to the selected glossary file, then reload it."
+        actions={<RecoveryActions onReload={onReload} />}
+      />
+    );
+  }
+
+  if (result.totalMatchCount === 0) {
+    return (
+      <List.EmptyView
+        title="No Matching Terms"
+        description="Try a shorter or different prefix."
+        actions={
+          <ActionPanel>
+            <ReloadAction onReload={onReload} />
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
+  return <ResultSection onReload={onReload} result={result} />;
+};
+
 export default function Command(): ReactElement {
   const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();
   const [state, setState] = useState<CommandState>({ status: "loading" });
@@ -127,43 +194,7 @@ export default function Command(): ReactElement {
       searchBarPlaceholder="Search terms by prefix"
       searchText={query}
     >
-      {state.status === "error" ? (
-        <List.EmptyView
-          title="Glossary Could Not Be Loaded"
-          description={state.message}
-          actions={<RecoveryActions onReload={reload} />}
-        />
-      ) : state.status === "ready" && state.terms.length === 0 ? (
-        <List.EmptyView
-          title="No Terms in Glossary"
-          description="Add terms to the selected glossary file, then reload it."
-          actions={<RecoveryActions onReload={reload} />}
-        />
-      ) : state.status === "ready" && result.totalMatchCount === 0 ? (
-        <List.EmptyView
-          title="No Matching Terms"
-          description="Try a shorter or different prefix."
-          actions={
-            <ActionPanel>
-              <ReloadAction onReload={reload} />
-            </ActionPanel>
-          }
-        />
-      ) : state.status === "ready" ? (
-        <List.Section
-          {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}
-        >
-          {result.terms.map((term) => (
-            <List.Item
-              key={term.term}
-              id={term.term}
-              title={term.term}
-              detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
-              actions={<TermActions term={term} onReload={reload} />}
-            />
-          ))}
-        </List.Section>
-      ) : null}
+      <CommandContent onReload={reload} result={result} state={state} />
     </List>
   );
 }
