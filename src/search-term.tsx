@@ -1,18 +1,25 @@
 import { Action, ActionPanel, Icon, List, openExtensionPreferences } from "@raycast/api";
 import type { ReactElement } from "react";
 
+import { showFailureToast } from "@raycast/utils";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import type { SearchResult } from "./search";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
 import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 import type { Term } from "./utils/types";
 
-const runAction = (action: () => Promise<unknown>): void => {
-  action().catch(() => null);
+const runAction = (action: () => Promise<unknown>, failureTitle: string): void => {
+  action().catch((error: unknown) => showFailureToast(error, { title: failureTitle }));
 };
 
 const ReloadAction = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
-  return <Action title="Reload Glossary" icon={Icon.ArrowClockwise} onAction={() => runAction(onReload)} />;
+  return (
+    <Action
+      title="Reload Glossary"
+      icon={Icon.ArrowClockwise}
+      onAction={() => runAction(onReload, "Failed to Reload Glossary")}
+    />
+  );
 };
 
 const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
@@ -22,7 +29,7 @@ const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> 
       <Action
         title="Open Extension Preferences"
         icon={Icon.Gear}
-        onAction={() => runAction(openExtensionPreferences)}
+        onAction={() => runAction(openExtensionPreferences, "Failed to Open Extension Preferences")}
       />
     </ActionPanel>
   );
@@ -34,12 +41,12 @@ const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => 
       <Action
         title="Copy Definition"
         icon={Icon.Clipboard}
-        onAction={() => runAction(() => copyWithFeedback(term.definition, "Definition"))}
+        onAction={() => runAction(() => copyWithFeedback(term.definition, "Definition"), "Failed to Copy Definition")}
       />
       <Action
         title="Copy Term"
         icon={Icon.Clipboard}
-        onAction={() => runAction(() => copyWithFeedback(term.term, "Term"))}
+        onAction={() => runAction(() => copyWithFeedback(term.term, "Term"), "Failed to Copy Term")}
       />
       <ActionPanel.Section>
         <ReloadAction onReload={onReload} />
