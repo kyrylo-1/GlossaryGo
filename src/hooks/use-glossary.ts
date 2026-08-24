@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { GlossaryError, loadGlossary } from "./glossary";
-import type { CommandState } from "./search-term-state";
+import { GlossaryError, loadGlossary, Term } from "../glossary";
 
 type GlossaryState = Readonly<{
   reload: () => Promise<void>;
   state: CommandState;
 }>;
+
+export type CommandState =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "ready"; terms: readonly Term[] }>
+  | Readonly<{ status: "error"; message: string }>;
 
 const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";

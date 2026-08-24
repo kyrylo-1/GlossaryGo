@@ -3,9 +3,9 @@ import { useMemo, useState, type ReactElement } from "react";
 
 import type { Term } from "./glossary";
 import { copyWithFeedback } from "./helpers/copy-with-feedback";
+import type { CommandState } from "./hooks/use-glossary";
+import { useGlossary } from "./hooks/use-glossary";
 import { searchTerms, type SearchResult } from "./search";
-import type { CommandState } from "./search-term-state";
-import { useGlossary } from "./use-glossary";
 import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 
 const runAction = (action: () => Promise<unknown>): void => {
