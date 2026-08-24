@@ -1,9 +1,144 @@
-import { getPreferenceValues, List } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Clipboard,
+  getPreferenceValues,
+  Icon,
+  List,
+  openExtensionPreferences,
+  showToast,
+  Toast,
+} from "@raycast/api";
 import { type ReactElement, useMemo, useState } from "react";
 
-import { searchTerms } from "./search";
-import { CommandContent } from "./search-term-content";
+import type { Term } from "./glossary";
+import { searchTerms, type SearchResult } from "./search";
+import type { CommandState } from "./search-term-state";
 import { useGlossary } from "./use-glossary";
+
+const copyWithFeedback = async (content: string, label: string): Promise<void> => {
+  try {
+    await Clipboard.copy(content);
+    await showToast({ style: Toast.Style.Success, title: `${label} copied` });
+  } catch {
+    await showToast({ style: Toast.Style.Failure, title: `${label} could not be copied` });
+  }
+};
+
+const runAction = (action: () => Promise<unknown>): void => {
+  action().catch(() => null);
+};
+
+const ReloadAction = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
+  return <Action title="Reload Glossary" icon={Icon.ArrowClockwise} onAction={() => runAction(onReload)} />;
+};
+
+const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
+  return (
+    <ActionPanel>
+      <ReloadAction onReload={onReload} />
+      <Action
+        title="Open Extension Preferences"
+        icon={Icon.Gear}
+        onAction={() => runAction(openExtensionPreferences)}
+      />
+    </ActionPanel>
+  );
+};
+
+const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => Promise<void> }>): ReactElement => {
+  return (
+    <ActionPanel>
+      <Action
+        title="Copy Definition"
+        icon={Icon.Clipboard}
+        onAction={() => runAction(() => copyWithFeedback(term.definition, "Definition"))}
+      />
+      <Action
+        title="Copy Term"
+        icon={Icon.Clipboard}
+        onAction={() => runAction(() => copyWithFeedback(term.term, "Term"))}
+      />
+      <ActionPanel.Section>
+        <ReloadAction onReload={onReload} />
+      </ActionPanel.Section>
+    </ActionPanel>
+  );
+};
+
+const renderPlainTextAsMarkdown = (value: string): string => {
+  const longestBacktickRun = [...value.matchAll(/`+/g)].reduce(
+    (longest, match) => Math.max(longest, match[0].length),
+    0,
+  );
+  const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
+  return `${fence}\n${value}${value.endsWith("\n") ? "" : "\n"}${fence}`;
+};
+
+const ResultSection = ({
+  onReload,
+  result,
+}: Readonly<{ onReload: () => Promise<void>; result: SearchResult }>): ReactElement => {
+  return (
+    <List.Section {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}>
+      {result.terms.map((term) => (
+        <List.Item
+          key={term.term}
+          id={term.term}
+          title={term.term}
+          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
+          actions={<TermActions term={term} onReload={onReload} />}
+        />
+      ))}
+    </List.Section>
+  );
+};
+
+const CommandContent = ({
+  onReload,
+  result,
+  state,
+}: Readonly<{ onReload: () => Promise<void>; result: SearchResult; state: CommandState }>): ReactElement | null => {
+  if (state.status === "error") {
+    return (
+      <List.EmptyView
+        title="Glossary Could Not Be Loaded"
+        description={state.message}
+        actions={<RecoveryActions onReload={onReload} />}
+      />
+    );
+  }
+
+  if (state.status === "loading") {
+    return null;
+  }
+
+  if (state.terms.length === 0) {
+    return (
+      <List.EmptyView
+        title="No Terms in Glossary"
+        description="Add terms to the selected glossary file, then reload it."
+        actions={<RecoveryActions onReload={onReload} />}
+      />
+    );
+  }
+
+  if (result.totalMatchCount === 0) {
+    return (
+      <List.EmptyView
+        title="No Matching Terms"
+        description="Try a shorter or different prefix."
+        actions={
+          <ActionPanel>
+            <ReloadAction onReload={onReload} />
+          </ActionPanel>
+        }
+      />
+    );
+  }
+
+  return <ResultSection onReload={onReload} result={result} />;
+};
 
 export default function Command(): ReactElement {
   const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();

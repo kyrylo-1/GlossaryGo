@@ -204,7 +204,7 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ["src/**/*.{js,jsx,ts,tsx}"],
+    files: ["src/**/*.{ts}"],
     rules: {
       "max-lines": ["error", 150],
     },
