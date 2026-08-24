@@ -9,7 +9,7 @@ import {
   showToast,
   Toast,
 } from "@raycast/api";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlossaryError, loadGlossary, type Term } from "./glossary";
 import { searchTerms } from "./search";
@@ -70,7 +70,7 @@ function TermActions({ term, onReload }: Readonly<{ term: Term; onReload: () => 
   );
 }
 
-export default function Command() {
+export default function Command(): ReactElement {
   const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();
   const [state, setState] = useState<CommandState>({ status: "loading" });
   const [query, setQuery] = useState("");

@@ -12,7 +12,7 @@ function normalize(value: string) {
   return value.normalize("NFC");
 }
 
-export function areTermsEquivalent(left: string, right: string) {
+export function areTermsEquivalent(left: string, right: string): boolean {
   return searchCollator.compare(normalize(left), normalize(right)) === 0;
 }
 
