@@ -1,7 +1,20 @@
 import { open, type FileHandle } from "node:fs/promises";
 import { TextDecoder } from "node:util";
 
-import { isMap, isNode, isScalar, isSeq, LineCounter, parseAllDocuments, visit } from "yaml";
+import {
+  type Document,
+  isMap,
+  isNode,
+  isScalar,
+  isSeq,
+  LineCounter,
+  type Pair,
+  parseAllDocuments,
+  type ParsedNode,
+  visit,
+  type YAMLMap,
+  type YAMLSeq,
+} from "yaml";
 
 import { areTermsEquivalent } from "./search";
 
@@ -23,6 +36,13 @@ export type GlossaryErrorCode =
 
 const maximumGlossaryBytes = 5 * 1024 * 1024;
 const readChunkBytes = 64 * 1024;
+
+type ParsedGlossaryDocument = Document.Parsed;
+type SourceRange = readonly number[] | null | undefined;
+type EntryPairs = Readonly<{
+  definitionPair: Pair<unknown, unknown>;
+  termPair: Pair<unknown, unknown>;
+}>;
 
 export class GlossaryError extends Error {
   constructor(
@@ -62,6 +82,16 @@ const createInvalidRootError = (
     lineCounter,
     range,
   );
+};
+
+const getNodeRange = (node: unknown, fallbackNode: unknown): SourceRange => {
+  if (isNode(node)) {
+    return node.range;
+  }
+  if (isNode(fallbackNode)) {
+    return fallbackNode.range;
+  }
+  return null;
 };
 
 const readGlossaryBytes = async (path: string): Promise<Buffer> => {
@@ -104,20 +134,15 @@ const readGlossaryBytes = async (path: string): Promise<Buffer> => {
   }
 };
 
-export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
-  if (!path.endsWith(".yaml")) {
-    throw new GlossaryError("invalid-extension", "Choose a file with the .yaml extension.");
-  }
-
-  const bytes = await readGlossaryBytes(path);
-
-  let source: string;
+const decodeGlossary = (bytes: Buffer): string => {
   try {
-    source = new TextDecoder("utf8", { fatal: true }).decode(bytes);
+    return new TextDecoder("utf8", { fatal: true }).decode(bytes);
   } catch {
     throw new GlossaryError("invalid-encoding", "The glossary file must use valid UTF-8.");
   }
-  const lineCounter = new LineCounter();
+};
+
+const parseGlossaryDocument = (source: string, lineCounter: LineCounter): ParsedGlossaryDocument => {
   const documents = parseAllDocuments(source, { lineCounter, prettyErrors: false, strict: true });
   const parseError = documents.find((document) => document.errors.length > 0)?.errors[0];
   if (parseError) {
@@ -134,10 +159,41 @@ export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
     );
   }
 
+  return documents[0];
+};
+
+const findUnsupportedYamlOffset = (document: ParsedGlossaryDocument): number | null => {
+  let offset: number | null = null;
+  visit(document, {
+    Alias(_key, node) {
+      offset = node.range?.[0] ?? 0;
+      return visit.BREAK;
+    },
+    Node(_key, node) {
+      if (node.anchor || node.tag) {
+        offset = node.range?.[0] ?? 0;
+        return visit.BREAK;
+      }
+    },
+    Pair(_key, pair) {
+      if (isScalar(pair.key) && pair.key.value === "<<") {
+        offset = pair.key.range?.[0] ?? 0;
+        return visit.BREAK;
+      }
+    },
+  });
+  return offset;
+};
+
+const rejectUnsupportedYaml = (
+  source: string,
+  document: ParsedGlossaryDocument,
+  lineCounter: LineCounter,
+): void => {
   const directiveOffset = /^%/m.exec(source)?.index;
-  const warning = documents[0].warnings[0];
+  const warning = document.warnings[0];
   if (typeof directiveOffset === "number" || warning) {
-    const line = lineCounter.linePos(directiveOffset ?? warning.pos[0]).line;
+    const line = lineCounter.linePos(directiveOffset ?? warning?.pos[0] ?? 0).line;
     throw new GlossaryError(
       "unsupported-yaml",
       `The glossary uses an unsupported YAML construct near line ${line}.`,
@@ -145,27 +201,8 @@ export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
     );
   }
 
-  let unsupportedOffset: number | undefined;
-  visit(documents[0], {
-    Alias(_key, node) {
-      unsupportedOffset = node.range?.[0] ?? 0;
-      return visit.BREAK;
-    },
-    Node(_key, node) {
-      if (node.anchor || node.tag) {
-        unsupportedOffset = node.range?.[0] ?? 0;
-        return visit.BREAK;
-      }
-    },
-    Pair(_key, pair) {
-      if (isScalar(pair.key) && pair.key.value === "<<") {
-        unsupportedOffset = pair.key.range?.[0] ?? 0;
-        return visit.BREAK;
-      }
-    },
-  });
-
-  if (typeof unsupportedOffset === "number") {
+  const unsupportedOffset = findUnsupportedYamlOffset(document);
+  if (unsupportedOffset !== null) {
     const line = lineCounter.linePos(unsupportedOffset).line;
     throw new GlossaryError(
       "unsupported-yaml",
@@ -173,8 +210,9 @@ export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
       line,
     );
   }
+};
 
-  const contents = documents[0].contents;
+const getTermsSequence = (contents: ParsedNode | null, lineCounter: LineCounter): YAMLSeq<unknown> => {
   if (!isMap(contents)) {
     throw createInvalidRootError(lineCounter, contents?.range);
   }
@@ -197,77 +235,142 @@ export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
   }
 
   if (!isSeq(termsPair.value)) {
-    throw createInvalidRootError(lineCounter, termsPair.value?.range ?? termsPair.key.range);
+    throw createInvalidRootError(lineCounter, isNode(termsPair.value) ? termsPair.value.range : termsPair.key.range);
   }
 
+  return termsPair.value;
+};
+
+const validateEntryFields = (
+  entry: YAMLMap<unknown, unknown>,
+  message: string,
+  lineCounter: LineCounter,
+): void => {
+  const fieldNames = new Set<string>();
+  let invalidFieldRange: SourceRange = null;
+  for (const pair of entry.items) {
+    if (!isScalar(pair.key) || (pair.key.value !== "term" && pair.key.value !== "definition")) {
+      invalidFieldRange = isScalar(pair.key) ? pair.key.range : entry.range;
+      break;
+    }
+    fieldNames.add(pair.key.value);
+  }
+
+  if (invalidFieldRange) {
+    throw createLocatedError("invalid-schema", message, lineCounter, invalidFieldRange);
+  }
+
+  if (entry.items.length !== 2 || !fieldNames.has("term") || !fieldNames.has("definition")) {
+    throw createLocatedError("invalid-schema", message, lineCounter, invalidFieldRange ?? entry.range);
+  }
+};
+
+const getEntryPairs = (
+  entry: unknown,
+  index: number,
+  lineCounter: LineCounter,
+  sequenceRange: SourceRange,
+): EntryPairs => {
+  const message = `Entry ${index + 1} must contain exactly the term and definition fields`;
+  if (!isMap(entry)) {
+    throw createLocatedError(
+      "invalid-schema",
+      message,
+      lineCounter,
+      isNode(entry) ? entry.range : sequenceRange,
+    );
+  }
+
+  validateEntryFields(entry, message, lineCounter);
+  const termPair = entry.items.find((pair) => isScalar(pair.key) && pair.key.value === "term");
+  const definitionPair = entry.items.find((pair) => isScalar(pair.key) && pair.key.value === "definition");
+  if (!termPair || !definitionPair) {
+    throw createLocatedError("invalid-schema", message, lineCounter, entry.range);
+  }
+
+  return { definitionPair, termPair };
+};
+
+const parseTermValue = (
+  termPair: Pair<unknown, unknown>,
+  index: number,
+  lineCounter: LineCounter,
+): string => {
+  const termNode = termPair.value;
+  if (
+    !isScalar(termNode) ||
+    typeof termNode.value !== "string" ||
+    termNode.value.length === 0 ||
+    termNode.value.trim() !== termNode.value
+  ) {
+    throw createLocatedError(
+      "invalid-schema",
+      `Entry ${index + 1} term must be a non-empty string without surrounding whitespace`,
+      lineCounter,
+      getNodeRange(termNode, termPair.key),
+    );
+  }
+  return termNode.value;
+};
+
+const parseDefinitionValue = (
+  definitionPair: Pair<unknown, unknown>,
+  index: number,
+  lineCounter: LineCounter,
+): string => {
+  const definitionNode = definitionPair.value;
+  if (!isScalar(definitionNode) || typeof definitionNode.value !== "string" || definitionNode.value.length === 0) {
+    throw createLocatedError(
+      "invalid-schema",
+      `Entry ${index + 1} definition must be a non-empty string`,
+      lineCounter,
+      getNodeRange(definitionNode, definitionPair.key),
+    );
+  }
+  return definitionNode.value;
+};
+
+const parseGlossaryEntry = (
+  entry: unknown,
+  index: number,
+  terms: readonly Term[],
+  lineCounter: LineCounter,
+  sequenceRange: SourceRange,
+): Term => {
+  const { definitionPair, termPair } = getEntryPairs(entry, index, lineCounter, sequenceRange);
+  const termValue = parseTermValue(termPair, index, lineCounter);
+  const definitionValue = parseDefinitionValue(definitionPair, index, lineCounter);
+
+  if (terms.some((term) => areTermsEquivalent(term.term, termValue))) {
+    throw createLocatedError(
+      "duplicate-term",
+      `Entry ${index + 1} duplicates another term`,
+      lineCounter,
+      isNode(termPair.value) ? termPair.value.range : null,
+    );
+  }
+
+  return Object.freeze({ definition: definitionValue, term: termValue });
+};
+
+const parseGlossaryTerms = (document: ParsedGlossaryDocument, lineCounter: LineCounter): readonly Term[] => {
+  const termsSequence = getTermsSequence(document.contents, lineCounter);
   const terms: Term[] = [];
-  for (const [index, entry] of termsPair.value.items.entries()) {
-    const message = `Entry ${index + 1} must contain exactly the term and definition fields`;
-    if (!isMap(entry)) {
-      throw createLocatedError("invalid-schema", message, lineCounter, entry?.range ?? termsPair.value.range);
-    }
+  for (const [index, entry] of termsSequence.items.entries()) {
+    terms.push(parseGlossaryEntry(entry, index, terms, lineCounter, termsSequence.range));
+  }
+  return Object.freeze(terms);
+};
 
-    const fieldNames = new Set<string>();
-    let invalidFieldRange: readonly number[] | null | undefined;
-    for (const pair of entry.items) {
-      if (!isScalar(pair.key) || (pair.key.value !== "term" && pair.key.value !== "definition")) {
-        invalidFieldRange = isScalar(pair.key) ? pair.key.range : entry.range;
-        break;
-      }
-      fieldNames.add(pair.key.value);
-    }
-
-    if (invalidFieldRange) {
-      throw createLocatedError("invalid-schema", message, lineCounter, invalidFieldRange);
-    }
-
-    if (entry.items.length !== 2 || !fieldNames.has("term") || !fieldNames.has("definition")) {
-      throw createLocatedError("invalid-schema", message, lineCounter, invalidFieldRange ?? entry.range);
-    }
-
-    const termPair = entry.items.find((pair) => isScalar(pair.key) && pair.key.value === "term");
-    const definitionPair = entry.items.find((pair) => isScalar(pair.key) && pair.key.value === "definition");
-    if (!termPair || !definitionPair) {
-      throw createLocatedError("invalid-schema", message, lineCounter, entry.range);
-    }
-
-    const termNode = termPair.value;
-    if (
-      !isScalar(termNode) ||
-      typeof termNode.value !== "string" ||
-      termNode.value.length === 0 ||
-      termNode.value.trim() !== termNode.value
-    ) {
-      throw createLocatedError(
-        "invalid-schema",
-        `Entry ${index + 1} term must be a non-empty string without surrounding whitespace`,
-        lineCounter,
-        isNode(termNode) ? termNode.range : termPair.key.range,
-      );
-    }
-    const termValue = termNode.value;
-
-    const definitionNode = definitionPair.value;
-    if (!isScalar(definitionNode) || typeof definitionNode.value !== "string" || definitionNode.value.length === 0) {
-      throw createLocatedError(
-        "invalid-schema",
-        `Entry ${index + 1} definition must be a non-empty string`,
-        lineCounter,
-        isNode(definitionNode) ? definitionNode.range : definitionPair.key.range,
-      );
-    }
-
-    if (terms.some((term) => areTermsEquivalent(term.term, termValue))) {
-      throw createLocatedError(
-        "duplicate-term",
-        `Entry ${index + 1} duplicates another term`,
-        lineCounter,
-        termNode.range,
-      );
-    }
-
-    terms.push(Object.freeze({ definition: definitionNode.value, term: termValue }));
+export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
+  if (!path.endsWith(".yaml")) {
+    throw new GlossaryError("invalid-extension", "Choose a file with the .yaml extension.");
   }
 
-  return Object.freeze(terms);
+  const bytes = await readGlossaryBytes(path);
+  const source = decodeGlossary(bytes);
+  const lineCounter = new LineCounter();
+  const document = parseGlossaryDocument(source, lineCounter);
+  rejectUnsupportedYaml(source, document, lineCounter);
+  return parseGlossaryTerms(document, lineCounter);
 };
