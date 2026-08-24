@@ -24,7 +24,7 @@ function getSafeErrorMessage(error: unknown) {
 }
 
 function renderPlainTextAsMarkdown(value: string) {
-  const longestBacktickRun = Array.from(value.matchAll(/`+/g)).reduce(
+  const longestBacktickRun = [...value.matchAll(/`+/g)].reduce(
     (longest, match) => Math.max(longest, match[0].length),
     0,
   );
