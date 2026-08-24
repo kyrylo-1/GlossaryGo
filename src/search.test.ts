@@ -7,7 +7,7 @@ const term = (name: string, definition = `${name} definition`): Term => {
   return { definition, term: name };
 };
 
-describe("searchTerms", () => {
+describe("searchTerms query behavior", () => {
   test("an empty query sorts the full glossary and returns only the first five matches", () => {
     const terms = [term("Zulu"), term("echo"), term("Delta"), term("charlie"), term("Bravo"), term("alpha")];
 
@@ -31,7 +31,9 @@ describe("searchTerms", () => {
 
     expect(searchTerms(terms, "Application")).toEqual({ terms: [], totalMatchCount: 0 });
   });
+});
 
+describe("searchTerms Unicode and limits", () => {
   test("is accent-sensitive while matching canonically equivalent Unicode", () => {
     const terms = [term("eclair"), term("éclair")];
 

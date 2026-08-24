@@ -23,7 +23,7 @@ afterEach(async () => {
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })));
 });
 
-describe("loadGlossary", () => {
+describe("loadGlossary file selection", () => {
   test("loads a valid glossary without changing definition content", async () => {
     const path = await writeGlossary(`
 # Product language
@@ -52,7 +52,9 @@ terms:
       new GlossaryError("invalid-extension", "Choose a file with the .yaml extension."),
     );
   });
+});
 
+describe("loadGlossary file access", () => {
   test("reports a safe error when the glossary file is missing", async () => {
     const path = await createTemporaryPath("missing.yaml");
 
@@ -87,7 +89,9 @@ terms:
       ),
     );
   });
+});
 
+describe("loadGlossary decoding and parsing", () => {
   test("rejects bytes that are not valid UTF-8", async () => {
     const path = await writeGlossary(new Uint8Array([0x74, 0x65, 0x72, 0x6d, 0x73, 0x3a, 0x20, 0xff]));
 
@@ -126,7 +130,9 @@ terms:
       new GlossaryError("multiple-documents", "The glossary must contain exactly one YAML document near line 2.", 2),
     );
   });
+});
 
+describe("loadGlossary unsupported YAML", () => {
   test.each([
     ["an explicit YAML directive", "%YAML 1.2\n---\nterms: []\n"],
     ["a tag directive", "%TAG !e! tag:example.com,2026:\n---\nterms: []\n"],
@@ -153,7 +159,9 @@ terms:
       new GlossaryError("unsupported-yaml", `The glossary uses an unsupported YAML construct near line ${line}.`, line),
     );
   });
+});
 
+describe("loadGlossary root schema", () => {
   test("reports an unknown root field even when it precedes terms", async () => {
     const path = await writeGlossary("version: 1\nterms: []\n");
 
@@ -178,7 +186,9 @@ terms:
       ),
     );
   });
+});
 
+describe("loadGlossary entry fields", () => {
   test("reports an unknown entry field even when it precedes required fields", async () => {
     const path = await writeGlossary("terms:\n  - category: Technical\n    term: API\n    definition: Interface\n");
 
@@ -206,7 +216,9 @@ terms:
       ),
     );
   });
+});
 
+describe("loadGlossary entry values", () => {
   test.each([
     ["a numeric term", "42"],
     ["a null term", ""],
@@ -235,7 +247,9 @@ terms:
       new GlossaryError("invalid-schema", "Entry 1 definition must be a non-empty string near line 3.", 3),
     );
   });
+});
 
+describe("loadGlossary valid terms", () => {
   test("accepts reordered fields and folded multiline definitions", async () => {
     const path = await writeGlossary(`
 terms:
@@ -268,7 +282,9 @@ terms:
     expect(terms).toHaveLength(3_000);
     expect(terms.at(-1)).toEqual({ definition: "Definition 2999", term: "Term 2999" });
   });
+});
 
+describe("loadGlossary duplicate and safe errors", () => {
   test.each([
     ["case-insensitive", "API", "api"],
     ["canonically equivalent", "éclair", "e\u0301clair"],
