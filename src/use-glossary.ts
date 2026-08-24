@@ -17,6 +17,10 @@ export const useGlossary = (glossaryFile: string): GlossaryState => {
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
     const sequence = ++loadSequence.current;
+    await Promise.resolve();
+    if (sequence !== loadSequence.current) {
+      return;
+    }
     setState({ status: "loading" });
 
     try {
@@ -32,8 +36,14 @@ export const useGlossary = (glossaryFile: string): GlossaryState => {
   }, [glossaryFile]);
 
   useEffect(() => {
-    reload();
+    let isActive = true;
+    queueMicrotask(() => {
+      if (isActive) {
+        reload().catch(() => null);
+      }
+    });
     return (): void => {
+      isActive = false;
       loadSequence.current += 1;
     };
   }, [reload]);
