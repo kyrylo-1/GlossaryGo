@@ -87,9 +87,7 @@ const ResultSection = ({
   result,
 }: Readonly<{ onReload: () => Promise<void>; result: SearchResult }>): ReactElement => {
   return (
-    <List.Section
-      {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}
-    >
+    <List.Section {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}>
       {result.terms.map((term) => (
         <List.Item
           key={term.term}

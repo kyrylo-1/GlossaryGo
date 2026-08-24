@@ -185,11 +185,7 @@ const findUnsupportedYamlOffset = (document: ParsedGlossaryDocument): number | n
   return offset;
 };
 
-const rejectUnsupportedYaml = (
-  source: string,
-  document: ParsedGlossaryDocument,
-  lineCounter: LineCounter,
-): void => {
+const rejectUnsupportedYaml = (source: string, document: ParsedGlossaryDocument, lineCounter: LineCounter): void => {
   const directiveOffset = /^%/m.exec(source)?.index;
   const warning = document.warnings[0];
   if (typeof directiveOffset === "number" || warning) {
@@ -241,11 +237,7 @@ const getTermsSequence = (contents: ParsedNode | null, lineCounter: LineCounter)
   return termsPair.value;
 };
 
-const validateEntryFields = (
-  entry: YAMLMap<unknown, unknown>,
-  message: string,
-  lineCounter: LineCounter,
-): void => {
+const validateEntryFields = (entry: YAMLMap<unknown, unknown>, message: string, lineCounter: LineCounter): void => {
   const fieldNames = new Set<string>();
   let invalidFieldRange: SourceRange = null;
   for (const pair of entry.items) {
@@ -273,12 +265,7 @@ const getEntryPairs = (
 ): EntryPairs => {
   const message = `Entry ${index + 1} must contain exactly the term and definition fields`;
   if (!isMap(entry)) {
-    throw createLocatedError(
-      "invalid-schema",
-      message,
-      lineCounter,
-      isNode(entry) ? entry.range : sequenceRange,
-    );
+    throw createLocatedError("invalid-schema", message, lineCounter, isNode(entry) ? entry.range : sequenceRange);
   }
 
   validateEntryFields(entry, message, lineCounter);
@@ -291,11 +278,7 @@ const getEntryPairs = (
   return { definitionPair, termPair };
 };
 
-const parseTermValue = (
-  termPair: Pair<unknown, unknown>,
-  index: number,
-  lineCounter: LineCounter,
-): string => {
+const parseTermValue = (termPair: Pair<unknown, unknown>, index: number, lineCounter: LineCounter): string => {
   const termNode = termPair.value;
   if (
     !isScalar(termNode) ||
