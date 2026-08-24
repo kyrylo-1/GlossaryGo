@@ -2,8 +2,9 @@ import { isNode, isScalar, type LineCounter, type Pair } from "yaml";
 
 import { getEntryPairs, getNodeRange } from "./glossary-entry-fields";
 import { createLocatedError } from "./glossary-error";
-import type { SourceRange, Term } from "./glossary-types";
+import type { SourceRange } from "./glossary-types";
 import { areTermsEquivalent } from "./search";
+import { Term } from "./utils/types";
 
 const parseTermValue = (termPair: Pair<unknown, unknown>, index: number, lineCounter: LineCounter): string => {
   const termNode = termPair.value;

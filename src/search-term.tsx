@@ -1,11 +1,11 @@
 import { Action, ActionPanel, getPreferenceValues, Icon, List, openExtensionPreferences } from "@raycast/api";
 import { useMemo, useState, type ReactElement } from "react";
 
-import type { Term } from "./glossary";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { searchTerms, type SearchResult } from "./search";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
 import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
+import { Term } from "./utils/types";
 
 const runAction = (action: () => Promise<unknown>): void => {
   action().catch(() => null);

@@ -3,12 +3,11 @@ import { LineCounter } from "yaml";
 import { GlossaryError } from "./glossary-error";
 import { readGlossarySource } from "./glossary-file";
 import { parseGlossaryTerms } from "./glossary-schema";
-import type { Term } from "./glossary-types";
 import { parseGlossaryDocument, rejectUnsupportedYaml } from "./glossary-yaml";
+import { Term } from "./utils/types";
 
 export { GlossaryError } from "./glossary-error";
 export type { GlossaryErrorCode } from "./glossary-error";
-export type { Term } from "./glossary-types";
 
 export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
   if (!path.endsWith(".yaml")) {
