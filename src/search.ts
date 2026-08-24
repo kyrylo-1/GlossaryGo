@@ -8,15 +8,15 @@ export type SearchResult = Readonly<{
 const termCollator = new Intl.Collator([], { sensitivity: "accent", usage: "sort" });
 const searchCollator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
 
-function normalize(value: string): string {
+const normalize = (value: string): string => {
   return value.normalize("NFC");
-}
+};
 
-export function areTermsEquivalent(left: string, right: string): boolean {
+export const areTermsEquivalent = (left: string, right: string): boolean => {
   return searchCollator.compare(normalize(left), normalize(right)) === 0;
-}
+};
 
-function termStartsWith(term: string, query: string): boolean {
+const termStartsWith = (term: string, query: string): boolean => {
   const normalizedTerm = normalize(term);
   const normalizedQuery = normalize(query);
   if (normalizedQuery.length === 0) {
@@ -32,9 +32,9 @@ function termStartsWith(term: string, query: string): boolean {
   }
 
   return false;
-}
+};
 
-export function searchTerms(terms: readonly Term[], query: string): SearchResult {
+export const searchTerms = (terms: readonly Term[], query: string): SearchResult => {
   const normalizedQuery = query.trim();
   const matches = terms
     .filter(({ term }) => termStartsWith(term, normalizedQuery))
@@ -44,4 +44,4 @@ export function searchTerms(terms: readonly Term[], query: string): SearchResult
     terms: Object.freeze(matches.slice(0, 5)),
     totalMatchCount: matches.length,
   });
-}
+};

@@ -35,36 +35,36 @@ export class GlossaryError extends Error {
   }
 }
 
-function createLocatedError(
+const createLocatedError = (
   code: GlossaryErrorCode,
   message: string,
   lineCounter: LineCounter,
   range: readonly number[] | null | undefined,
-): GlossaryError {
+): GlossaryError => {
   const line = lineCounter.linePos(range?.[0] ?? 0).line;
   return new GlossaryError(code, `${message} near line ${line}.`, line);
-}
+};
 
-function createUnreadableError(): GlossaryError {
+const createUnreadableError = (): GlossaryError => {
   return new GlossaryError(
     "unreadable",
     "The glossary file could not be read. Check that it still exists and is accessible.",
   );
-}
+};
 
-function createInvalidRootError(
+const createInvalidRootError = (
   lineCounter: LineCounter,
   range: readonly number[] | null | undefined,
-): GlossaryError {
+): GlossaryError => {
   return createLocatedError(
     "invalid-schema",
     "The glossary root must contain exactly one terms sequence",
     lineCounter,
     range,
   );
-}
+};
 
-async function readGlossaryBytes(path: string): Promise<Buffer> {
+const readGlossaryBytes = async (path: string): Promise<Buffer> => {
   let handle: FileHandle | undefined;
   try {
     handle = await open(path, "r");
@@ -102,9 +102,9 @@ async function readGlossaryBytes(path: string): Promise<Buffer> {
   } finally {
     await handle?.close().catch(() => null);
   }
-}
+};
 
-export async function loadGlossary(path: string): Promise<readonly Term[]> {
+export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
   if (!path.endsWith(".yaml")) {
     throw new GlossaryError("invalid-extension", "Choose a file with the .yaml extension.");
   }
@@ -270,4 +270,4 @@ export async function loadGlossary(path: string): Promise<readonly Term[]> {
   }
 
   return Object.freeze(terms);
-}
+};

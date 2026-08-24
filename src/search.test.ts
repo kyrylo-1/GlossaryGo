@@ -3,9 +3,9 @@ import { describe, expect, test } from "vitest";
 import type { Term } from "./glossary";
 import { searchTerms } from "./search";
 
-function term(name: string, definition = `${name} definition`): Term {
+const term = (name: string, definition = `${name} definition`): Term => {
   return { definition, term: name };
-}
+};
 
 describe("searchTerms", () => {
   test("an empty query sorts the full glossary and returns only the first five matches", () => {

@@ -19,42 +19,42 @@ type CommandState =
   | Readonly<{ status: "ready"; terms: readonly Term[] }>
   | Readonly<{ status: "error"; message: string }>;
 
-function getSafeErrorMessage(error: unknown): string {
+const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
-}
+};
 
-function renderPlainTextAsMarkdown(value: string): string {
+const renderPlainTextAsMarkdown = (value: string): string => {
   const longestBacktickRun = [...value.matchAll(/`+/g)].reduce(
     (longest, match) => Math.max(longest, match[0].length),
     0,
   );
   const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
   return `${fence}\n${value}${value.endsWith("\n") ? "" : "\n"}${fence}`;
-}
+};
 
-async function copyWithFeedback(content: string, label: string): Promise<void> {
+const copyWithFeedback = async (content: string, label: string): Promise<void> => {
   try {
     await Clipboard.copy(content);
     await showToast({ style: Toast.Style.Success, title: `${label} copied` });
   } catch {
     await showToast({ style: Toast.Style.Failure, title: `${label} could not be copied` });
   }
-}
+};
 
-function ReloadAction({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement {
+const ReloadAction = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
   return <Action title="Reload Glossary" icon={Icon.ArrowClockwise} onAction={onReload} />;
-}
+};
 
-function RecoveryActions({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement {
+const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
   return (
     <ActionPanel>
       <ReloadAction onReload={onReload} />
       <Action title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
     </ActionPanel>
   );
-}
+};
 
-function TermActions({ term, onReload }: Readonly<{ term: Term; onReload: () => Promise<void> }>): ReactElement {
+const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => Promise<void> }>): ReactElement => {
   return (
     <ActionPanel>
       <Action
@@ -68,7 +68,7 @@ function TermActions({ term, onReload }: Readonly<{ term: Term; onReload: () => 
       </ActionPanel.Section>
     </ActionPanel>
   );
-}
+};
 
 export default function Command(): ReactElement {
   const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();
