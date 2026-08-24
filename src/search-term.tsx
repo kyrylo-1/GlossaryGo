@@ -93,7 +93,7 @@ export default function Command() {
   }, [glossaryFile]);
 
   useEffect(() => {
-    void reload();
+    reload();
     return () => {
       loadSequence.current += 1;
     };
