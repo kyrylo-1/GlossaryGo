@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run lint",
+            "timeout": 120,
+            "statusMessage": "Running lint..."
+          },
+          {
+            "type": "command",
+            "command": "npm run test",
+            "timeout": 120,
+            "statusMessage": "Running tests..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run format",
+            "timeout": 120,
+            "statusMessage": "Formatting..."
+          }
+        ]
+      }
+    ]
+  }
+}
