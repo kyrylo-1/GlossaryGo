@@ -3,7 +3,7 @@ import { isMap, isNode, isScalar, isSeq, type LineCounter, type ParsedNode, type
 import { parseGlossaryEntry } from "./glossary-entry";
 import { createInvalidRootError } from "./glossary-error";
 import type { ParsedGlossaryDocument } from "./glossary-types";
-import { Term } from "./utils/types";
+import type { Term } from "./utils/types";
 
 const getTermsSequence = (contents: ParsedNode | null, lineCounter: LineCounter): YAMLSeq<unknown> => {
   if (!isMap(contents)) {

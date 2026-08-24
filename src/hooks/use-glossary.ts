@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { GlossaryError, loadGlossary, type Term } from "../glossary";
+import { GlossaryError, loadGlossary } from "../glossary";
+import type { Term } from "../utils/types";
 
 type GlossaryState = Readonly<{
   reload: () => Promise<void>;
