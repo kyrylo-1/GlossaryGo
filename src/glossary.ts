@@ -97,7 +97,7 @@ async function readGlossaryBytes(path: string) {
     }
     throw createUnreadableError();
   } finally {
-    await handle?.close().catch(() => undefined);
+    await handle?.close().catch(() => null);
   }
 }
 
