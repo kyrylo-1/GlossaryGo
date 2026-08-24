@@ -8,6 +8,7 @@ export type SearchResult = Readonly<{
 const termCollator = new Intl.Collator([], { sensitivity: "accent", usage: "sort" });
 const searchCollator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
 
+const a = "s";
 const normalize = (value: string): string => {
   return value.normalize("NFC");
 };

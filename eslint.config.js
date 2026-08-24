@@ -193,6 +193,12 @@ module.exports = defineConfig([
     },
   },
   {
+    files: ["src/**/*.{js,jsx,ts,tsx}"],
+    rules: {
+      "max-lines": ["error", 100],
+    },
+  },
+  {
     files: ["src/search-term.tsx"],
     rules: {
       "no-restricted-exports": "off",
