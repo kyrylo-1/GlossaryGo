@@ -5,7 +5,7 @@ export type SearchResult = Readonly<{
   totalMatchCount: number;
 }>;
 
-const termCollator = new Intl.Collator(undefined, { sensitivity: "accent", usage: "sort" });
+const termCollator = new Intl.Collator([], { sensitivity: "accent", usage: "sort" });
 const searchCollator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
 
 function normalize(value: string) {
@@ -25,7 +25,7 @@ function termStartsWith(term: string, query: string) {
 
   for (let end = 0; end < normalizedTerm.length;) {
     const codePoint = normalizedTerm.codePointAt(end);
-    end += codePoint !== undefined && codePoint > 0xffff ? 2 : 1;
+    end += typeof codePoint === "number" && codePoint > 0xffff ? 2 : 1;
     if (searchCollator.compare(normalizedTerm.slice(0, end), normalizedQuery) === 0) {
       return true;
     }

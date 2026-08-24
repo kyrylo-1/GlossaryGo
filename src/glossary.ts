@@ -133,7 +133,7 @@ export async function loadGlossary(path: string): Promise<readonly Term[]> {
 
   const directiveOffset = /^%/m.exec(source)?.index;
   const warning = documents[0].warnings[0];
-  if (directiveOffset !== undefined || warning) {
+  if (typeof directiveOffset === "number" || warning) {
     const line = lineCounter.linePos(directiveOffset ?? warning.pos[0]).line;
     throw new GlossaryError(
       "unsupported-yaml",
@@ -162,7 +162,7 @@ export async function loadGlossary(path: string): Promise<readonly Term[]> {
     },
   });
 
-  if (unsupportedOffset !== undefined) {
+  if (typeof unsupportedOffset === "number") {
     const line = lineCounter.linePos(unsupportedOffset).line;
     throw new GlossaryError(
       "unsupported-yaml",

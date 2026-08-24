@@ -138,7 +138,9 @@ export default function Command() {
           }
         />
       ) : state.status === "ready" ? (
-        <List.Section title={result.totalMatchCount > 5 ? `Showing 5 of ${result.totalMatchCount} matches` : undefined}>
+        <List.Section
+          {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}
+        >
           {result.terms.map((term) => (
             <List.Item
               key={term.term}
