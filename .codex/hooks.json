@@ -6,22 +6,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npm run lint",
-            "timeout": 120,
-            "statusMessage": "Running lint..."
-          },
-          {
-            "type": "command",
-            "command": "npm run test",
-            "timeout": 120,
-            "statusMessage": "Running tests..."
+            "command": "npm run lint && npm run test && npm run build",
+            "timeout": 300,
+            "statusMessage": "Running lint tests and building..."
           }
         ]
       }
     ],
     "Stop": [
       {
-        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
