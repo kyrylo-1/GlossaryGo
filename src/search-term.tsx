@@ -41,15 +41,23 @@ const copyWithFeedback = async (content: string, label: string): Promise<void> =
   }
 };
 
+const runAction = (action: () => Promise<unknown>): void => {
+  action().catch(() => null);
+};
+
 const ReloadAction = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
-  return <Action title="Reload Glossary" icon={Icon.ArrowClockwise} onAction={onReload} />;
+  return <Action title="Reload Glossary" icon={Icon.ArrowClockwise} onAction={() => runAction(onReload)} />;
 };
 
 const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
   return (
     <ActionPanel>
       <ReloadAction onReload={onReload} />
-      <Action title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
+      <Action
+        title="Open Extension Preferences"
+        icon={Icon.Gear}
+        onAction={() => runAction(openExtensionPreferences)}
+      />
     </ActionPanel>
   );
 };
@@ -60,9 +68,13 @@ const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => 
       <Action
         title="Copy Definition"
         icon={Icon.Clipboard}
-        onAction={() => copyWithFeedback(term.definition, "Definition")}
+        onAction={() => runAction(() => copyWithFeedback(term.definition, "Definition"))}
       />
-      <Action title="Copy Term" icon={Icon.Clipboard} onAction={() => copyWithFeedback(term.term, "Term")} />
+      <Action
+        title="Copy Term"
+        icon={Icon.Clipboard}
+        onAction={() => runAction(() => copyWithFeedback(term.term, "Term"))}
+      />
       <ActionPanel.Section>
         <ReloadAction onReload={onReload} />
       </ActionPanel.Section>
