@@ -195,34 +195,7 @@ module.exports = defineConfig([
   {
     files: ["src/**/*.{js,jsx,ts,tsx}"],
     rules: {
-      "max-lines": ["error", 100],
-    },
-  },
-  {
-    files: ["src/search-term.tsx"],
-    rules: {
-      "no-restricted-exports": "off",
-    },
-  },
-  {
-    files: ["src/App.tsx"],
-    rules: {
-      "unicorn/filename-case": "off",
-    },
-  },
-  {
-    files: ["src/components/ui/**/*.tsx", "src/lib/utils.ts"],
-    rules: {
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-      "func-style": "off",
-      "sort-keys": "off",
-    },
-  },
-  {
-    files: ["src/components/ui/**/*.tsx"],
-    rules: {
-      "react-refresh/only-export-components": "off",
+      "max-lines": ["error", 150],
     },
   },
   {

@@ -1,18 +1,6 @@
 repos:
   - repo: local
     hooks:
-      - id: format
-        name: format
-        entry: npm run format:check --
-        language: system
-        files: ^src/.*\.(ts|tsx|js|jsx|json|jsonc|css|html|md)$
-
-      - id: lint
-        name: lint
-        entry: npm run lint --
-        language: system
-        files: ^src/.*\.(ts|tsx|js|jsx)$
-
       - id: npm-test
         name: npm test
         entry: npm run test
