@@ -2,10 +2,9 @@ import { Action, ActionPanel, getPreferenceValues, Icon, List, openExtensionPref
 import { useMemo, useState, type ReactElement } from "react";
 
 import type { Term } from "./glossary";
-import { copyWithFeedback } from "./helpers/copy-with-feedback";
-import type { CommandState } from "./hooks/use-glossary";
-import { useGlossary } from "./hooks/use-glossary";
+import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { searchTerms, type SearchResult } from "./search";
+import { copyWithFeedback } from "./utils/copy-with-feedback";
 import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 
 const runAction = (action: () => Promise<unknown>): void => {
