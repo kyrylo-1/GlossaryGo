@@ -3,6 +3,8 @@ const tsPlugin = require("@typescript-eslint/eslint-plugin");
 const tsParser = require("@typescript-eslint/parser");
 const raycastConfig = require("@raycast/eslint-config");
 const promise = require("eslint-plugin-promise");
+const react = require("eslint-plugin-react");
+const reactHooks = require("eslint-plugin-react-hooks");
 const reactRefreshModule = require("eslint-plugin-react-refresh");
 const unicornModule = require("eslint-plugin-unicorn");
 const vitest = require("@vitest/eslint-plugin");
@@ -15,6 +17,14 @@ const testFiles = ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.t
 
 module.exports = defineConfig([
   ...raycastConfig,
+  {
+    ...react.configs.flat["jsx-runtime"],
+    files: typescriptFiles,
+  },
+  {
+    ...reactHooks.configs.flat.recommended,
+    files: typescriptFiles,
+  },
   {
     ignores: ["dist/**", "node_modules/**"],
   },
@@ -140,6 +150,7 @@ module.exports = defineConfig([
       "promise/param-names": "error",
       "promise/prefer-catch": "error",
       "promise/valid-params": "error",
+      "react-hooks/rules-of-hooks": "error",
       "react-refresh/only-export-components": "error",
       "unicorn/consistent-assert": "error",
       "unicorn/consistent-date-clone": "error",
