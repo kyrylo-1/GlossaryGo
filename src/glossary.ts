@@ -40,19 +40,22 @@ function createLocatedError(
   message: string,
   lineCounter: LineCounter,
   range: readonly number[] | null | undefined,
-) {
+): GlossaryError {
   const line = lineCounter.linePos(range?.[0] ?? 0).line;
   return new GlossaryError(code, `${message} near line ${line}.`, line);
 }
 
-function createUnreadableError() {
+function createUnreadableError(): GlossaryError {
   return new GlossaryError(
     "unreadable",
     "The glossary file could not be read. Check that it still exists and is accessible.",
   );
 }
 
-function createInvalidRootError(lineCounter: LineCounter, range: readonly number[] | null | undefined) {
+function createInvalidRootError(
+  lineCounter: LineCounter,
+  range: readonly number[] | null | undefined,
+): GlossaryError {
   return createLocatedError(
     "invalid-schema",
     "The glossary root must contain exactly one terms sequence",
@@ -61,7 +64,7 @@ function createInvalidRootError(lineCounter: LineCounter, range: readonly number
   );
 }
 
-async function readGlossaryBytes(path: string) {
+async function readGlossaryBytes(path: string): Promise<Buffer> {
   let handle: FileHandle | undefined;
   try {
     handle = await open(path, "r");

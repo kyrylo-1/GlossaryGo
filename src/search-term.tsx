@@ -19,11 +19,11 @@ type CommandState =
   | Readonly<{ status: "ready"; terms: readonly Term[] }>
   | Readonly<{ status: "error"; message: string }>;
 
-function getSafeErrorMessage(error: unknown) {
+function getSafeErrorMessage(error: unknown): string {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
 }
 
-function renderPlainTextAsMarkdown(value: string) {
+function renderPlainTextAsMarkdown(value: string): string {
   const longestBacktickRun = [...value.matchAll(/`+/g)].reduce(
     (longest, match) => Math.max(longest, match[0].length),
     0,
@@ -32,7 +32,7 @@ function renderPlainTextAsMarkdown(value: string) {
   return `${fence}\n${value}${value.endsWith("\n") ? "" : "\n"}${fence}`;
 }
 
-async function copyWithFeedback(content: string, label: string) {
+async function copyWithFeedback(content: string, label: string): Promise<void> {
   try {
     await Clipboard.copy(content);
     await showToast({ style: Toast.Style.Success, title: `${label} copied` });
@@ -41,11 +41,11 @@ async function copyWithFeedback(content: string, label: string) {
   }
 }
 
-function ReloadAction({ onReload }: Readonly<{ onReload: () => Promise<void> }>) {
+function ReloadAction({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement {
   return <Action title="Reload Glossary" icon={Icon.ArrowClockwise} onAction={onReload} />;
 }
 
-function RecoveryActions({ onReload }: Readonly<{ onReload: () => Promise<void> }>) {
+function RecoveryActions({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement {
   return (
     <ActionPanel>
       <ReloadAction onReload={onReload} />
@@ -54,7 +54,7 @@ function RecoveryActions({ onReload }: Readonly<{ onReload: () => Promise<void> 
   );
 }
 
-function TermActions({ term, onReload }: Readonly<{ term: Term; onReload: () => Promise<void> }>) {
+function TermActions({ term, onReload }: Readonly<{ term: Term; onReload: () => Promise<void> }>): ReactElement {
   return (
     <ActionPanel>
       <Action
@@ -94,7 +94,7 @@ export default function Command(): ReactElement {
 
   useEffect(() => {
     reload();
-    return () => {
+    return (): void => {
       loadSequence.current += 1;
     };
   }, [reload]);

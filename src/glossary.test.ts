@@ -7,13 +7,13 @@ import { GlossaryError, loadGlossary } from "./glossary";
 
 const temporaryDirectories: string[] = [];
 
-async function createTemporaryPath(filename: string) {
+async function createTemporaryPath(filename: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "glossarygo-"));
   temporaryDirectories.push(directory);
   return join(directory, filename);
 }
 
-async function writeGlossary(contents: string | Uint8Array, filename = "glossary.yaml") {
+async function writeGlossary(contents: string | Uint8Array, filename = "glossary.yaml"): Promise<string> {
   const path = await createTemporaryPath(filename);
   await writeFile(path, contents);
   return path;

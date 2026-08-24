@@ -8,7 +8,7 @@ export type SearchResult = Readonly<{
 const termCollator = new Intl.Collator([], { sensitivity: "accent", usage: "sort" });
 const searchCollator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
 
-function normalize(value: string) {
+function normalize(value: string): string {
   return value.normalize("NFC");
 }
 
@@ -16,7 +16,7 @@ export function areTermsEquivalent(left: string, right: string): boolean {
   return searchCollator.compare(normalize(left), normalize(right)) === 0;
 }
 
-function termStartsWith(term: string, query: string) {
+function termStartsWith(term: string, query: string): boolean {
   const normalizedTerm = normalize(term);
   const normalizedQuery = normalize(query);
   if (normalizedQuery.length === 0) {
