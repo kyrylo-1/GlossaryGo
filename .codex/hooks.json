@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npm run format",
+            "command": "npm run format 1>&2",
             "timeout": 120,
             "statusMessage": "Formatting..."
           }
