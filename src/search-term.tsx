@@ -1,29 +1,12 @@
-import {
-  Action,
-  ActionPanel,
-  Clipboard,
-  getPreferenceValues,
-  Icon,
-  List,
-  openExtensionPreferences,
-  showToast,
-  Toast,
-} from "@raycast/api";
-import { type ReactElement, useMemo, useState } from "react";
+import { Action, ActionPanel, getPreferenceValues, Icon, List, openExtensionPreferences } from "@raycast/api";
+import { useMemo, useState, type ReactElement } from "react";
 
 import type { Term } from "./glossary";
+import { copyWithFeedback } from "./helpers/copy-with-feedback";
 import { searchTerms, type SearchResult } from "./search";
 import type { CommandState } from "./search-term-state";
 import { useGlossary } from "./use-glossary";
-
-const copyWithFeedback = async (content: string, label: string): Promise<void> => {
-  try {
-    await Clipboard.copy(content);
-    await showToast({ style: Toast.Style.Success, title: `${label} copied` });
-  } catch {
-    await showToast({ style: Toast.Style.Failure, title: `${label} could not be copied` });
-  }
-};
+import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 
 const runAction = (action: () => Promise<unknown>): void => {
   action().catch(() => null);
@@ -64,15 +47,6 @@ const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => 
       </ActionPanel.Section>
     </ActionPanel>
   );
-};
-
-const renderPlainTextAsMarkdown = (value: string): string => {
-  const longestBacktickRun = [...value.matchAll(/`+/g)].reduce(
-    (longest, match) => Math.max(longest, match[0].length),
-    0,
-  );
-  const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
-  return `${fence}\n${value}${value.endsWith("\n") ? "" : "\n"}${fence}`;
 };
 
 const ResultSection = ({
