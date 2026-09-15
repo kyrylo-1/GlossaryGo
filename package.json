@@ -14,7 +14,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=22.14"
+    "node": ">=22.22.2"
   },
   "commands": [
     {
@@ -34,7 +34,7 @@
     }
   ],
   "dependencies": {
-    "@raycast/api": "^1.104.25",
+    "@raycast/api": "^2.4.1",
     "@raycast/utils": "^2.3.0",
     "yaml": "^2.9.0"
   },
