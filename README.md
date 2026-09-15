@@ -11,7 +11,9 @@ a term, and select a result to read or copy its complete definition.
    extension preferences.
 
 GlossaryGo supports macOS and Windows. The selected file must be readable, contain exactly one YAML document, and be
-no larger than 5 MiB. The `.yml` extension is not supported.
+no larger than 5 MiB. Adding terms also requires the path to be a writable ordinary file with exactly one filesystem
+link. Symbolic links and multiply hard-linked files may be searched, but GlossaryGo will not update them because
+replacement could change their link semantics. The `.yml` extension is not supported.
 
 ## Glossary format
 
@@ -51,16 +53,21 @@ Matches are sorted in case-insensitive, accent-sensitive, locale-aware ascending
 the first five results; when more exist, it reports `Showing 5 of N matches`. With an empty query, the first five terms
 from the sorted glossary are shown.
 
-Use the result actions to copy the complete definition or term without closing the command. Choose **Reload Glossary**
-after editing the file to reread and revalidate it. GlossaryGo does not watch the file automatically, and a failed
-reload shows an error instead of retaining stale results.
+Use the result actions to copy the complete definition or term without closing the command. Choose **Add Term** from a
+result, an empty glossary, or a no-match view to open a form in the same **Search Term** command. The current query is
+used as the initial term name. Names are trimmed when saved; definitions must contain non-whitespace text and otherwise
+retain their exact content. After a successful add, GlossaryGo searches for the saved name and reloads the glossary.
+Load-error views keep only file-recovery actions until the selected file is valid again.
 
-Add, edit, and delete actions save only to the selected Glossary File. Each save rereads and validates the latest
-source, writes a restricted sibling temporary file, rechecks the selected file, and replaces it only after the write
-has completed. Saves submitted by this GlossaryGo process for the same path run in sequence. These checks reduce
-accidental overwrites, but they are not an atomic compare-and-swap against external editors or separate processes and
-do not guarantee crash durability on every filesystem. Avoid editing the Glossary File elsewhere while GlossaryGo is
-saving it.
+Choose **Reload Glossary** after editing the file externally to reread and revalidate it. GlossaryGo does not watch the
+file automatically, and a failed reload shows an error instead of retaining stale results.
+
+Term changes save only to the selected Glossary File. Each save rereads and validates the latest source, writes a
+restricted sibling temporary file, rechecks the selected file, and replaces it only after the write has completed.
+Saves submitted by this GlossaryGo process for the same path run in sequence. These checks reduce accidental
+overwrites, but they are not an atomic compare-and-swap against external editors or separate processes and do not
+guarantee crash durability on every filesystem. Avoid editing the Glossary File elsewhere while GlossaryGo is saving
+it.
 
 ## Testing
 
@@ -68,10 +75,10 @@ See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, 
 
 ## Privacy
 
-GlossaryGo reads only the glossary file you select. Glossary content stays on your device and is held in memory while
-the command is open. It is written only to the selected Glossary File when you explicitly add, edit, or delete a term;
-it is not persisted elsewhere, logged, sent over the network, or included in telemetry. Content leaves the command
-only when you explicitly copy a term or definition to the clipboard.
+GlossaryGo reads only the glossary file you select. Existing glossary content and text entered in the term form stay on
+your device and are held in memory while the command is open. Content is written only to the selected Glossary File
+when you explicitly submit a term change; it is not persisted elsewhere, logged, sent over the network, or included in
+telemetry. Content leaves the command only when you explicitly copy a term or definition to the clipboard.
 
 ## Troubleshooting
 
@@ -86,3 +93,5 @@ only when you explicitly copy a term or definition to the clipboard.
   term. Shorten or correct the prefix.
 - **Recent edits do not appear:** Choose **Reload Glossary** from the action panel. File changes are not loaded
   automatically.
+- **A term cannot be added:** Correct any field error shown in the form. If saving fails, use **Open Extension
+  Preferences** from the failure toast and select a writable ordinary `.yaml` file with one filesystem link.

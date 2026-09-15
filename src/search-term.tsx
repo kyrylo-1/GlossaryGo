@@ -1,7 +1,8 @@
-import { Action, ActionPanel, Icon, List, openExtensionPreferences } from "@raycast/api";
-import type { ReactElement } from "react";
+import { Action, ActionPanel, Icon, List, openExtensionPreferences, useNavigation } from "@raycast/api";
+import { useCallback, type ReactElement } from "react";
 
 import { showFailureToast } from "@raycast/utils";
+import { TermForm } from "./components/term-form";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
@@ -22,20 +23,69 @@ const ReloadAction = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>)
   );
 };
 
+const OpenPreferencesAction = (): ReactElement => {
+  return (
+    <Action
+      title="Open Extension Preferences"
+      icon={Icon.Gear}
+      onAction={() => runAction(openExtensionPreferences, "Failed to Open Extension Preferences")}
+    />
+  );
+};
+
 const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
   return (
     <ActionPanel>
       <ReloadAction onReload={onReload} />
-      <Action
-        title="Open Extension Preferences"
-        icon={Icon.Gear}
-        onAction={() => runAction(openExtensionPreferences, "Failed to Open Extension Preferences")}
-      />
+      <OpenPreferencesAction />
     </ActionPanel>
   );
 };
 
-const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => Promise<void> }>): ReactElement => {
+type AddTermActionProps = Readonly<{
+  glossaryFile: string;
+  initialTerm: string;
+  onSaved: (term: Term) => Promise<void>;
+}>;
+
+const AddTermAction = ({ glossaryFile, initialTerm, onSaved }: AddTermActionProps): ReactElement => {
+  return (
+    <Action.Push
+      title="Add Term"
+      icon={Icon.Plus}
+      target={<TermForm glossaryFile={glossaryFile} initialTerm={initialTerm} mode="add" onSaved={onSaved} />}
+    />
+  );
+};
+
+type SearchActionsProps = AddTermActionProps & Readonly<{ onReload: () => Promise<void> }>;
+
+const EmptyGlossaryActions = (props: SearchActionsProps): ReactElement => {
+  return (
+    <ActionPanel>
+      <AddTermAction {...props} />
+      <ActionPanel.Section>
+        <ReloadAction onReload={props.onReload} />
+        <OpenPreferencesAction />
+      </ActionPanel.Section>
+    </ActionPanel>
+  );
+};
+
+const NoMatchActions = (props: SearchActionsProps): ReactElement => {
+  return (
+    <ActionPanel>
+      <AddTermAction {...props} />
+      <ActionPanel.Section>
+        <ReloadAction onReload={props.onReload} />
+      </ActionPanel.Section>
+    </ActionPanel>
+  );
+};
+
+type TermActionsProps = SearchActionsProps & Readonly<{ term: Term }>;
+
+const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
   return (
     <ActionPanel>
       <Action
@@ -49,16 +99,14 @@ const TermActions = ({ term, onReload }: Readonly<{ term: Term; onReload: () => 
         onAction={() => runAction(() => copyWithFeedback(term.term, "Term"), "Failed to Copy Term")}
       />
       <ActionPanel.Section>
-        <ReloadAction onReload={onReload} />
+        <AddTermAction {...props} />
+        <ReloadAction onReload={props.onReload} />
       </ActionPanel.Section>
     </ActionPanel>
   );
 };
 
-const ResultSection = ({
-  onReload,
-  result,
-}: Readonly<{ onReload: () => Promise<void>; result: SearchResult }>): ReactElement => {
+const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
   return (
     <List.Section {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}>
       {result.terms.map((term) => (
@@ -67,7 +115,7 @@ const ResultSection = ({
           id={term.term}
           title={term.term}
           detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
-          actions={<TermActions term={term} onReload={onReload} />}
+          actions={<TermActions term={term} {...props} />}
         />
       ))}
     </List.Section>
@@ -78,7 +126,8 @@ const CommandContent = ({
   onReload,
   result,
   state,
-}: Readonly<{ onReload: () => Promise<void>; result: SearchResult; state: CommandState }>): ReactElement | null => {
+  ...props
+}: SearchActionsProps & Readonly<{ result: SearchResult; state: CommandState }>): ReactElement | null => {
   if (state.status === "error") {
     return (
       <List.EmptyView
@@ -97,8 +146,8 @@ const CommandContent = ({
     return (
       <List.EmptyView
         title="No Terms in Glossary"
-        description="Add terms to the selected glossary file, then reload it."
-        actions={<RecoveryActions onReload={onReload} />}
+        description="Add a term to the selected glossary file."
+        actions={<EmptyGlossaryActions onReload={onReload} {...props} />}
       />
     );
   }
@@ -108,20 +157,25 @@ const CommandContent = ({
       <List.EmptyView
         title="No Matching Terms"
         description="Try a shorter or different prefix."
-        actions={
-          <ActionPanel>
-            <ReloadAction onReload={onReload} />
-          </ActionPanel>
-        }
+        actions={<NoMatchActions onReload={onReload} {...props} />}
       />
     );
   }
 
-  return <ResultSection onReload={onReload} result={result} />;
+  return <ResultSection onReload={onReload} result={result} {...props} />;
 };
 
 export default function Command(): ReactElement {
-  const { query, reload, result, setQuery, state } = useGlossary();
+  const { glossaryFile, query, reload, result, setQuery, state } = useGlossary();
+  const { pop } = useNavigation();
+  const onSaved = useCallback(
+    async (term: Term): Promise<void> => {
+      setQuery(term.term);
+      await reload();
+      pop();
+    },
+    [pop, reload, setQuery],
+  );
 
   return (
     <List
@@ -132,7 +186,14 @@ export default function Command(): ReactElement {
       searchBarPlaceholder="Search terms by prefix"
       searchText={query}
     >
-      <CommandContent onReload={reload} result={result} state={state} />
+      <CommandContent
+        glossaryFile={glossaryFile}
+        initialTerm={query}
+        onReload={reload}
+        onSaved={onSaved}
+        result={result}
+        state={state}
+      />
     </List>
   );
 }

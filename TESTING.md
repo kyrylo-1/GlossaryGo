@@ -94,5 +94,30 @@ Start with the unmodified test glossary. Open the action panel to access **Copy 
 | Preference recovery   | From an error state, choose **Open Extension Preferences**, select a valid test glossary, and reopen the command.  | The selected glossary loads.                                                   |
 | Local installation    | Stop development mode with Ctrl+C, restart Raycast, and open **Search Term**.                                      | The extension remains available and loads the selected file.                   |
 
+## Add Term acceptance matrix
+
+Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
+synthetic glossary before each scenario that changes the file.
+
+| Check                     | Action                                                                                                                 | Expected result                                                                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Result menu               | Search for `ap`, open a result's actions, and choose **Add Term**.                                                     | A nested form opens with `ap` in **Term** and a blank **Definition**.                                                          |
+| Empty glossary            | Load `terms: []`, reload, and open the empty-view actions.                                                             | **Add Term**, **Reload Glossary**, and **Open Extension Preferences** are available.                                           |
+| No match                  | Search for `missing` and open the no-match actions.                                                                    | **Add Term** and **Reload Glossary** are available; Add opens with `missing` prefilled.                                        |
+| Load error                | Replace the file with `terms: [`, reload, and open the error actions.                                                  | Only **Reload Glossary** and **Open Extension Preferences** are available; **Add Term** is absent.                             |
+| Blank name                | Open Add, enter spaces in **Term**, move focus away, and submit with a valid definition.                               | A Term field error appears and no file write occurs.                                                                           |
+| Blank definition          | Enter a valid term and a spaces-only **Definition**, move focus away, and submit.                                      | A Definition field error appears and no file write occurs.                                                                     |
+| Error clearing            | Trigger both field errors, then edit only **Term**.                                                                    | The Term error clears while the Definition error remains.                                                                      |
+| Duplicate                 | Submit `api` with any meaningful definition while `API` exists.                                                        | The duplicate error appears on **Term**, entered text remains, and no duplicate is written.                                    |
+| Exact definition          | Add `Protocol` with a definition containing meaningful leading/trailing spaces and a line break.                       | **Term Added** appears; the saved name is `Protocol`, and the definition text is preserved exactly after reload.               |
+| Refresh and navigation    | Successfully add a unique term from a non-empty query.                                                                 | The form closes after reload, the query becomes the trimmed saved name, and the new result is shown.                           |
+| Save failure recovery     | Make the selected ordinary file read-only after opening Add, then submit valid values.                                 | A safe failure toast offers **Open Extension Preferences**, the form stays open, and both entered values remain.               |
+| Linked-file policy        | Select a symbolic link or a path with multiple hard links, then submit valid values.                                   | A safe failure toast offers **Open Extension Preferences**; the selected path and linked source are unchanged.                 |
+| Double submission         | Submit the same valid form twice rapidly.                                                                              | Only one term is written and the UI remains loading until the save and refresh complete.                                       |
+| Post-save refresh failure | Cause the file to become invalid or unavailable immediately after a successful replacement but before the reload ends. | The save is not labeled as failed or retried; Search Term shows its load-error recovery state, or safe saved/refresh feedback. |
+
+Automated tests cover validation, normalization, duplicate routing, double-submit guarding, and the post-save failure
+boundary, but they do not establish platform UI acceptance.
+
 Testing is complete when all automated commands pass and every manual check produces the expected result. Record any
 failed scenario with its query, synthetic input, and observed behavior before making a fix.

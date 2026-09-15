@@ -8,6 +8,7 @@ import { glossaryReducer, type CommandState } from "./glossary-reducer";
 export type { CommandState } from "./glossary-reducer";
 
 type GlossaryController = Readonly<{
+  glossaryFile: string;
   query: string;
   reload: () => Promise<void>;
   result: SearchResult;
@@ -66,5 +67,5 @@ export const useGlossary = (): GlossaryController => {
     };
   }, [reload]);
 
-  return { query: model.query, reload, result, setQuery, state: model.state };
+  return { glossaryFile, query: model.query, reload, result, setQuery, state: model.state };
 };
