@@ -13,7 +13,7 @@ A user-selected YAML file that encodes a Glossary.
 _Avoid_: Configuration file, glossary document
 
 **Term**:
-A named glossary entry that has a definition and can appear in search results.
+A named glossary entry that has a definition and can appear in search results. Its name is unique within its glossary.
 _Avoid_: Item, record, search term
 
 **Definition**:
