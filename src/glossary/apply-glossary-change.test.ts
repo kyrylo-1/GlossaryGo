@@ -114,6 +114,22 @@ describe("applyGlossaryChange additions", () => {
     ]);
   });
 
+  test("rejects an empty source term before the add mutation", () => {
+    const source = 'terms:\n  - term: ""\n    definition: Present definition\n';
+
+    expect(() =>
+      applyGlossaryChange(source, { term: { definition: "New definition", term: "New" }, type: "add" }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-schema" }));
+  });
+
+  test("rejects an empty source definition before the add mutation", () => {
+    const source = 'terms:\n  - term: Present\n    definition: ""\n';
+
+    expect(() =>
+      applyGlossaryChange(source, { term: { definition: "New definition", term: "New" }, type: "add" }),
+    ).toThrowError(expect.objectContaining({ code: "invalid-schema" }));
+  });
+
   // eslint-disable-next-line vitest/expect-expect
   test.each([
     ["malformed YAML", "terms: [}\n", "invalid-yaml"],

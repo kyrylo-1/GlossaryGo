@@ -57,3 +57,26 @@ The focused test file covers the required round-trip add and edit examples; broa
 ### Concerns
 
 - No production concerns found. Full repository formatting remains blocked only by the two pre-existing scratch-file warnings listed above.
+
+## Fix round 2: empty source fields
+
+### Files changed
+
+- `src/glossary/apply-glossary-change.test.ts`
+- `.superpowers/sdd/2026-09-14-add-term/task-1-report.md`
+
+### Tests and verification
+
+- Added explicit synthetic source-YAML regressions proving `term: ""` and `definition: ""` each fail with `invalid-schema` before the add mutation.
+- `npm test -- src/glossary/apply-glossary-change.test.ts` passed (1 file, 34 tests).
+- `npm run lint` passed.
+- `npm exec -- prettier --check src/glossary/apply-glossary-change.test.ts` passed.
+- `git diff --check` passed.
+
+### Mutation summary
+
+- The empty-term test fails if parsed-source entry term validation is skipped or accepts an empty scalar; the empty-definition test fails for the corresponding definition-validation mutation. Both call `applyGlossaryChange` directly and assert the existing consumer-visible schema error code.
+
+### Concerns
+
+- No concerns.
