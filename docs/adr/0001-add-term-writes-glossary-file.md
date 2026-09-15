@@ -6,4 +6,4 @@ GlossaryGo currently reads a user-owned Glossary File, and its privacy guidance 
 
 - Update the read-only privacy wording when implementing the feature.
 - Treat the existing file as user-owned content that must be protected during saves.
-- Command entry points, duplicate handling, input cleanup, formatting, and the file-writing mechanism remain separate design decisions.
+- The implementation plan tracks the separately confirmed entry points, duplicate handling, input cleanup, and formatting behavior. Success navigation, recovery, and the file-writing mechanism remain open design decisions.
