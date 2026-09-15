@@ -1,6 +1,6 @@
 # GlossaryGo
 
-GlossaryGo supports finding and adding terms in a user-owned glossary.
+GlossaryGo supports finding, adding, editing, and deleting terms in a user-owned glossary.
 
 ## Language
 
