@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=../glossary.schema.json
+terms:
+  - term: API
+    definition: Application Programming Interface
+  - term: Apple
+    definition: A fruit
+  - term: Application
+    definition: A software program
+  - term: Apricot
+    definition: Another fruit
+  - term: Aptitude
+    definition: An ability
+  - term: Aquarium
+    definition: A tank for aquatic animals
+  - term: éclair
+    definition: A pastry
+  - term: Markdown
+    definition: |-
+      **These asterisks should remain visible.**
+      This second line should be preserved.
