@@ -1,6 +1,6 @@
 # GlossaryGo
 
-GlossaryGo provides fast lookup of terms stored in a user-owned glossary.
+GlossaryGo supports finding and adding terms in a user-owned glossary.
 
 ## Language
 

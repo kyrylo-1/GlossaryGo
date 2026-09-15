@@ -6,4 +6,6 @@ GlossaryGo currently reads a user-owned Glossary File, and its privacy guidance 
 
 - Update the read-only privacy wording when implementing the feature.
 - Treat the existing file as user-owned content that must be protected during saves.
-- The implementation plan tracks the separately confirmed entry points, duplicate handling, input cleanup, and formatting behavior. Success navigation, recovery, and the file-writing mechanism remain open design decisions.
+- A restricted transient sibling file may be used for replacement. Normal cleanup removes it, but a crash may leave it behind; this privacy consequence was accepted during the design interview.
+- Detected external edits abort the save with the user's input preserved. The user accepts that these checks cannot guarantee protection against an external writer changing the file at the exact same moment.
+- The implementation plan records the confirmed entry points, input rules, formatting, success navigation, and recovery behavior. Support for linked file paths remains the final scope check.
