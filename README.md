@@ -55,6 +55,10 @@ Use the result actions to copy the complete definition or term without closing t
 after editing the file to reread and revalidate it. GlossaryGo does not watch the file automatically, and a failed
 reload shows an error instead of retaining stale results.
 
+## Testing
+
+See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, and the manual testing checklist.
+
 ## Privacy
 
 GlossaryGo reads only the glossary file you select. Glossary content stays on your device and is held in memory while
