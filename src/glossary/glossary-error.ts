@@ -9,6 +9,7 @@ export type GlossaryErrorCode =
   | "invalid-schema"
   | "invalid-yaml"
   | "multiple-documents"
+  | "stale-term"
   | "too-large"
   | "unsupported-yaml"
   | "unreadable";

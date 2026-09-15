@@ -3,7 +3,7 @@ import { TextDecoder } from "node:util";
 
 import { GlossaryError, createUnreadableError } from "./glossary-error";
 
-const maximumGlossaryBytes = 5 * 1024 * 1024;
+export const maximumGlossaryBytes = 5 * 1024 * 1024;
 const readChunkBytes = 64 * 1024;
 
 const readGlossaryBytes = async (path: string): Promise<Buffer> => {

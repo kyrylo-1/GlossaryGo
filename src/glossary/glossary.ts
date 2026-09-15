@@ -6,6 +6,13 @@ import { parseGlossaryTerms } from "./glossary-schema";
 import { parseGlossaryDocument, rejectUnsupportedYaml } from "./glossary-yaml";
 import type { Term } from "../utils/types";
 
+export const parseGlossarySource = (source: string): readonly Term[] => {
+  const lineCounter = new LineCounter();
+  const document = parseGlossaryDocument(source, lineCounter);
+  rejectUnsupportedYaml(source, document, lineCounter);
+  return parseGlossaryTerms(document, lineCounter);
+};
+
 export { GlossaryError } from "./glossary-error";
 export type { GlossaryErrorCode } from "./glossary-error";
 
@@ -15,8 +22,5 @@ export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
   }
 
   const source = await readGlossarySource(path);
-  const lineCounter = new LineCounter();
-  const document = parseGlossaryDocument(source, lineCounter);
-  rejectUnsupportedYaml(source, document, lineCounter);
-  return parseGlossaryTerms(document, lineCounter);
+  return parseGlossarySource(source);
 };
