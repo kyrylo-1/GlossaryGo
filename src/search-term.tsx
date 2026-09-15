@@ -2,8 +2,8 @@ import { Action, ActionPanel, Icon, List, openExtensionPreferences } from "@rayc
 import type { ReactElement } from "react";
 
 import { showFailureToast } from "@raycast/utils";
+import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
-import type { SearchResult } from "./search";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
 import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 import type { Term } from "./utils/types";

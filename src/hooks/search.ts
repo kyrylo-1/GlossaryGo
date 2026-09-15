@@ -1,4 +1,4 @@
-import type { Term } from "./utils/types";
+import type { Term } from "../utils/types";
 
 export type SearchResult = Readonly<{
   terms: readonly Term[];
