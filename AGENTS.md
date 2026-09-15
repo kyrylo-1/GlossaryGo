@@ -40,6 +40,8 @@ Recent history mixes imperative subjects with `feat:` and `refactor:` prefixes. 
 
 ## Privacy & Agent Instructions
 
-Keep glossary content local and in memory; never persist, log, or transmit it. Use synthetic glossary data in tests.
+Keep glossary content local and in memory. The only permitted persistence is an explicit Add Term, Edit Term, or
+Delete Term write to the user-selected Glossary File through the glossary save service. Never persist glossary content
+elsewhere, log it, or transmit it. Use synthetic glossary data in tests.
 
 Preserve unrelated working-tree changes. Agents must provide deletion commands for the user instead of deleting files because of the DSG hook. When a commit is requested, delegate its creation to a separate Luna agent with low reasoning.

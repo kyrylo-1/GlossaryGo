@@ -11,6 +11,9 @@ export type GlossaryErrorCode =
   | "multiple-documents"
   | "stale-term"
   | "too-large"
+  | "unwritable"
+  | "file-changed"
+  | "unsupported-write-target"
   | "unsupported-yaml"
   | "unreadable";
 
@@ -39,6 +42,21 @@ export const createUnreadableError = (): GlossaryError => {
   return new GlossaryError(
     "unreadable",
     "The glossary file could not be read. Check that it still exists and is accessible.",
+  );
+};
+
+export const createUnwritableError = (): GlossaryError => {
+  return new GlossaryError("unwritable", "The glossary file could not be saved. Check its permissions and try again.");
+};
+
+export const createFileChangedError = (): GlossaryError => {
+  return new GlossaryError("file-changed", "The glossary changed while saving. Try again.");
+};
+
+export const createUnsupportedWriteTargetError = (): GlossaryError => {
+  return new GlossaryError(
+    "unsupported-write-target",
+    "The selected glossary cannot be safely replaced. Choose a regular file with one link.",
   );
 };
 

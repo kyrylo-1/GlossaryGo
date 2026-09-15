@@ -55,6 +55,13 @@ Use the result actions to copy the complete definition or term without closing t
 after editing the file to reread and revalidate it. GlossaryGo does not watch the file automatically, and a failed
 reload shows an error instead of retaining stale results.
 
+Add, edit, and delete actions save only to the selected Glossary File. Each save rereads and validates the latest
+source, writes a restricted sibling temporary file, rechecks the selected file, and replaces it only after the write
+has completed. Saves submitted by this GlossaryGo process for the same path run in sequence. These checks reduce
+accidental overwrites, but they are not an atomic compare-and-swap against external editors or separate processes and
+do not guarantee crash durability on every filesystem. Avoid editing the Glossary File elsewhere while GlossaryGo is
+saving it.
+
 ## Testing
 
 See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, and the manual testing checklist.
@@ -62,8 +69,9 @@ See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, 
 ## Privacy
 
 GlossaryGo reads only the glossary file you select. Glossary content stays on your device and is held in memory while
-the command is open. It is not persisted, logged, sent over the network, or included in telemetry. Content leaves the
-command only when you explicitly copy a term or definition to the clipboard.
+the command is open. It is written only to the selected Glossary File when you explicitly add, edit, or delete a term;
+it is not persisted elsewhere, logged, sent over the network, or included in telemetry. Content leaves the command
+only when you explicitly copy a term or definition to the clipboard.
 
 ## Troubleshooting
 
