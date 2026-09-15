@@ -60,8 +60,9 @@ const saveOnce = async (path: string, change: GlossaryChange): Promise<void> => 
   let handle: FileHandle | null = null;
   let temporaryPath: string | null = null;
   try {
-    temporaryPath = createTemporaryPath(path);
-    handle = await glossarySaveFileSystem.createExclusive(temporaryPath);
+    const attemptedTemporaryPath = createTemporaryPath(path);
+    handle = await glossarySaveFileSystem.createExclusive(attemptedTemporaryPath);
+    temporaryPath = attemptedTemporaryPath;
     await glossarySaveFileSystem.write(handle, candidate);
     await glossarySaveFileSystem.flush(handle);
     await glossarySaveFileSystem.close(handle);

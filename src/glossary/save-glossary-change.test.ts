@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 import { loadGlossary } from "./glossary";
 import { GlossaryError } from "./glossary-error";
-import { glossarySaveFileSystem } from "./glossary-file";
+import { glossarySaveFileSystem, glossaryWriteTargetFileSystem } from "./glossary-file";
 import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary-test-utils";
 import { saveGlossaryChange } from "./save-glossary-change";
 
@@ -147,6 +147,27 @@ describe("saveGlossaryChange target access", () => {
   });
 });
 
+describe("saveGlossaryChange effective write access", () => {
+  test.skipIf(process.platform === "win32")(
+    "rejects an owner-read-only target even when its group write bit is set",
+    async () => {
+      const path = await writeGlossary("terms: []\n");
+      const original = await readFile(path);
+      await chmod(path, 0o460);
+      vi.spyOn(glossaryWriteTargetFileSystem, "checkWriteAccess").mockRejectedValue(
+        Object.assign(new Error("EACCES: effective access denied"), { code: "EACCES" }),
+      );
+
+      await expect(
+        saveGlossaryChange(path, { term: { definition: "Interface", term: "API" }, type: "add" }),
+      ).rejects.toEqual(
+        new GlossaryError("unwritable", "The glossary file could not be saved. Check its permissions and try again."),
+      );
+      await expect(readFile(path)).resolves.toEqual(original);
+    },
+  );
+});
+
 describe("saveGlossaryChange replacement", () => {
   test("hides raw read failures at the writer boundary", async () => {
     const path = await writeGlossary("terms: []\n");
@@ -225,6 +246,26 @@ describe("saveGlossaryChange temporary file failures", () => {
     );
     await expect(readFile(path)).resolves.toEqual(original);
     await expect(readdir(dirname(path))).resolves.toEqual(["glossary.yaml"]);
+  });
+});
+
+describe("saveGlossaryChange exclusive temporary creation", () => {
+  test("does not remove a pre-existing path when exclusive creation reports EEXIST", async () => {
+    const path = await writeGlossary("terms: []\n");
+    const preExistingBytes = Buffer.from("unrelated file bytes");
+    let attemptedPath = "";
+    vi.spyOn(glossarySaveFileSystem, "createExclusive").mockImplementation(async (temporaryPath) => {
+      attemptedPath = temporaryPath;
+      await writeFile(temporaryPath, preExistingBytes);
+      throw Object.assign(new Error("EEXIST: temporary path already exists"), { code: "EEXIST" });
+    });
+
+    await expect(
+      saveGlossaryChange(path, { term: { definition: "Interface", term: "API" }, type: "add" }),
+    ).rejects.toEqual(
+      new GlossaryError("unwritable", "The glossary file could not be saved. Check its permissions and try again."),
+    );
+    await expect(readFile(attemptedPath)).resolves.toEqual(preExistingBytes);
   });
 });
 

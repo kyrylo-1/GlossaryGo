@@ -1,5 +1,5 @@
-import type { BigIntStats } from "node:fs";
-import { chmod, lstat, open, rename, unlink, type FileHandle } from "node:fs/promises";
+import { constants, type BigIntStats } from "node:fs";
+import { access, chmod, lstat, open, rename, unlink, type FileHandle } from "node:fs/promises";
 import { TextDecoder } from "node:util";
 
 import {
@@ -86,6 +86,10 @@ const metadataMatches = (left: GlossaryFileMetadata, right: GlossaryFileMetadata
   );
 };
 
+export const glossaryWriteTargetFileSystem = {
+  checkWriteAccess: async (path: string): Promise<void> => access(path, constants.W_OK),
+};
+
 export const inspectGlossaryWriteTarget = async (path: string): Promise<GlossaryFileMetadata> => {
   try {
     const stats = await lstat(path, { bigint: true });
@@ -93,6 +97,11 @@ export const inspectGlossaryWriteTarget = async (path: string): Promise<Glossary
       throw createUnsupportedWriteTargetError();
     }
     if ((stats.mode & 0o222n) === 0n) {
+      throw createUnwritableError();
+    }
+    try {
+      await glossaryWriteTargetFileSystem.checkWriteAccess(path);
+    } catch {
       throw createUnwritableError();
     }
     return toMetadata(stats);
