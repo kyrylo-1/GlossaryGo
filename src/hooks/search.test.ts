@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import type { Term } from "../glossary";
+import type { Term } from "../utils/types";
 import { searchTerms } from "./search";
 
 const term = (name: string, definition = `${name} definition`): Term => {

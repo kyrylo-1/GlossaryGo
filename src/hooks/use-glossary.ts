@@ -1,7 +1,7 @@
 import { getPreferenceValues } from "@raycast/api";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
-import { GlossaryError, loadGlossary } from "../glossary";
+import { GlossaryError, loadGlossary } from "../glossary/glossary";
 import { searchTerms, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState } from "./glossary-reducer";
 

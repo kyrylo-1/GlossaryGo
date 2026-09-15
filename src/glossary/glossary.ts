@@ -4,7 +4,7 @@ import { GlossaryError } from "./glossary-error";
 import { readGlossarySource } from "./glossary-file";
 import { parseGlossaryTerms } from "./glossary-schema";
 import { parseGlossaryDocument, rejectUnsupportedYaml } from "./glossary-yaml";
-import type { Term } from "./utils/types";
+import type { Term } from "../utils/types";
 
 export { GlossaryError } from "./glossary-error";
 export type { GlossaryErrorCode } from "./glossary-error";

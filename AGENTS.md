@@ -5,7 +5,7 @@
 GlossaryGo is a Raycast extension for searching a private local YAML glossary.
 
 - `src/search-term.tsx` implements the command UI.
-- `src/glossary*.ts` handles file loading, decoding, validation, and domain types.
+- `src/glossary/` contains glossary file loading, decoding, validation, and their tests.
 - `src/hooks/` contains glossary state, reload handling, and search logic; `src/utils/` contains shared helpers.
 - Tests live beside source files as `*.test.ts`; `assets/` contains the extension icon.
 - `package.json` defines the Raycast command and preferences; `glossary.schema.json` describes the glossary format.
