@@ -1,14 +1,17 @@
 # GlossaryGo
 
-GlossaryGo searches a private glossary stored in a local YAML file. Open **Search Term** in Raycast, type the start of
-a term, and select a result to read or copy its complete definition.
+GlossaryGo searches and updates a private glossary stored in a local YAML file. Open **Search Term** in Raycast to find
+an entry by prefix, or open **Add Term** to add entries without first starting a search.
 
 ## Setup
 
 1. Create a UTF-8 file whose name ends in `.yaml` using the format below.
-2. Open **Search Term** in Raycast.
+2. Open **Search Term** or **Add Term** in Raycast.
 3. When prompted, set the required **Glossary File** preference to that file. You can change it later in the
    extension preferences.
+
+Both commands share the same preference. After upgrading from a version where Glossary File belonged only to Search
+Term, Raycast may ask you to select the file once more at the extension level.
 
 GlossaryGo supports macOS and Windows. The selected file must be readable, contain exactly one YAML document, and be
 no larger than 5 MiB. Changing terms also requires the path to be a writable ordinary file with exactly one filesystem
@@ -42,6 +45,17 @@ Do not add other root or entry fields. Duplicate terms are rejected using the sa
 case-insensitive comparison as search. Anchors, aliases, merge keys, custom tags, and multiple YAML documents are not
 supported. Ordinary mappings, sequences, comments, quoted strings, and literal or folded multiline strings are
 supported.
+
+## Adding terms
+
+Open the standalone **Add Term** command to enter a **Term** and multiline **Definition**, then choose **Save Term**.
+Names are trimmed when saved; definitions must contain non-whitespace text and otherwise retain their exact content.
+After a successful save, **Term Added** appears, both fields clear, and focus returns to **Term** so another entry can
+be added. The form does not save drafts.
+
+The standalone command uses the same safe save path and Glossary File preference as the Search Term actions described
+below. A saved term appears the next time Search Term opens, or after choosing **Reload Glossary** in an already-open
+Search Term window.
 
 ## Searching and actions
 

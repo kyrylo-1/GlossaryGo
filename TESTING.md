@@ -13,7 +13,7 @@ npm run dev
 ```
 
 Development mode builds the extension and automatically imports it into Raycast. Open Raycast, search for
-**GlossaryGo** or **Search Term**, and select your **Glossary File** when prompted.
+**GlossaryGo**, **Search Term**, or **Add Term**, and select your shared **Glossary File** when prompted.
 
 Once the extension loads, press **Ctrl+C** in the terminal to stop development mode. The extension remains available
 in Raycast. Run `npm run dev` again after changing extension code. See the official
@@ -38,8 +38,9 @@ npm test -- src/hooks/search.test.ts
 ```
 
 The existing tests cover glossary loading, YAML validation, duplicate rejection, UTF-8 and file-size limits,
-Unicode prefix matching, sorting, result limits, and reducer state transitions. Automated checks do not verify the
-Raycast interface, clipboard actions, or the complete reload lifecycle; perform the manual checks below as well.
+Unicode prefix matching, sorting, result limits, reducer state transitions, repeated-submit guards, and resetting the
+standalone form after a successful save. Automated checks do not verify the Raycast interface, clipboard actions, or
+the complete reload lifecycle; perform the manual checks below as well.
 
 ## Prepare a test glossary
 
@@ -95,7 +96,28 @@ glossary and reload it after each scenario that changes its contents.
 | Preference recovery   | From an error state, choose **Open Extension Preferences**, select a valid test glossary, and reopen the command.  | The selected glossary loads.                                                   |
 | Local installation    | Stop development mode with Ctrl+C, restart Raycast, and open **Search Term**.                                      | The extension remains available and loads the selected file.                   |
 
-## Add Term acceptance matrix
+## Standalone Add Term acceptance matrix
+
+Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
+synthetic glossary before each scenario that changes the file.
+
+| Check                    | Action                                                                                                     | Expected result                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Shared setup             | With no preference selected, open **Add Term**, select the test file, then open **Search Term**.           | Both commands use the selected file without asking for a second command-specific selection.                                |
+| Upgrade setup            | Upgrade from a build that stored Glossary File under Search Term.                                          | If Raycast prompts once for the new extension-level preference, reselection is sufficient for both commands.               |
+| Form contents            | Open **Add Term**.                                                                                         | **Term**, multiline **Definition**, and **Save Term** are visible; both fields begin empty.                                |
+| Empty glossary           | Select a file containing `terms: []`, enter a unique term and definition, and choose **Save Term**.        | **Term Added** appears and exactly one entry is appended.                                                                  |
+| Populated glossary       | Restore the synthetic glossary, add a unique term, then reload Search Term.                                | The new entry follows the existing entries in file order and is searchable.                                                |
+| Blank fields             | Submit spaces in either field while the other field is valid.                                              | The corresponding field error appears, entered text remains, and no write occurs.                                          |
+| Duplicate                | Submit `api` while `API` exists.                                                                           | The duplicate error appears on **Term**, both fields retain their input, and the file is unchanged.                        |
+| Exact definition         | Save a definition containing meaningful leading/trailing spaces and a line break.                          | The exact definition is present after reload; existing values and comments survive.                                        |
+| Successful reset         | Save a unique term and wait for completion.                                                                | Both fields clear, loading stops, and focus returns to **Term** for another entry.                                         |
+| Consecutive additions    | After one successful reset, add a second unique term.                                                      | Both terms are written exactly once; the first success does not leave the form locked.                                     |
+| Save failure             | Make the selected ordinary file read-only, submit valid values, then restore its permissions.              | A safe failure offers **Open Extension Preferences**; both entered values remain.                                          |
+| Cancel and reopen        | Enter values, close Add Term without submitting, and reopen it.                                            | The glossary is unchanged and both fields reopen empty because drafts are disabled.                                        |
+| Existing Search behavior | Search, copy both fields, use the menu Add action, externally edit and reload, then edit and delete terms. | Search Term retains its existing search, clipboard, nested Add, reload, Edit, and Delete behavior with the shared setting. |
+
+## Search Term Add Term acceptance matrix
 
 Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
 synthetic glossary before each scenario that changes the file.
