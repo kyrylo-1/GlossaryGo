@@ -1,8 +1,14 @@
 export const renderPlainTextAsMarkdown = (value: string): string => {
-  const longestBacktickRun = [...value.matchAll(/`+/g)].reduce(
-    (longest, match) => Math.max(longest, match[0].length),
-    0,
-  );
-  const fence = "`".repeat(Math.max(3, longestBacktickRun + 1));
-  return `${fence}\n${value}${value.endsWith("\n") ? "" : "\n"}${fence}`;
+  return value
+    .split(/\r?\n/)
+    .map((line) => {
+      if (line.length === 0) {
+        return "&#160;";
+      }
+      const escaped = line.replaceAll(/[!-/:-@[-`{-~]/g, String.raw`\$&`);
+      return escaped.replace(/^[ \t]+/, (indent) =>
+        [...indent].map((character) => (character === "\t" ? "&#9;" : "&#32;")).join(""),
+      );
+    })
+    .join("  \n");
 };
