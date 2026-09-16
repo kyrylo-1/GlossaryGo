@@ -94,8 +94,10 @@ See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, 
 ## Privacy
 
 GlossaryGo reads only the glossary file you select. Existing glossary content and text entered in the term form stay on
-your device and are held in memory while the command is open. Content is written only to the selected Glossary File
-when you explicitly submit a term change; it is not persisted elsewhere, logged, sent over the network, or included in
+your device and are held in memory while the command is open. When you explicitly submit a term change, the save
+service writes a restrictive sibling temporary copy before atomically replacing the selected Glossary File. Normal
+failures remove that temporary copy, but a crash or cleanup failure can leave it beside the selected file for manual
+removal. GlossaryGo does not otherwise persist glossary content, log it, send it over the network, or include it in
 telemetry. Content leaves the command only when you explicitly copy a term or definition to the clipboard.
 
 ## Troubleshooting
