@@ -6,5 +6,6 @@
 - Added sorted results with a five-result limit, full definition details, and copy actions for terms and definitions.
 - Added in-command actions for adding, editing, and deleting glossary terms.
 - Added the standalone **Add Term** command with saved-value confirmation and an option to add another term.
+- Added the **Quick Add Term** command with inline arguments for saving directly from Raycast's root search.
 - Added automatic first-save creation of a private default glossary in Raycast's extension support directory.
 - Added safe, conflict-aware glossary updates that preserve supported YAML comments and formatting.

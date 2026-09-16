@@ -1,14 +1,14 @@
 # GlossaryGo
 
 GlossaryGo searches and updates a private glossary stored in a local YAML file. Open **Search Term** in Raycast to find
-an entry by prefix, or open **Add Term** to add entries without first starting a search.
+an entry by prefix, **Add Term** for a reusable form, or **Quick Add Term** to save from Raycast's root search.
 
 ## Setup
 
-Open **Search Term** or **Add Term** in Raycast. No file setup is required: when **Glossary File** is not selected in
-the extension preferences, both commands use `glossary.yaml` in Raycast's extension-specific Application Support
-directory. The first valid **Add Term** save creates that file and its support directory. Opening a command, canceling
-a form, or submitting invalid fields does not create anything.
+Open **Search Term**, **Add Term**, or **Quick Add Term** in Raycast. No file setup is required: when **Glossary File**
+is not selected in the extension preferences, every command uses `glossary.yaml` in Raycast's extension-specific
+Application Support directory. The first valid add creates that file and its support directory. Opening a command,
+canceling a form, or submitting invalid fields does not create anything.
 
 To keep a glossary elsewhere, select an existing `.yaml` file in the optional shared **Glossary File** preference. A
 selected custom path always takes precedence. If that file is later removed, a valid Add Term save can recreate it
@@ -63,6 +63,14 @@ The standalone command uses the same safe save path and Glossary File preference
 below. A saved term appears the next time Search Term opens, or after choosing **Reload Glossary** in an already-open
 Search Term window.
 
+## Quick adding terms
+
+Open **Quick Add Term** from Raycast's root search, enter the required inline **Term** and **Definition** arguments,
+then press Return to save without opening a form. Term names are trimmed, definitions preserve their entered content,
+and duplicate or invalid entries are rejected using the same rules as **Add Term**. **Term Added** appears only after
+the effective Glossary File has been saved successfully. Use the existing **Add Term** form for multiline definitions
+or when adding several entries in succession.
+
 ## Searching and actions
 
 Search matches term-name prefixes only. It trims the query, ignores case, preserves accent differences, and treats
@@ -115,12 +123,13 @@ See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, 
 
 ## Privacy
 
-GlossaryGo reads only the effective Glossary File. Existing glossary content and text entered in the term form stay on
-your device and are held in memory while the command is open. A valid explicit first Add may create the file; later
-changes use a restrictive sibling temporary copy before replacing it. Normal failures remove files created by the
-failed operation, but a crash or cleanup failure can leave an incomplete first file or temporary copy for manual
-recovery. GlossaryGo does not otherwise persist glossary content, log it, send it over the network, or include it in
-telemetry. Content leaves the command only when you explicitly copy a term or definition to the clipboard.
+GlossaryGo reads only the effective Glossary File. Existing glossary content and text entered in a term form or Quick
+Add Term's inline arguments stay on your device and are held in memory while the command is open. A valid explicit
+first Add may create the file; later changes use a restrictive sibling temporary copy before replacing it. Normal
+failures remove files created by the failed operation, but a crash or cleanup failure can leave an incomplete first
+file or temporary copy for manual recovery. GlossaryGo does not otherwise persist glossary content, log it, send it
+over the network, or include it in telemetry. Content leaves the command only when you explicitly copy a term or
+definition to the clipboard.
 
 ## Troubleshooting
 
