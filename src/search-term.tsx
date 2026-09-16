@@ -14,6 +14,7 @@ import { useCallback, useRef, type ReactElement } from "react";
 
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
+import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-action";
 import { TermForm } from "./components/term-form";
 import { SEARCH_RESULT_LIMIT } from "./constants";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
@@ -47,10 +48,14 @@ const OpenPreferencesAction = (): ReactElement => {
   );
 };
 
-const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>): ReactElement => {
+const RecoveryActions = ({
+  glossaryFile,
+  onReload,
+}: Readonly<{ glossaryFile: string; onReload: () => Promise<void> }>): ReactElement => {
   return (
     <ActionPanel>
       <ReloadAction onReload={onReload} />
+      <RevealGlossaryFileAction glossaryFile={glossaryFile} />
       <OpenPreferencesAction />
     </ActionPanel>
   );
@@ -164,6 +169,7 @@ const EmptyGlossaryActions = (props: SearchActionsProps): ReactElement => {
       <AddTermAction {...props} />
       <ActionPanel.Section>
         <ReloadAction onReload={props.onReload} />
+        <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
         <OpenPreferencesAction />
       </ActionPanel.Section>
     </ActionPanel>
@@ -176,6 +182,7 @@ const NoMatchActions = (props: SearchActionsProps): ReactElement => {
       <AddTermAction {...props} />
       <ActionPanel.Section>
         <ReloadAction onReload={props.onReload} />
+        <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
       </ActionPanel.Section>
     </ActionPanel>
   );
@@ -206,6 +213,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         />
         <DeleteTermAction glossaryFile={props.glossaryFile} onReload={props.onReload} term={term} />
         <ReloadAction onReload={props.onReload} />
+        <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
       </ActionPanel.Section>
     </ActionPanel>
   );
@@ -223,11 +231,30 @@ const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ res
           key={term.term}
           id={term.term}
           title={term.term}
-          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
+          detail={
+            <List.Item.Detail
+              markdown={renderPlainTextAsMarkdown(term.definition)}
+              metadata={
+                <List.Item.Detail.Metadata>
+                  <List.Item.Detail.Metadata.Label title="Glossary File" text={props.glossaryFile} />
+                </List.Item.Detail.Metadata>
+              }
+            />
+          }
           actions={<TermActions term={term} {...props} />}
         />
       ))}
     </List.Section>
+  );
+};
+
+const MissingGlossaryView = (props: SearchActionsProps): ReactElement => {
+  return (
+    <List.EmptyView
+      title="Create Your Glossary"
+      description={`No glossary exists at ${props.glossaryFile}. Add your first term to create it.`}
+      actions={<EmptyGlossaryActions {...props} />}
+    />
   );
 };
 
@@ -241,8 +268,8 @@ const CommandContent = ({
     return (
       <List.EmptyView
         title="Glossary Could Not Be Loaded"
-        description={state.message}
-        actions={<RecoveryActions onReload={onReload} />}
+        description={`${state.message}\n\nGlossary File: ${props.glossaryFile}`}
+        actions={<RecoveryActions glossaryFile={props.glossaryFile} onReload={onReload} />}
       />
     );
   }
@@ -251,11 +278,15 @@ const CommandContent = ({
     return null;
   }
 
+  if (state.status === "missing") {
+    return <MissingGlossaryView onReload={onReload} {...props} />;
+  }
+
   if (state.terms.length === 0) {
     return (
       <List.EmptyView
         title="No Terms in Glossary"
-        description="Add a term to the selected glossary file."
+        description={`Add a term to ${props.glossaryFile}.`}
         actions={<EmptyGlossaryActions onReload={onReload} {...props} />}
       />
     );
@@ -265,7 +296,7 @@ const CommandContent = ({
     return (
       <List.EmptyView
         title="No Matching Terms"
-        description="Try a shorter or different prefix."
+        description={`Try a shorter or different prefix.\n\nGlossary File: ${props.glossaryFile}`}
         actions={<NoMatchActions onReload={onReload} {...props} />}
       />
     );

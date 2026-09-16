@@ -3,6 +3,7 @@ import { useRef, useState, type ReactElement } from "react";
 
 import { saveGlossaryChange } from "../glossary/save-glossary-change";
 import type { Term } from "../utils/types";
+import { RevealGlossaryFileAction } from "./reveal-glossary-file-action";
 import {
   getInitialTerm,
   runTermFormSubmission,
@@ -172,6 +173,9 @@ export const TermForm = (props: TermFormProps): ReactElement => {
             icon={props.mode === "add" ? Icon.Plus : Icon.Pencil}
             onSubmit={model.handleSubmit}
           />
+          <ActionPanel.Section>
+            <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
+          </ActionPanel.Section>
         </ActionPanel>
       }
       enableDrafts={false}
@@ -195,6 +199,7 @@ export const TermForm = (props: TermFormProps): ReactElement => {
         onChange={model.onDefinitionChange}
         {...(model.definitionError === null ? {} : { error: model.definitionError })}
       />
+      <Form.Description title="Glossary File" text={props.glossaryFile} />
     </Form>
   );
 };

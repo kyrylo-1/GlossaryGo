@@ -45,7 +45,11 @@ export const useGlossary = (): GlossaryController => {
       }
     } catch (error: unknown) {
       if (sequence === loadSequence.current) {
-        dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
+        if (error instanceof GlossaryError && error.code === "missing") {
+          dispatch({ type: "loadMissing" });
+        } else {
+          dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
+        }
       }
     }
   }, [glossaryFile]);

@@ -41,4 +41,13 @@ describe("glossaryReducer", () => {
       state: { message: "Invalid glossary", status: "error" },
     });
   });
+
+  test("stores a missing-glossary onboarding state without clearing the query", () => {
+    const state: GlossaryReducerState = { query: "api", state: { status: "loading" } };
+
+    expect(glossaryReducer(state, { type: "loadMissing" })).toEqual({
+      query: "api",
+      state: { status: "missing" },
+    });
+  });
 });
