@@ -27,6 +27,26 @@
       "title": "Add Term",
       "description": "Add a term and definition to your local glossary",
       "mode": "view"
+    },
+    {
+      "name": "quick-add-term",
+      "title": "Quick Add Term",
+      "description": "Quickly add a term and definition to your local glossary",
+      "mode": "no-view",
+      "arguments": [
+        {
+          "name": "term",
+          "placeholder": "Term",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "definition",
+          "placeholder": "Definition",
+          "type": "text",
+          "required": true
+        }
+      ]
     }
   ],
   "preferences": [
