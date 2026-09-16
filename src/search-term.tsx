@@ -1,8 +1,21 @@
-import { Action, ActionPanel, Icon, List, openExtensionPreferences, useNavigation } from "@raycast/api";
-import { useCallback, type ReactElement } from "react";
+import {
+  Action,
+  ActionPanel,
+  Alert,
+  confirmAlert,
+  Icon,
+  List,
+  openExtensionPreferences,
+  showToast,
+  Toast,
+  useNavigation,
+} from "@raycast/api";
+import { useCallback, useRef, type ReactElement } from "react";
 
 import { showFailureToast } from "@raycast/utils";
+import { runDeleteTerm } from "./components/delete-term-logic";
 import { TermForm } from "./components/term-form";
+import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
@@ -77,6 +90,58 @@ const EditTermAction = ({ glossaryFile, onReload, onSaved, original }: EditTermA
   );
 };
 
+type DeletionLock = { current: boolean };
+
+type DeleteTermActionProps = Readonly<{
+  glossaryFile: string;
+  onReload: () => Promise<void>;
+  term: Term;
+}>;
+
+const confirmDelete = async (term: Term): Promise<boolean> => {
+  return confirmAlert({
+    dismissAction: { style: Alert.ActionStyle.Cancel, title: "Cancel" },
+    message: `Delete “${term.term}” from this glossary? This cannot be undone.`,
+    primaryAction: { style: Alert.ActionStyle.Destructive, title: "Delete" },
+    title: "Delete Term?",
+  });
+};
+
+const showDeleteFailure = async (message: string): Promise<void> => {
+  await showToast({ message, style: Toast.Style.Failure, title: "Could Not Delete Term" });
+};
+
+const showDeleteSuccess = async (): Promise<void> => {
+  await showToast({ style: Toast.Style.Success, title: "Term Deleted" });
+};
+
+const DeleteTermAction = ({ glossaryFile, onReload, term }: DeleteTermActionProps): ReactElement => {
+  const deleting: DeletionLock = useRef(false);
+  return (
+    <Action
+      title="Delete Term"
+      icon={Icon.Trash}
+      style={Action.Style.Destructive}
+      onAction={() =>
+        runAction(
+          () =>
+            runDeleteTerm({
+              confirmDelete,
+              deleting,
+              glossaryFile,
+              onDeleteFailure: showDeleteFailure,
+              onDeleteSuccess: showDeleteSuccess,
+              original: term,
+              reload: onReload,
+              saveChange: saveGlossaryChange,
+            }),
+          "Failed to Delete Term",
+        )
+      }
+    />
+  );
+};
+
 type SearchActionsProps = AddTermActionProps &
   Readonly<{
     onEditConflictReload: () => Promise<void>;
@@ -129,6 +194,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
           onSaved={props.onSaved}
           original={term}
         />
+        <DeleteTermAction glossaryFile={props.glossaryFile} onReload={props.onReload} term={term} />
         <ReloadAction onReload={props.onReload} />
       </ActionPanel.Section>
     </ActionPanel>

@@ -11,7 +11,7 @@ a term, and select a result to read or copy its complete definition.
    extension preferences.
 
 GlossaryGo supports macOS and Windows. The selected file must be readable, contain exactly one YAML document, and be
-no larger than 5 MiB. Adding or editing terms also requires the path to be a writable ordinary file with exactly one filesystem
+no larger than 5 MiB. Changing terms also requires the path to be a writable ordinary file with exactly one filesystem
 link. Symbolic links and multiply hard-linked files may be searched, but GlossaryGo will not update them because
 replacement could change their link semantics. The `.yml` extension is not supported.
 
@@ -53,10 +53,12 @@ Matches are sorted in case-insensitive, accent-sensitive, locale-aware ascending
 the first five results; when more exist, it reports `Showing 5 of N matches`. With an empty query, the first five terms
 from the sorted glossary are shown.
 
-Use the result actions to copy the complete definition or term without closing the command. Choose **Add Term** from a
-result, an empty glossary, or a no-match view to open a form in the same **Search Term** command. The current query is
-used as the initial term name. Names are trimmed when saved; definitions must contain non-whitespace text and otherwise
-retain their exact content. After a successful add, GlossaryGo searches for the saved name and reloads the glossary.
+For a selected result, actions appear in this order: **Copy Definition**, **Copy Term**, **Add Term**, **Edit Term**,
+**Delete Term**, and **Reload Glossary**. Copy actions do not close the command. Choose **Add Term** from a result, an
+empty glossary, or a no-match view to open a form in the same **Search Term** command. Those empty/no-match views do not
+offer Edit or Delete. The current query is used as the initial term name. Names are trimmed when saved; definitions
+must contain non-whitespace text and otherwise retain their exact content. After a successful add, GlossaryGo searches
+for the saved name and reloads the glossary.
 
 Choose **Edit Term** from a selected result to open the same form with that result's actual name and definition. Both
 fields are editable independently of the current query. A successful edit updates the selected entry in its existing
@@ -64,8 +66,15 @@ file position, preserves its field comments, searches for the normalized saved n
 to another case- or Unicode-equivalent term is rejected, while changing only the selected term's case is allowed when
 no other entry conflicts.
 
-If the selected entry or file changes before an edit is saved, GlossaryGo refuses the stale edit and retains the entered
-values. Use the failure action to reload the current results before editing again; the query does not change. Load-error
+**Delete Term** is available only for a selected result and asks for confirmation naming the captured selection.
+Canceling does not write or reload. Confirming removes exactly that captured entry, shows **Term Deleted** after the
+save, and reloads without changing the query. Entry-owned comments are removed with the entry; document, sequence, and
+surviving-entry comments remain. Deleting the last match shows the no-match view with **Add Term** available, and
+deleting the last entry leaves a valid empty glossary in the selected file.
+
+If the selected term or file changes before an edit or deletion can be saved, GlossaryGo refuses the stale operation
+with a safe conflict message. A conflicted edit retains the entered values and offers a user-triggered reload without
+changing the query. A conflicted deletion reloads once and must be retried from a current result. Load-error
 views keep only file-recovery actions until the selected file is valid again.
 
 Choose **Reload Glossary** after editing the file externally to reread and revalidate it. GlossaryGo does not watch the
@@ -105,3 +114,5 @@ telemetry. Content leaves the command only when you explicitly copy a term or de
 - **A term cannot be added or edited:** Correct any field error shown in the form. If saving fails, use the recovery
   action from the failure toast. File conflicts offer **Reload Glossary**; other failures offer **Open Extension
   Preferences** so you can select a writable ordinary `.yaml` file with one filesystem link.
+- **A term cannot be deleted:** Retry from a refreshed result after resolving any external file edit. GlossaryGo will
+  not delete from a symbolic link, multiply hard-linked file, or stale selected snapshot.
