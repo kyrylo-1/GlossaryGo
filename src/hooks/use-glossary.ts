@@ -26,7 +26,7 @@ const getSafeErrorMessage = (error: unknown): string => {
 };
 
 export const useGlossary = (): GlossaryController => {
-  const { glossaryFile } = getPreferenceValues<Preferences.SearchTerm>();
+  const { glossaryFile } = getPreferenceValues<Preferences>();
   const [model, dispatch] = useReducer(glossaryReducer, { query: "", state: { status: "loading" } });
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {

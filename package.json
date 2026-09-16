@@ -21,16 +21,22 @@
       "name": "search-term",
       "title": "Search Term",
       "description": "Find a term in your local glossary",
-      "mode": "view",
-      "preferences": [
-        {
-          "name": "glossaryFile",
-          "title": "Glossary File",
-          "description": "Select the local .yaml glossary to search and update",
-          "type": "file",
-          "required": true
-        }
-      ]
+      "mode": "view"
+    },
+    {
+      "name": "add-term",
+      "title": "Add Term",
+      "description": "Add a term and definition to your local glossary",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "glossaryFile",
+      "title": "Glossary File",
+      "description": "Select the local .yaml glossary to search and update",
+      "type": "file",
+      "required": true
     }
   ],
   "dependencies": {
