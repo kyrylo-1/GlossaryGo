@@ -35,7 +35,8 @@ terms:
 ```
 
 `term` and `definition` must both be non-empty strings. A term cannot have leading or trailing whitespace. Definitions
-may span multiple lines, and their content is preserved when displayed and copied. An empty glossary is valid:
+may span multiple lines. Search Term displays them as plain-text result subtitles, and copying preserves their exact
+content. An empty glossary is valid:
 
 ```yaml
 terms: []
