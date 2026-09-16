@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/// <reference lib="dom" />
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -20,7 +21,13 @@ vi.mock("./glossary/get-glossary-target", () => ({
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.saveGlossaryChange }));
 
-const valueOf = (id: string): string => screen.getByTestId(id).value;
+const valueOf = (id: string): string => {
+  const field = screen.getByTestId(id);
+  if (!(field instanceof globalThis.HTMLInputElement) && !(field instanceof globalThis.HTMLTextAreaElement)) {
+    throw new TypeError(`Unexpected ${id} form field.`);
+  }
+  return field.value;
+};
 
 const expectPristineForm = (): ReturnType<typeof screen.getByTestId> => {
   const termField = screen.getByTestId("term");

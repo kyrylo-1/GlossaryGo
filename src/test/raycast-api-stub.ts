@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 import { createElement, type ReactElement, type ReactNode } from "react";
 import { vi } from "vitest";
 
@@ -34,8 +36,8 @@ const action = ({ onAction, title }: ActionProps): ReactElement =>
 const actionPanel = ({ children }: ContainerProps): ReactElement => createElement("div", {}, children);
 
 const getFieldValue = (id: string): string => {
-  const field = globalThis.document.querySelector(`[data-testid="${id}"]`) as { value?: string } | null;
-  if (typeof field?.value !== "string") {
+  const field = globalThis.document.querySelector(`[data-testid="${id}"]`);
+  if (!(field instanceof globalThis.HTMLInputElement) && !(field instanceof globalThis.HTMLTextAreaElement)) {
     throw new TypeError(`Missing ${id} form field.`);
   }
   return field.value;
