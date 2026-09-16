@@ -17,6 +17,8 @@ import { runDeleteTerm } from "./components/delete-term-logic";
 import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-action";
 import { TermForm } from "./components/term-form";
 import { SEARCH_RESULT_LIMIT } from "./constants";
+import { getGlossaryTarget } from "./glossary/get-glossary-target";
+import type { GlossaryTarget } from "./glossary/glossary-target";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
@@ -159,6 +161,8 @@ const DeleteTermAction = ({ glossaryFile, onReload, term }: DeleteTermActionProp
 
 type SearchActionsProps = AddTermActionProps &
   Readonly<{
+    isRecent: boolean;
+    onTermUsed: (name: string) => void;
     onEditConflictReload: () => Promise<void>;
     onReload: () => Promise<void>;
   }>;
@@ -196,12 +200,19 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
       <Action
         title="Copy Definition"
         icon={Icon.Clipboard}
-        onAction={() => runAction(() => copyWithFeedback(term.definition, "Definition"), "Failed to Copy Definition")}
+        onAction={() =>
+          runAction(
+            () => copyWithFeedback(term.definition, "Definition", () => props.onTermUsed(term.term)),
+            "Failed to Copy Definition",
+          )
+        }
       />
       <Action
         title="Copy Term"
         icon={Icon.Clipboard}
-        onAction={() => runAction(() => copyWithFeedback(term.term, "Term"), "Failed to Copy Term")}
+        onAction={() =>
+          runAction(() => copyWithFeedback(term.term, "Term", () => props.onTermUsed(term.term)), "Failed to Copy Term")
+        }
       />
       <ActionPanel.Section>
         <AddTermAction {...props} />
@@ -222,9 +233,12 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
 const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
   return (
     <List.Section
-      {...(result.totalMatchCount > SEARCH_RESULT_LIMIT
-        ? { title: `Showing ${SEARCH_RESULT_LIMIT} of ${result.totalMatchCount} matches` }
-        : {})}
+      title={props.isRecent ? "Recent Terms" : "Terms"}
+      subtitle={
+        result.totalMatchCount > SEARCH_RESULT_LIMIT
+          ? `Showing ${SEARCH_RESULT_LIMIT} of ${result.totalMatchCount} ${props.isRecent ? "recent terms" : "matches"}`
+          : ""
+      }
     >
       {result.terms.map((term) => (
         <List.Item
@@ -305,8 +319,9 @@ const CommandContent = ({
   return <ResultSection onReload={onReload} result={result} {...props} />;
 };
 
-export default function Command(): ReactElement {
-  const { createParent, glossaryFile, query, reload, result, setQuery, state } = useGlossary();
+const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): ReactElement => {
+  const { createParent, glossaryFile, isRecent, query, recordTerm, reload, result, setQuery, state } =
+    useGlossary(target);
   const { pop } = useNavigation();
   const onSaved = useCallback(
     async (term: Term): Promise<void> => {
@@ -334,6 +349,8 @@ export default function Command(): ReactElement {
         createParent={createParent}
         glossaryFile={glossaryFile}
         initialTerm={query}
+        isRecent={isRecent}
+        onTermUsed={recordTerm}
         onEditConflictReload={onEditConflictReload}
         onReload={reload}
         onSaved={onSaved}
@@ -342,4 +359,9 @@ export default function Command(): ReactElement {
       />
     </List>
   );
+};
+
+export default function Command(): ReactElement {
+  const target = getGlossaryTarget();
+  return <SearchTermCommand key={target.path} target={target} />;
 }
