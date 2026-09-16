@@ -26,6 +26,7 @@ type SubmissionCallbacks = Readonly<{
   onEditConflict: (message: string) => Promise<void>;
   onErrors: (errors: TermFormErrors) => void;
   onPostSaveFailure: () => Promise<void>;
+  onResetAfterSave?: () => void;
   onSaved: (term: Term) => Promise<void>;
   onSaveFailure: (message: string) => Promise<void>;
   onSaveSuccess: (term: Term) => Promise<void>;
@@ -123,6 +124,12 @@ export const runTermFormSubmission = async (options: SubmitTermFormOptions): Pro
     await options.onSaved(validation.term);
   } catch {
     await options.onPostSaveFailure();
+    return true;
+  }
+  if (options.onResetAfterSave) {
+    options.onResetAfterSave();
+    options.submitting.current = false;
+    options.onSubmittingChange(false);
   }
   return true;
 };
