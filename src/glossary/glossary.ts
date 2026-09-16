@@ -1,17 +1,11 @@
-import { LineCounter } from "yaml";
-
 import { GLOSSARY_FILE_EXTENSION } from "../constants";
 import { GlossaryError } from "./glossary-error";
 import { readGlossarySource } from "./glossary-file";
-import { parseGlossaryTerms } from "./glossary-schema";
-import { parseGlossaryDocument, rejectUnsupportedYaml } from "./glossary-yaml";
+import { parseValidatedGlossarySource } from "./validated-glossary-source";
 import type { Term } from "../utils/types";
 
 export const parseGlossarySource = (source: string): readonly Term[] => {
-  const lineCounter = new LineCounter();
-  const document = parseGlossaryDocument(source, lineCounter);
-  rejectUnsupportedYaml(source, document, lineCounter);
-  return parseGlossaryTerms(document, lineCounter);
+  return parseValidatedGlossarySource(source).terms;
 };
 
 export { GlossaryError } from "./glossary-error";
