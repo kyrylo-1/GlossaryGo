@@ -1,12 +1,10 @@
-import { isMap, isScalar, isSeq, LineCounter } from "yaml";
+import { isMap, isScalar, isSeq } from "yaml";
 
 import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
-import { areTermsEquivalent } from "../hooks/search";
 import type { Term } from "../utils/types";
-import { parseGlossarySource } from "./glossary";
 import { GlossaryError } from "./glossary-error";
-import { parseGlossaryTerms } from "./glossary-schema";
-import { parseGlossaryDocument, rejectUnsupportedYaml } from "./glossary-yaml";
+import { areTermsEquivalent } from "./term-matching";
+import { parseValidatedGlossarySource } from "./validated-glossary-source";
 
 export type GlossaryChange =
   | Readonly<{ term: Term; type: "add" }>
@@ -22,10 +20,7 @@ const normalizeTerm = (term: Term): Term => {
 };
 
 export const applyGlossaryChange = (source: string, change: GlossaryChange): string => {
-  const lineCounter = new LineCounter();
-  const document = parseGlossaryDocument(source, lineCounter);
-  rejectUnsupportedYaml(source, document, lineCounter);
-  const terms = parseGlossaryTerms(document, lineCounter);
+  const { document, terms } = parseValidatedGlossarySource(source);
   const sequence = document.get("terms", true);
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
@@ -67,6 +62,6 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
-  parseGlossarySource(nextSource);
+  parseValidatedGlossarySource(nextSource);
   return nextSource;
 };
