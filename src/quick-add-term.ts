@@ -1,12 +1,19 @@
-import { showToast, Toast, type LaunchProps } from "@raycast/api";
+import { openExtensionPreferences, showToast, Toast, type LaunchProps } from "@raycast/api";
 
 import { getGlossaryTarget } from "./glossary/get-glossary-target";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import { runQuickAddTerm, type QuickAddTermArguments, type QuickAddTermFailure } from "./quick-add-term-logic";
 
+const openPreferences = (): void => {
+  openExtensionPreferences().catch(() => null);
+};
+
 const showFailure = async (failure: QuickAddTermFailure): Promise<void> => {
   await showToast({
     message: failure.message,
+    ...(failure.kind === "save"
+      ? { primaryAction: { onAction: openPreferences, title: "Open Extension Preferences" } }
+      : {}),
     style: Toast.Style.Failure,
     title: "Could Not Add Term",
   });

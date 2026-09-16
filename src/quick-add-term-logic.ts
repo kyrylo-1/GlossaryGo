@@ -7,7 +7,7 @@ import { validateTermForm, type TermFormValues } from "./components/term-form-lo
 export type QuickAddTermArguments = TermFormValues;
 
 export type QuickAddTermFailure = Readonly<{
-  kind: "save" | "validation";
+  kind: "duplicate" | "save" | "validation";
   message: string;
 }>;
 
@@ -23,7 +23,8 @@ const unknownSaveErrorMessage = "The glossary file could not be saved. Try again
 
 export const runQuickAddTerm = async (options: QuickAddTermOptions): Promise<boolean> => {
   const validation = validateTermForm(options.arguments);
-  if (!("term" in validation)) {
+  const term = validation.term;
+  if (!term) {
     await options.onFailure({
       kind: "validation",
       message: validation.errors.term ?? validation.errors.definition ?? unknownSaveErrorMessage,
@@ -32,7 +33,7 @@ export const runQuickAddTerm = async (options: QuickAddTermOptions): Promise<boo
   }
 
   try {
-    const change: GlossaryChange = { term: validation.term, type: "add" };
+    const change: GlossaryChange = { term, type: "add" };
     if (options.glossaryTarget.createParent) {
       await options.saveChange(options.glossaryTarget.path, change, { createParent: true });
     } else {
@@ -40,7 +41,7 @@ export const runQuickAddTerm = async (options: QuickAddTermOptions): Promise<boo
     }
   } catch (error: unknown) {
     await options.onFailure({
-      kind: "save",
+      kind: error instanceof GlossaryError && error.code === "duplicate-term" ? "duplicate" : "save",
       message: error instanceof GlossaryError ? error.message : unknownSaveErrorMessage,
     });
     return false;

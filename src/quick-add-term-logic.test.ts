@@ -108,7 +108,7 @@ describe("runQuickAddTerm save failures", () => {
     });
 
     expect(onFailure).toHaveBeenCalledWith({
-      kind: "save",
+      kind: "duplicate",
       message: expect.stringContaining("duplicates another term"),
     });
     expect(onSuccess).not.toHaveBeenCalled();
