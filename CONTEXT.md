@@ -9,7 +9,8 @@ A user-owned collection of terms and their definitions.
 _Avoid_: Dictionary, configuration
 
 **Glossary File**:
-A user-selected YAML file that encodes a Glossary.
+The effective YAML file that encodes a Glossary. It is either the optional user-selected file or GlossaryGo's default
+file in Raycast's extension support directory.
 _Avoid_: Configuration file, glossary document
 
 **Term**:
