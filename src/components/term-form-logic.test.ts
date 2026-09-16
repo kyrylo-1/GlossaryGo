@@ -154,6 +154,25 @@ describe("runTermFormSubmission failures", () => {
     expect(callbacks.onSubmittingChange).toHaveBeenLastCalledWith(false);
     expect(submitting.current).toBe(false);
   });
+
+  test("does not leave the form or alter entered values when saving fails", async () => {
+    const callbacks = createCallbacks();
+    const enteredValues = { definition: "Definition stays", term: "Term stays" };
+
+    await runTermFormSubmission({
+      ...callbacks,
+      glossaryFile: "/tmp/glossary.yaml",
+      mode: "add",
+      saveChange: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>().mockRejectedValue(new Error()),
+      submitting: { current: false },
+      values: enteredValues,
+    });
+
+    expect(enteredValues).toEqual({ definition: "Definition stays", term: "Term stays" });
+    expect(callbacks.onSaveSuccess).not.toHaveBeenCalled();
+    expect(callbacks.onSaved).not.toHaveBeenCalled();
+    expect(callbacks.onSaveFailure).toHaveBeenCalledWith("The glossary file could not be saved. Try again.");
+  });
 });
 
 describe("runTermFormSubmission edit failure routing", () => {

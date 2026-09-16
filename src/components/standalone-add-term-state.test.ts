@@ -7,6 +7,10 @@ import {
 } from "./standalone-add-term-state";
 
 describe("standalone Add Term state", () => {
+  test("starts with a pristine form that focuses Term", () => {
+    expect(createStandaloneAddTermState()).toEqual({ formKey: 0, focusTermOnMount: true, view: "form" });
+  });
+
   test("preserves the normalized saved values in a stable confirmation", () => {
     const state = showStandaloneAddTermConfirmation(createStandaloneAddTermState(), {
       definition: "  First line\nSecond line  ",
@@ -29,6 +33,10 @@ describe("standalone Add Term state", () => {
       term: "API",
     });
 
-    expect(startAnotherStandaloneTerm(confirmation)).toEqual({ formKey: 1, view: "form" });
+    expect(startAnotherStandaloneTerm(confirmation)).toEqual({
+      formKey: 1,
+      focusTermOnMount: true,
+      view: "form",
+    });
   });
 });
