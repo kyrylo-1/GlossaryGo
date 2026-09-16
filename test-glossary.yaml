@@ -18,3 +18,27 @@ terms:
     definition: |-
       **These asterisks should remain visible.**
       This second line should be preserved.
+  - term: Cache
+    definition: Temporarily stored data that can be retrieved quickly
+  - term: Circuit Breaker
+    definition: A safeguard that stops repeated calls to a failing service
+  - term: Database
+    definition: An organized collection of data
+  - term: Deployment
+    definition: The process of releasing software to an environment
+  - term: Event Queue
+    definition: An ordered collection of events waiting to be processed
+  - term: Feature Flag
+    definition: A switch that enables or disables software behavior
+  - term: Idempotency
+    definition: The property of producing the same result when an operation is repeated
+  - term: Latency
+    definition: The time required for an operation to complete
+  - term: Observability
+    definition: The ability to understand a system through its outputs
+  - term: Rate Limit
+    definition: A restriction on how often an operation may be performed
+  - term: Résumé
+    definition: A summary of a person's education and work experience
+  - term: Zero-Downtime Deployment
+    definition: A software release performed without interrupting availability
