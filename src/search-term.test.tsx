@@ -39,7 +39,7 @@ describe("definition reading from Search Term", () => {
     render(<Command />);
     expect(screen.queryAllByText("Glossary File")).toHaveLength(0);
     expect(screen.getAllByTestId("preview")[0].textContent).toBe(
-      "\\# Literal heading  \n\\*\\*literal emphasis\\*\\* \\[literal link\\]\\(https\\:\\/\\/example\\.com\\)  \nLast line",
+      "&#35; Literal heading  \n&#42;&#42;literal emphasis&#42;&#42; &#91;literal link&#93;&#40;https&#58;&#47;&#47;example&#46;com&#41;  \nLast line",
     );
   });
 

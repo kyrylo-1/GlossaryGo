@@ -7,10 +7,14 @@ describe("renderPlainTextAsMarkdown", () => {
     expect(renderPlainTextAsMarkdown("First line\nSecond line")).toBe("First line  \nSecond line");
   });
 
-  test("escapes Markdown, HTML, links, and entities as literal text", () => {
-    expect(renderPlainTextAsMarkdown("# Title\n**bold** _text_ `code` [link](https://example.com) <b> &copy; \\")).toBe(
-      "\\# Title  \n\\*\\*bold\\*\\* \\_text\\_ \\`code\\` \\[link\\]\\(https\\:\\/\\/example\\.com\\) \\<b\\> \\&copy\\; \\\\",
-    );
+  test.each([
+    ["# Title", "&#35; Title"],
+    ["**bold** _text_ `code`", "&#42;&#42;bold&#42;&#42; &#95;text&#95; &#96;code&#96;"],
+    ["[link](url)", "&#91;link&#93;&#40;url&#41;"],
+    ["<b> &copy;", "&#60;b&#62; &#38;copy&#59;"],
+    [String.raw`$math$ \[brackets\]`, "&#36;math&#36; &#92;&#91;brackets&#92;&#93;"],
+  ])("renders punctuation literally without Markdown or math syntax: %s", (input, expected) => {
+    expect(renderPlainTextAsMarkdown(input)).toBe(expected);
   });
 
   test("preserves blank lines and leading whitespace without creating indented code", () => {
