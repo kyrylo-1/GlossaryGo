@@ -14,7 +14,7 @@ Read `CONTEXT.md` before changing domain terminology and `README.md` before chan
 
 ## Build, Test, and Development Commands
 
-Use only npm for this repo. Node.js 22.14 or newer is required.
+Use only npm for this repo. Node.js 22.22.2 or newer is required.
 
 - `npm ci`: install dependencies from `package-lock.json`.
 - `npm run dev`: start Raycast development mode.

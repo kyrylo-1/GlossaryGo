@@ -4,7 +4,7 @@ Follow this guide to load the local extension into Raycast and verify its behavi
 
 ## Add the local extension to Raycast
 
-With Raycast running and Node.js 22.14 or newer installed, run these commands from the extension directory:
+With Raycast running and Node.js 22.22.2 or newer installed, run these commands from the extension directory:
 
 ```bash
 node --version
