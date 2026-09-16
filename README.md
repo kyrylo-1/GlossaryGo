@@ -54,9 +54,10 @@ supported.
 
 Open the standalone **Add Term** command to enter a **Term** and multiline **Definition**, then choose **Save Term**.
 Names are trimmed when saved; definitions must contain non-whitespace text and otherwise retain their exact content.
-After a successful save, **Term Added** appears, both fields clear, and focus returns to **Term** so another entry can
-be added. The form does not save drafts. It displays the effective Glossary File path and offers **Reveal Glossary in
-Finder**.
+After a successful save, a **Term Added** confirmation keeps the saved term and definition visible. Choose **Add
+Another Term** to open a pristine form focused on **Term**, or **Done** to close the command. Failed saves keep both
+entered values in the form and show an actionable error. The form does not save drafts. It displays the effective
+Glossary File path and offers **Reveal Glossary in Finder**.
 
 The standalone command uses the same safe save path and Glossary File preference as the Search Term actions described
 below. A saved term appears the next time Search Term opens, or after choosing **Reload Glossary** in an already-open
