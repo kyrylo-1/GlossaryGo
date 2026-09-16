@@ -70,9 +70,9 @@ terms:
 
 ## Manual checks in Raycast
 
-Start with the unmodified test glossary. Open the action panel to access **Copy Definition**, **Copy Term**, and
-**Add Term**, **Edit Term**, and **Reload Glossary**. Restore the test glossary and reload it after each scenario that
-changes its contents.
+Start with the unmodified test glossary. For a selected result, confirm that the action panel order is **Copy
+Definition**, **Copy Term**, **Add Term**, **Edit Term**, **Delete Term**, and **Reload Glossary**. Restore the test
+glossary and reload it after each scenario that changes its contents.
 
 | Check                 | Action                                                                                                             | Expected result                                                                |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
@@ -127,8 +127,8 @@ synthetic glossary before each scenario that changes the file.
 
 | Check                     | Action                                                                                                                          | Expected result                                                                                                                                       |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Selected-result menu      | Search for `ap` and open API's actions.                                                                                         | Copy Definition and Copy Term are followed by **Add Term**, **Edit Term**, and **Reload Glossary**, in that order.                                    |
-| Empty or no-match view    | Load `terms: []`, then restore the glossary and search for `missing`; inspect both action panels.                               | **Add Term** remains available, while **Edit Term** is absent because neither view has a selected result.                                             |
+| Selected-result menu      | Search for `ap` and open API's actions.                                                                                         | Actions are ordered **Copy Definition**, **Copy Term**, **Add Term**, **Edit Term**, **Delete Term**, and **Reload Glossary**.                        |
+| Empty or no-match view    | Load `terms: []`, then restore the glossary and search for `missing`; inspect both action panels.                               | **Add Term** remains available, while **Edit Term** and **Delete Term** are absent because neither view has a selected result.                        |
 | Selected snapshot         | Search for `a`, select API, and choose **Edit Term**.                                                                           | **Term** contains `API` and **Definition** contains `Application Programming Interface`, independent of the query.                                    |
 | Name and definition       | Rename API to `Protocol` and enter a multiline definition with meaningful leading/trailing whitespace.                          | **Term Updated** appears; the form closes after reload, the query becomes `Protocol`, and the exact definition is shown and copied after reopening.   |
 | Existing-name collision   | Edit API and rename it `Apple`.                                                                                                 | A duplicate error appears on **Term**, the file is unchanged, and both entered values remain in the form.                                             |
@@ -142,6 +142,33 @@ synthetic glossary before each scenario that changes the file.
 
 Automated tests cover edit initialization, original-snapshot submission, normalized saved-name callbacks, duplicate and
 conflict routing, double-submit guarding, and post-save failure separation. They do not establish platform UI acceptance.
+
+## Delete Term acceptance matrix
+
+Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Use only synthetic
+glossary content. Restore the synthetic glossary before each scenario that changes the file.
+
+| Check                          | Action                                                                                                             | Expected result                                                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Complete selected-result menu  | Search for `api`, select API, and open its actions.                                                                | Actions are ordered **Copy Definition**, **Copy Term**, **Add Term**, **Edit Term**, **Delete Term**, **Reload Glossary**. Empty/no-match states have Add, not Edit/Delete. |
+| Delete confirmation            | Choose **Delete Term** for API.                                                                                    | A destructive confirmation identifies API and offers explicit **Cancel** and destructive **Delete** choices.                                                                |
+| Cancel deletion                | Choose **Cancel**.                                                                                                 | No file write, reload, or success notification occurs; API remains selected and Delete can be opened again.                                                                 |
+| Confirm deletion               | Choose **Delete**, then inspect the file and command.                                                              | Exactly API is removed once, **Term Deleted** appears only after persistence, and the existing query is preserved during reload.                                            |
+| Selection changes              | Open Delete for one result, then change the selected row before resolving confirmation if the platform permits it. | The originally named result is the only possible deletion target; the pending operation never follows the new selection.                                                    |
+| Rapid repeated delete          | Invoke Delete repeatedly during confirmation and again while saving.                                               | One confirmation and at most one write occur.                                                                                                                               |
+| Last match                     | Use a prefix matching one term, delete that term, and keep the same query.                                         | **No Matching Terms** appears with **Add Term** available.                                                                                                                  |
+| Last entry                     | Load a one-entry glossary and delete its only term.                                                                | The selected file remains present and valid with `terms: []`; **No Terms in Glossary** appears with **Add Term** available.                                                 |
+| Comment ownership              | Delete an entry with leading and field comments while document, sequence, and another entry also have comments.    | Entry-owned comments disappear; document, sequence, and surviving-entry comments remain.                                                                                    |
+| Stale selected term            | Open Delete, externally change or remove that exact term, then confirm.                                            | No unrelated term changes; the static stale-term message appears, results reload once, and deletion must be retried from a current result.                                  |
+| File changed during save       | Change the selected file after the delete save begins but before replacement.                                      | The static file-changed message appears, the external contents remain, results reload once, and the obsolete action cannot retry.                                           |
+| Generic save failure           | Make the ordinary selected file unwritable and confirm Delete, then restore its permissions.                       | A static safe failure appears without raw paths or glossary values; no success appears, and the same current action may be retried.                                         |
+| Linked-file policy             | Select a symbolic link or a path with multiple hard links and confirm Delete.                                      | A safe failure appears; neither the selected path nor linked source is replaced.                                                                                            |
+| Post-save notification failure | Cause success notification delivery to fail after a persisted deletion, if the test harness supports injection.    | Reload still runs; the persisted deletion is not reported as failed and cannot be retried.                                                                                  |
+| Post-save refresh failure      | Make the file invalid or unavailable immediately after successful replacement but before reload completes.         | The deletion stays successful and cannot be retried; Search Term shows its load-error recovery state without a failed-deletion message.                                     |
+| Existing actions               | Repeat search, copy, Add, Edit, and explicit reload checks after exercising Delete.                                | Existing behavior remains unchanged.                                                                                                                                        |
+
+Automated tests cover cancellation, callback ordering, immutable selection capture, repeat guarding, conflict routing,
+retry behavior, and post-save failure separation. They do not establish platform UI acceptance.
 
 Testing is complete when all automated commands pass and every manual check produces the expected result. Record any
 failed scenario with its query, synthetic input, and observed behavior before making a fix.
