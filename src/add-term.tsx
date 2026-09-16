@@ -10,6 +10,7 @@ export default function Command(): ReactElement {
 
   return (
     <TermForm
+      createParent={glossaryTarget.createParent}
       glossaryFile={glossaryTarget.path}
       mode="add"
       onSaved={keepCommandOpen}

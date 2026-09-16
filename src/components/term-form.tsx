@@ -16,7 +16,13 @@ export type TermFormProps = Readonly<{
   onSaved: (term: Term) => Promise<void>;
 }> &
   (
-    | Readonly<{ initialTerm?: string; mode: "add"; resetAfterSave?: boolean; submitTitle?: string }>
+    | Readonly<{
+        createParent?: boolean;
+        initialTerm?: string;
+        mode: "add";
+        resetAfterSave?: boolean;
+        submitTitle?: string;
+      }>
     | Readonly<{ mode: "edit"; onReload: () => Promise<void>; original: Term }>
   );
 
@@ -80,6 +86,7 @@ type SubmitTermFormOptions = Readonly<{
 const submitTermForm = async (options: SubmitTermFormOptions): Promise<boolean> => {
   const { props } = options;
   return runTermFormSubmission({
+    ...(props.mode === "add" && props.createParent === true ? { createParent: true } : {}),
     ...(props.mode === "edit" ? { original: props.original } : {}),
     glossaryFile: props.glossaryFile,
     mode: props.mode,

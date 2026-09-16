@@ -34,7 +34,8 @@
       "name": "glossaryFile",
       "title": "Glossary File",
       "description": "YAML format and example: https://github.com/kyrylo-1/GlossaryGo#glossary-format",
-      "type": "file"
+      "type": "file",
+      "required": false
     }
   ],
   "dependencies": {

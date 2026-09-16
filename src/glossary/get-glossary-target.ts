@@ -8,5 +8,5 @@ type GlossaryPreferences = Readonly<{
 
 export const getGlossaryTarget = (): GlossaryTarget => {
   const { glossaryFile } = getPreferenceValues<GlossaryPreferences>();
-  return resolveGlossaryTarget(glossaryFile, environment.supportPath);
+  return resolveGlossaryTarget(environment.supportPath, glossaryFile);
 };

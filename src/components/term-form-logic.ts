@@ -1,5 +1,6 @@
 import type { GlossaryChange } from "../glossary/apply-glossary-change";
 import { GlossaryError } from "../glossary/glossary";
+import type { SaveGlossaryChangeOptions } from "../glossary/save-glossary-change";
 import type { Term } from "../utils/types";
 
 export type TermFormField = "definition" | "term";
@@ -34,8 +35,9 @@ type SubmissionCallbacks = Readonly<{
 }>;
 
 type SubmissionDependencies = Readonly<{
+  createParent?: boolean;
   glossaryFile: string;
-  saveChange: (path: string, change: GlossaryChange) => Promise<void>;
+  saveChange: (path: string, change: GlossaryChange, options?: SaveGlossaryChangeOptions) => Promise<void>;
   submitting: SubmissionLock;
   values: TermFormValues;
 }>;
@@ -108,7 +110,12 @@ export const runTermFormSubmission = async (options: SubmitTermFormOptions): Pro
   options.submitting.current = true;
   options.onSubmittingChange(true);
   try {
-    await options.saveChange(options.glossaryFile, createChange(options, validation.term));
+    const change = createChange(options, validation.term);
+    if (options.mode === "add" && options.createParent === true) {
+      await options.saveChange(options.glossaryFile, change, { createParent: true });
+    } else {
+      await options.saveChange(options.glossaryFile, change);
+    }
   } catch (error: unknown) {
     try {
       await handleSaveFailure(options, error);

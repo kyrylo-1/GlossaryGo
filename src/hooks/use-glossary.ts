@@ -8,6 +8,7 @@ import { glossaryReducer, type CommandState } from "./glossary-reducer";
 export type { CommandState } from "./glossary-reducer";
 
 type GlossaryController = Readonly<{
+  createParent: boolean;
   glossaryFile: string;
   query: string;
   reload: () => Promise<void>;
@@ -26,7 +27,7 @@ const getSafeErrorMessage = (error: unknown): string => {
 };
 
 export const useGlossary = (): GlossaryController => {
-  const { path: glossaryFile } = getGlossaryTarget();
+  const { createParent, path: glossaryFile } = getGlossaryTarget();
   const [model, dispatch] = useReducer(glossaryReducer, { query: "", state: { status: "loading" } });
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
@@ -67,5 +68,5 @@ export const useGlossary = (): GlossaryController => {
     };
   }, [reload]);
 
-  return { glossaryFile, query: model.query, reload, result, setQuery, state: model.state };
+  return { createParent, glossaryFile, query: model.query, reload, result, setQuery, state: model.state };
 };

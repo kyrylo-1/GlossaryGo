@@ -70,15 +70,18 @@ describe("term form validation", () => {
   });
 });
 
-describe("runTermFormSubmission changes", () => {
+describe("runTermFormSubmission add changes", () => {
   test("submits an add with the normalized term", async () => {
     const callbacks = createCallbacks();
-    const saveChange = vi.fn<(path: string, change: GlossaryChange) => Promise<void>>().mockResolvedValue();
+    const saveChange = vi
+      .fn<(path: string, change: GlossaryChange, options?: { createParent?: boolean }) => Promise<void>>()
+      .mockResolvedValue();
     const submitting = { current: false };
 
     await expect(
       runTermFormSubmission({
         ...callbacks,
+        createParent: true,
         glossaryFile: "/tmp/glossary.yaml",
         mode: "add",
         saveChange,
@@ -87,15 +90,21 @@ describe("runTermFormSubmission changes", () => {
       }),
     ).resolves.toBe(true);
 
-    expect(saveChange).toHaveBeenCalledWith("/tmp/glossary.yaml", {
-      term: { definition: values.definition, term: "API" },
-      type: "add",
-    });
+    expect(saveChange).toHaveBeenCalledWith(
+      "/tmp/glossary.yaml",
+      {
+        term: { definition: values.definition, term: "API" },
+        type: "add",
+      },
+      { createParent: true },
+    );
     expect(callbacks.onSaveSuccess).toHaveBeenCalledWith({ definition: values.definition, term: "API" });
     expect(callbacks.onSaved).toHaveBeenCalledWith({ definition: values.definition, term: "API" });
     expect(submitting.current).toBe(true);
   });
+});
 
+describe("runTermFormSubmission edit changes", () => {
   test("submits an edit with the original snapshot", async () => {
     const callbacks = createCallbacks();
     const original = { definition: "Old definition", term: "API" };

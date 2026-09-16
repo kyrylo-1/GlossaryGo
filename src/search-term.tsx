@@ -57,17 +57,26 @@ const RecoveryActions = ({ onReload }: Readonly<{ onReload: () => Promise<void> 
 };
 
 type AddTermActionProps = Readonly<{
+  createParent: boolean;
   glossaryFile: string;
   initialTerm: string;
   onSaved: (term: Term) => Promise<void>;
 }>;
 
-const AddTermAction = ({ glossaryFile, initialTerm, onSaved }: AddTermActionProps): ReactElement => {
+const AddTermAction = ({ createParent, glossaryFile, initialTerm, onSaved }: AddTermActionProps): ReactElement => {
   return (
     <Action.Push
       title="Add Term"
       icon={Icon.Plus}
-      target={<TermForm glossaryFile={glossaryFile} initialTerm={initialTerm} mode="add" onSaved={onSaved} />}
+      target={
+        <TermForm
+          createParent={createParent}
+          glossaryFile={glossaryFile}
+          initialTerm={initialTerm}
+          mode="add"
+          onSaved={onSaved}
+        />
+      }
     />
   );
 };
@@ -266,7 +275,7 @@ const CommandContent = ({
 };
 
 export default function Command(): ReactElement {
-  const { glossaryFile, query, reload, result, setQuery, state } = useGlossary();
+  const { createParent, glossaryFile, query, reload, result, setQuery, state } = useGlossary();
   const { pop } = useNavigation();
   const onSaved = useCallback(
     async (term: Term): Promise<void> => {
@@ -291,6 +300,7 @@ export default function Command(): ReactElement {
       searchText={query}
     >
       <CommandContent
+        createParent={createParent}
         glossaryFile={glossaryFile}
         initialTerm={query}
         onEditConflictReload={onEditConflictReload}

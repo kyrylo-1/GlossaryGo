@@ -107,20 +107,78 @@ describe("saveGlossaryChange invalid sources", () => {
   });
 });
 
-describe("saveGlossaryChange target access", () => {
-  test("reports a safe error when the target is missing", async () => {
+describe("saveGlossaryChange first glossary creation", () => {
+  test("creates a missing glossary for the first added term with private permissions", async () => {
     const path = await createTemporaryPath("missing.yaml");
+
+    await saveGlossaryChange(path, { term: { definition: "Interface", term: "API" }, type: "add" });
+
+    await expect(loadGlossary(path)).resolves.toEqual([{ definition: "Interface", term: "API" }]);
+    expect((await stat(path)).mode & 0o777).toBe(0o600);
+  });
+
+  test("creates the default support directory with private permissions", async () => {
+    const path = await createTemporaryPath("support/glossary.yaml");
+
+    await saveGlossaryChange(
+      path,
+      { term: { definition: "Interface", term: "API" }, type: "add" },
+      { createParent: true },
+    );
+
+    await expect(loadGlossary(path)).resolves.toEqual([{ definition: "Interface", term: "API" }]);
+    expect((await stat(dirname(path))).mode & 0o777).toBe(0o700);
+  });
+});
+
+describe("saveGlossaryChange missing targets", () => {
+  test("does not create a missing custom parent directory", async () => {
+    const path = await createTemporaryPath("custom/glossary.yaml");
 
     await expect(
       saveGlossaryChange(path, { term: { definition: "Interface", term: "API" }, type: "add" }),
     ).rejects.toEqual(
       new GlossaryError(
-        "unreadable",
-        "The glossary file could not be read. Check that it still exists and is accessible.",
+        "missing-parent",
+        "The glossary file could not be created because its parent folder is unavailable.",
       ),
     );
+    await expect(stat(path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
   });
 
+  test("does not create a missing glossary for edit or delete", async () => {
+    const path = await createTemporaryPath("missing.yaml");
+    const original = { definition: "Interface", term: "API" };
+
+    await expect(
+      saveGlossaryChange(path, {
+        original,
+        term: { definition: "Updated interface", term: "API" },
+        type: "edit",
+      }),
+    ).rejects.toEqual(new GlossaryError("missing", "No glossary file exists at this path. Add a term to create it."));
+    await expect(saveGlossaryChange(path, { original, type: "delete" })).rejects.toEqual(
+      new GlossaryError("missing", "No glossary file exists at this path. Add a term to create it."),
+    );
+    await expect(stat(path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+});
+
+describe("saveGlossaryChange first write failure", () => {
+  test("removes a new glossary when its first write fails", async () => {
+    const path = await createTemporaryPath("missing.yaml");
+    vi.spyOn(glossarySaveFileSystem, "write").mockRejectedValueOnce(new Error("ENOSPC: private term data"));
+
+    await expect(
+      saveGlossaryChange(path, { term: { definition: "Secret Definition", term: "Secret Term" }, type: "add" }),
+    ).rejects.toEqual(
+      new GlossaryError("unwritable", "The glossary file could not be saved. Check its permissions and try again."),
+    );
+    await expect(stat(path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+});
+
+describe("saveGlossaryChange target access", () => {
   test("rejects a directory as an unsupported replacement target", async () => {
     const path = await createTemporaryPath("directory.yaml");
     await mkdir(path);
