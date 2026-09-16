@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../glossary.schema.json
+# yaml-language-server: $schema=glossary.schema.json
 terms:
   - term: API
     definition: Application Programming Interface
