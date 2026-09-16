@@ -1,14 +1,22 @@
 import type { Term } from "../utils/types";
 
 export type StandaloneAddTermState =
-  | Readonly<{ formKey: number; view: "form" }>
+  | Readonly<{ focusTermOnMount: true; formKey: number; view: "form" }>
   | Readonly<{ formKey: number; savedTerm: Term; view: "confirmation" }>;
 
-export const createStandaloneAddTermState = (): StandaloneAddTermState => ({ formKey: 0, view: "form" });
+export const createStandaloneAddTermState = (): StandaloneAddTermState => ({
+  focusTermOnMount: true,
+  formKey: 0,
+  view: "form",
+});
 
 export const showStandaloneAddTermConfirmation = (
   state: StandaloneAddTermState,
-  _savedTerm: Term,
-): StandaloneAddTermState => state;
+  savedTerm: Term,
+): StandaloneAddTermState => ({ formKey: state.formKey, savedTerm, view: "confirmation" });
 
-export const startAnotherStandaloneTerm = (state: StandaloneAddTermState): StandaloneAddTermState => state;
+export const startAnotherStandaloneTerm = (state: StandaloneAddTermState): StandaloneAddTermState => ({
+  focusTermOnMount: true,
+  formKey: state.formKey + 1,
+  view: "form",
+});

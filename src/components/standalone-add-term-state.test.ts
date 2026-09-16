@@ -8,7 +8,7 @@ import {
 
 describe("standalone Add Term state", () => {
   test("starts with a pristine form that focuses Term", () => {
-    expect(createStandaloneAddTermState()).toEqual({ formKey: 0, focusTermOnMount: true, view: "form" });
+    expect(createStandaloneAddTermState()).toEqual({ focusTermOnMount: true, formKey: 0, view: "form" });
   });
 
   test("preserves the normalized saved values in a stable confirmation", () => {
@@ -34,8 +34,8 @@ describe("standalone Add Term state", () => {
     });
 
     expect(startAnotherStandaloneTerm(confirmation)).toEqual({
-      formKey: 1,
       focusTermOnMount: true,
+      formKey: 1,
       view: "form",
     });
   });

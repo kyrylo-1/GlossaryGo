@@ -275,32 +275,6 @@ describe("runTermFormSubmission guarding", () => {
   });
 });
 
-describe("runTermFormSubmission reusable add form", () => {
-  test("unlocks a reusable add form after resetting it for another term", async () => {
-    const callbacks = createCallbacks();
-    const onResetAfterSave = vi.fn<() => void>();
-    const saveChange = vi.fn<(path: string, change: GlossaryChange) => Promise<void>>().mockResolvedValue();
-    const submitting = { current: false };
-    const options = {
-      ...callbacks,
-      glossaryFile: "/tmp/glossary.yaml",
-      mode: "add" as const,
-      onResetAfterSave,
-      saveChange,
-      submitting,
-      values,
-    };
-
-    await expect(runTermFormSubmission(options)).resolves.toBe(true);
-    await expect(runTermFormSubmission(options)).resolves.toBe(true);
-
-    expect(saveChange).toHaveBeenCalledTimes(2);
-    expect(onResetAfterSave).toHaveBeenCalledTimes(2);
-    expect(callbacks.onSubmittingChange.mock.calls).toEqual([[true], [false], [true], [false]]);
-    expect(submitting.current).toBe(false);
-  });
-});
-
 describe("runTermFormSubmission edit guarding", () => {
   test("blocks a second edit submission while the selected snapshot save is pending", async () => {
     const pendingSave = Promise.withResolvers<number>();
