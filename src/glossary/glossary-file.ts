@@ -11,12 +11,9 @@ import {
   createUnwritableError,
   GlossaryError,
 } from "./glossary-error";
+import { hasFileSystemCode } from "./has-file-system-code";
 
 const readChunkBytes = 64 * 1024;
-
-const hasFileSystemCode = (error: unknown, code: string): boolean => {
-  return error instanceof Error && "code" in error && error.code === code;
-};
 
 export type GlossaryFileMetadata = Readonly<{
   changedNanoseconds: bigint;

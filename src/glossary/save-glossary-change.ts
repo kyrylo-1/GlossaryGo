@@ -12,6 +12,7 @@ import {
   createUnwritableError,
   GlossaryError,
 } from "./glossary-error";
+import { hasFileSystemCode } from "./has-file-system-code";
 import {
   glossarySaveFileSystem,
   inspectGlossaryWriteTarget,
@@ -24,10 +25,6 @@ const pendingSaves = new Map<string, Promise<void>>();
 export type SaveGlossaryChangeOptions = Readonly<{
   createParent?: boolean;
 }>;
-
-const hasFileSystemCode = (error: unknown, code: string): boolean => {
-  return error instanceof Error && "code" in error && error.code === code;
-};
 
 const metadataMatches = (left: GlossaryFileMetadata, right: GlossaryFileMetadata): boolean => {
   return (
