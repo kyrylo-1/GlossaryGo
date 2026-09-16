@@ -1,9 +1,9 @@
 import { isMap, isScalar, isSeq } from "yaml";
 
 import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
-import { areTermsEquivalent } from "../hooks/search";
 import type { Term } from "../utils/types";
 import { GlossaryError } from "./glossary-error";
+import { areTermsEquivalent } from "./term-matching";
 import { parseValidatedGlossarySource } from "./validated-glossary-source";
 
 export type GlossaryChange =
