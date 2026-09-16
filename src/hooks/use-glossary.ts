@@ -1,7 +1,7 @@
-import { getPreferenceValues } from "@raycast/api";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
 import { GlossaryError, loadGlossary } from "../glossary/glossary";
+import { getGlossaryTarget } from "../glossary/get-glossary-target";
 import { searchTerms, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState } from "./glossary-reducer";
 
@@ -26,7 +26,7 @@ const getSafeErrorMessage = (error: unknown): string => {
 };
 
 export const useGlossary = (): GlossaryController => {
-  const { glossaryFile } = getPreferenceValues<Preferences>();
+  const { path: glossaryFile } = getGlossaryTarget();
   const [model, dispatch] = useReducer(glossaryReducer, { query: "", state: { status: "loading" } });
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
