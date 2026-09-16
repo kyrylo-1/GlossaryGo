@@ -81,8 +81,13 @@ Matches are sorted in case-insensitive, accent-sensitive, locale-aware ascending
 the first five results; when more exist, it reports `Showing 5 of N matches`. With an empty query, the first five terms
 from the sorted glossary are shown.
 
-For a selected result, actions appear in this order: **Copy Definition**, **Copy Term**, **Add Term**, **Edit Term**,
-**Delete Term**, **Reload Glossary**, and **Reveal Glossary in Finder**. Copy actions do not close the command. Choose
+Definitions wrap as literal prose in the split-pane preview; Markdown-like characters are displayed as text. Choose
+**View Full Definition** to open the selected definition in a full-width, scrollable reading view. Its navigation title
+identifies the term, and its actions include **Copy Definition**, **Copy Term**, and **Reveal Glossary in Finder**. Go
+back to return to the same search query. The preview omits file metadata to leave more room for reading.
+
+For a selected result, actions appear in this order: **Copy Definition**, **Copy Term**, **View Full Definition**,
+**Add Term**, **Edit Term**, **Delete Term**, **Reload Glossary**, and **Reveal Glossary in Finder**. Copy actions do not close the command. Choose
 **Add Term** from a result, an empty glossary, a missing-glossary onboarding view, or a no-match view to open a form in
 the same **Search Term** command. Those views do not offer Edit or Delete. The current query is used as the initial term
 name. Names are trimmed when saved; definitions must contain non-whitespace text and otherwise retain their exact

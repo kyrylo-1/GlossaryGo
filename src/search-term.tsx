@@ -3,6 +3,7 @@ import {
   ActionPanel,
   Alert,
   confirmAlert,
+  Detail,
   Icon,
   List,
   openExtensionPreferences,
@@ -190,9 +191,9 @@ const NoMatchActions = (props: SearchActionsProps): ReactElement => {
 
 type TermActionsProps = SearchActionsProps & Readonly<{ term: Term }>;
 
-const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
+const CopyTermActions = ({ term }: Readonly<{ term: Term }>): ReactElement => {
   return (
-    <ActionPanel>
+    <>
       <Action
         title="Copy Definition"
         icon={Icon.Clipboard}
@@ -202,6 +203,34 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         title="Copy Term"
         icon={Icon.Clipboard}
         onAction={() => runAction(() => copyWithFeedback(term.term, "Term"), "Failed to Copy Term")}
+      />
+    </>
+  );
+};
+
+const FullDefinition = ({ glossaryFile, term }: Readonly<{ glossaryFile: string; term: Term }>): ReactElement => {
+  return (
+    <Detail
+      navigationTitle={term.term}
+      markdown={renderPlainTextAsMarkdown(term.definition)}
+      actions={
+        <ActionPanel>
+          <CopyTermActions term={term} />
+          <RevealGlossaryFileAction glossaryFile={glossaryFile} />
+        </ActionPanel>
+      }
+    />
+  );
+};
+
+const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
+  return (
+    <ActionPanel>
+      <CopyTermActions term={term} />
+      <Action.Push
+        title="View Full Definition"
+        icon={Icon.Document}
+        target={<FullDefinition glossaryFile={props.glossaryFile} term={term} />}
       />
       <ActionPanel.Section>
         <AddTermAction {...props} />
@@ -231,16 +260,7 @@ const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ res
           key={term.term}
           id={term.term}
           title={term.term}
-          detail={
-            <List.Item.Detail
-              markdown={renderPlainTextAsMarkdown(term.definition)}
-              metadata={
-                <List.Item.Detail.Metadata>
-                  <List.Item.Detail.Metadata.Label title="Glossary File" text={props.glossaryFile} />
-                </List.Item.Detail.Metadata>
-              }
-            />
-          }
+          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
           actions={<TermActions term={term} {...props} />}
         />
       ))}

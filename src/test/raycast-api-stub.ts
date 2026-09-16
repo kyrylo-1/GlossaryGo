@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { createElement, type ReactElement, type ReactNode } from "react";
+import { createElement, useState, type ReactElement, type ReactNode } from "react";
 import { vi } from "vitest";
 
 type ActionProps = Readonly<{ onAction?: () => void; title: string }>;
@@ -26,6 +26,7 @@ type SubmitProps = Readonly<{
 
 export const raycastApiMocks = {
   closeMainWindow: vi.fn<() => Promise<void>>().mockResolvedValue(),
+  copy: vi.fn<(content: string) => Promise<void>>().mockResolvedValue(),
   showInFinder: vi.fn<() => Promise<void>>().mockResolvedValue(),
   showToast: vi.fn<() => Promise<void>>().mockResolvedValue(),
 };
@@ -70,7 +71,16 @@ const renderField = (element: "input" | "textarea", props: FieldProps): ReactEle
     props.error ? createElement("span", { role: "alert" }, props.error) : null,
   );
 
-export const Action = Object.assign(action, { SubmitForm: submitForm });
+const PushAction = ({ target, title }: Readonly<{ target: ReactNode; title: string }>): ReactElement => {
+  const [opened, setOpened] = useState(false);
+  return opened ? createElement("div", {}, target) : action({ onAction: () => setOpened(true), title });
+};
+
+export const Action = Object.assign(action, {
+  Push: PushAction,
+  Style: { Destructive: "destructive" },
+  SubmitForm: submitForm,
+});
 export const ActionPanel = Object.assign(actionPanel, { Section: actionPanel });
 export const Detail = ({ actions, markdown, navigationTitle }: ContainerProps): ReactElement =>
   createElement("section", {}, createElement("h1", {}, navigationTitle), createElement("pre", {}, markdown), actions);
@@ -88,3 +98,47 @@ export const closeMainWindow = raycastApiMocks.closeMainWindow;
 export const openExtensionPreferences = vi.fn<() => Promise<void>>().mockResolvedValue();
 export const showInFinder = raycastApiMocks.showInFinder;
 export const showToast = raycastApiMocks.showToast;
+
+type ListProps = ContainerProps &
+  Readonly<{
+    onSearchTextChange?: (query: string) => void;
+    searchText?: string;
+  }>;
+const listItem = ({
+  actions,
+  detail,
+  title,
+}: ContainerProps & Readonly<{ detail?: ReactNode; title: string }>): ReactElement =>
+  createElement("article", {}, createElement("h2", {}, title), detail, actions);
+const listDetail = ({ markdown, metadata }: ContainerProps & Readonly<{ metadata?: ReactNode }>): ReactElement =>
+  createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata);
+export const List = Object.assign(
+  ({ children, onSearchTextChange, searchText }: ListProps): ReactElement =>
+    createElement(
+      "section",
+      {},
+      createElement("input", {
+        "aria-label": "Search",
+        onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) =>
+          onSearchTextChange?.(event.target.value),
+        value: searchText,
+      }),
+      children,
+    ),
+  {
+    EmptyView: ({ actions, title }: ContainerProps & Readonly<{ title: string }>): ReactElement =>
+      createElement("div", {}, title, actions),
+    Item: Object.assign(listItem, {
+      Detail: Object.assign(listDetail, {
+        Metadata: Object.assign(actionPanel, {
+          Label: ({ title }: Readonly<{ title: string }>): ReactElement => createElement("span", {}, title),
+        }),
+      }),
+    }),
+    Section: actionPanel,
+  },
+);
+export const Alert = { ActionStyle: { Cancel: "cancel", Destructive: "destructive" } };
+export const confirmAlert = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+export const useNavigation = (): Readonly<{ pop: () => void }> => ({ pop: (): void => {} });
+export const Clipboard = { copy: raycastApiMocks.copy };
