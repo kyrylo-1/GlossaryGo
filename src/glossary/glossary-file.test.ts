@@ -42,10 +42,7 @@ describe("loadGlossary file access", () => {
     const path = await createTemporaryPath("missing.yaml");
 
     await expect(loadGlossary(path)).rejects.toEqual(
-      new GlossaryError(
-        "unreadable",
-        "The glossary file could not be read. Check that it still exists and is accessible.",
-      ),
+      new GlossaryError("missing", "No glossary file exists at this path. Add a term to create it."),
     );
   });
 

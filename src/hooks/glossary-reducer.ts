@@ -2,6 +2,7 @@ import type { Term } from "../utils/types";
 
 export type CommandState =
   | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "missing" }>
   | Readonly<{ status: "ready"; terms: readonly Term[] }>
   | Readonly<{ status: "error"; message: string }>;
 
@@ -12,6 +13,7 @@ export type GlossaryReducerState = Readonly<{
 
 export type GlossaryAction =
   | Readonly<{ message: string; type: "loadFailed" }>
+  | Readonly<{ type: "loadMissing" }>
   | Readonly<{ type: "loadStarted" }>
   | Readonly<{ terms: readonly Term[]; type: "loadSucceeded" }>
   | Readonly<{ query: string; type: "queryChanged" }>;
@@ -23,6 +25,9 @@ export const glossaryReducer = (state: GlossaryReducerState, action: GlossaryAct
     }
     case "loadStarted": {
       return { query: state.query, state: { status: "loading" } };
+    }
+    case "loadMissing": {
+      return { query: state.query, state: { status: "missing" } };
     }
     case "loadSucceeded": {
       return { query: state.query, state: { status: "ready", terms: action.terms } };

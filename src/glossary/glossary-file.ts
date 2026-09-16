@@ -1,15 +1,17 @@
 import { constants, type BigIntStats } from "node:fs";
-import { access, chmod, lstat, open, rename, unlink, type FileHandle } from "node:fs/promises";
+import { access, chmod, lstat, mkdir, open, rename, unlink, type FileHandle } from "node:fs/promises";
 import { TextDecoder } from "node:util";
 
 import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
 import {
   createFileChangedError,
+  createMissingError,
   createUnreadableError,
   createUnsupportedWriteTargetError,
   createUnwritableError,
   GlossaryError,
 } from "./glossary-error";
+import { hasFileSystemCode } from "./has-file-system-code";
 
 const readChunkBytes = 64 * 1024;
 
@@ -109,6 +111,9 @@ export const inspectGlossaryWriteTarget = async (path: string): Promise<Glossary
     if (error instanceof GlossaryError) {
       throw error;
     }
+    if (hasFileSystemCode(error, "ENOENT")) {
+      throw createMissingError();
+    }
     throw createUnreadableError();
   }
 };
@@ -132,6 +137,9 @@ export const readGlossarySnapshot = async (path: string): Promise<GlossaryFileSn
     if (error instanceof GlossaryError) {
       throw error;
     }
+    if (hasFileSystemCode(error, "ENOENT")) {
+      throw createMissingError();
+    }
     throw createUnreadableError();
   } finally {
     await handle?.close().catch(() => null);
@@ -152,6 +160,9 @@ const readGlossaryBytesFromPath = async (path: string): Promise<Buffer> => {
     if (error instanceof GlossaryError) {
       throw error;
     }
+    if (hasFileSystemCode(error, "ENOENT")) {
+      throw createMissingError();
+    }
     throw createUnreadableError();
   } finally {
     await handle?.close().catch(() => null);
@@ -165,6 +176,7 @@ export const readGlossarySource = async (path: string): Promise<string> => {
 export const glossarySaveFileSystem = {
   chmod,
   close: async (handle: FileHandle): Promise<void> => handle.close(),
+  createDirectory: async (path: string): Promise<void> => mkdir(path, { mode: 0o700 }),
   createExclusive: async (path: string): Promise<FileHandle> => open(path, "wx", 0o600),
   flush: async (handle: FileHandle): Promise<void> => handle.sync(),
   readSnapshot: readGlossarySnapshot,

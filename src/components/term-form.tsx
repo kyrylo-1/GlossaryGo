@@ -3,6 +3,7 @@ import { useRef, useState, type ReactElement } from "react";
 
 import { saveGlossaryChange } from "../glossary/save-glossary-change";
 import type { Term } from "../utils/types";
+import { RevealGlossaryFileAction } from "./reveal-glossary-file-action";
 import {
   getInitialTerm,
   runTermFormSubmission,
@@ -16,7 +17,13 @@ export type TermFormProps = Readonly<{
   onSaved: (term: Term) => Promise<void>;
 }> &
   (
-    | Readonly<{ initialTerm?: string; mode: "add"; resetAfterSave?: boolean; submitTitle?: string }>
+    | Readonly<{
+        createParent?: boolean;
+        initialTerm?: string;
+        mode: "add";
+        resetAfterSave?: boolean;
+        submitTitle?: string;
+      }>
     | Readonly<{ mode: "edit"; onReload: () => Promise<void>; original: Term }>
   );
 
@@ -80,6 +87,7 @@ type SubmitTermFormOptions = Readonly<{
 const submitTermForm = async (options: SubmitTermFormOptions): Promise<boolean> => {
   const { props } = options;
   return runTermFormSubmission({
+    ...(props.mode === "add" && props.createParent === true ? { createParent: true } : {}),
     ...(props.mode === "edit" ? { original: props.original } : {}),
     glossaryFile: props.glossaryFile,
     mode: props.mode,
@@ -165,6 +173,9 @@ export const TermForm = (props: TermFormProps): ReactElement => {
             icon={props.mode === "add" ? Icon.Plus : Icon.Pencil}
             onSubmit={model.handleSubmit}
           />
+          <ActionPanel.Section>
+            <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
+          </ActionPanel.Section>
         </ActionPanel>
       }
       enableDrafts={false}
@@ -188,6 +199,7 @@ export const TermForm = (props: TermFormProps): ReactElement => {
         onChange={model.onDefinitionChange}
         {...(model.definitionError === null ? {} : { error: model.definitionError })}
       />
+      <Form.Description title="Glossary File" text={props.glossaryFile} />
     </Form>
   );
 };

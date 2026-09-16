@@ -8,6 +8,8 @@ export type GlossaryErrorCode =
   | "invalid-extension"
   | "invalid-schema"
   | "invalid-yaml"
+  | "missing"
+  | "missing-parent"
   | "multiple-documents"
   | "stale-term"
   | "too-large"
@@ -42,6 +44,17 @@ export const createUnreadableError = (): GlossaryError => {
   return new GlossaryError(
     "unreadable",
     "The glossary file could not be read. Check that it still exists and is accessible.",
+  );
+};
+
+export const createMissingError = (): GlossaryError => {
+  return new GlossaryError("missing", "No glossary file exists at this path. Add a term to create it.");
+};
+
+export const createMissingParentError = (): GlossaryError => {
+  return new GlossaryError(
+    "missing-parent",
+    "The glossary file could not be created because its parent folder is unavailable.",
   );
 };
 

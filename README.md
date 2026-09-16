@@ -5,18 +5,20 @@ an entry by prefix, or open **Add Term** to add entries without first starting a
 
 ## Setup
 
-1. Create a UTF-8 file whose name ends in `.yaml` using the format below.
-2. Open **Search Term** or **Add Term** in Raycast.
-3. When prompted, set the required **Glossary File** preference to that file. You can change it later in the
-   extension preferences.
+Open **Search Term** or **Add Term** in Raycast. No file setup is required: when **Glossary File** is not selected in
+the extension preferences, both commands use `glossary.yaml` in Raycast's extension-specific Application Support
+directory. The first valid **Add Term** save creates that file and its support directory. Opening a command, canceling
+a form, or submitting invalid fields does not create anything.
 
-Both commands share the same preference. After upgrading from a version where Glossary File belonged only to Search
-Term, Raycast may ask you to select the file once more at the extension level.
+To keep a glossary elsewhere, select an existing `.yaml` file in the optional shared **Glossary File** preference. A
+selected custom path always takes precedence. If that file is later removed, a valid Add Term save can recreate it
+only when its parent folder still exists; GlossaryGo never creates custom directory trees.
 
-GlossaryGo supports macOS. The selected file must be readable, contain exactly one YAML document, and be
-no larger than 5 MiB. Changing terms also requires the path to be a writable ordinary file with exactly one filesystem
+GlossaryGo supports macOS. An existing Glossary File must be readable, contain exactly one YAML document, and be no
+larger than 5 MiB. Changing terms also requires the path to be a writable ordinary file with exactly one filesystem
 link. Symbolic links and multiply hard-linked files may be searched, but GlossaryGo will not update them because
-replacement could change their link semantics. The `.yml` extension is not supported.
+replacement could change their link semantics. The `.yml` extension is not supported. Raycast may remove the default
+file when the extension is uninstalled, so select a custom file if the glossary must outlive the installation.
 
 ## Glossary format
 
@@ -53,7 +55,8 @@ supported.
 Open the standalone **Add Term** command to enter a **Term** and multiline **Definition**, then choose **Save Term**.
 Names are trimmed when saved; definitions must contain non-whitespace text and otherwise retain their exact content.
 After a successful save, **Term Added** appears, both fields clear, and focus returns to **Term** so another entry can
-be added. The form does not save drafts.
+be added. The form does not save drafts. It displays the effective Glossary File path and offers **Reveal Glossary in
+Finder**.
 
 The standalone command uses the same safe save path and Glossary File preference as the Search Term actions described
 below. A saved term appears the next time Search Term opens, or after choosing **Reload Glossary** in an already-open
@@ -70,11 +73,11 @@ the first five results; when more exist, it reports `Showing 5 of N matches`. Wi
 from the sorted glossary are shown.
 
 For a selected result, actions appear in this order: **Copy Definition**, **Copy Term**, **Add Term**, **Edit Term**,
-**Delete Term**, and **Reload Glossary**. Copy actions do not close the command. Choose **Add Term** from a result, an
-empty glossary, or a no-match view to open a form in the same **Search Term** command. Those empty/no-match views do not
-offer Edit or Delete. The current query is used as the initial term name. Names are trimmed when saved; definitions
-must contain non-whitespace text and otherwise retain their exact content. After a successful add, GlossaryGo searches
-for the saved name and reloads the glossary.
+**Delete Term**, **Reload Glossary**, and **Reveal Glossary in Finder**. Copy actions do not close the command. Choose
+**Add Term** from a result, an empty glossary, a missing-glossary onboarding view, or a no-match view to open a form in
+the same **Search Term** command. Those views do not offer Edit or Delete. The current query is used as the initial term
+name. Names are trimmed when saved; definitions must contain non-whitespace text and otherwise retain their exact
+content. After a successful add, GlossaryGo searches for the saved name and reloads the glossary.
 
 Choose **Edit Term** from a selected result to open the same form with that result's actual name and definition. Both
 fields are editable independently of the current query. A successful edit updates the selected entry in its existing
@@ -91,17 +94,19 @@ deleting the last entry leaves a valid empty glossary in the selected file.
 If the selected term or file changes before an edit or deletion can be saved, GlossaryGo refuses the stale operation
 with a safe conflict message. A conflicted edit retains the entered values and offers a user-triggered reload without
 changing the query. A conflicted deletion reloads once and must be retried from a current result. Load-error
-views keep only file-recovery actions until the selected file is valid again.
+views keep only file-recovery actions until the effective file is valid again. A missing file instead shows its
+effective path with Add Term, reload, Reveal in Finder, and Preferences actions so it can be created or replaced.
 
 Choose **Reload Glossary** after editing the file externally to reread and revalidate it. GlossaryGo does not watch the
 file automatically, and a failed reload shows an error instead of retaining stale results.
 
-Term changes save only to the selected Glossary File. Each save rereads and validates the latest source, writes a
-restricted sibling temporary file, rechecks the selected file, and replaces it only after the write has completed.
-Saves submitted by this GlossaryGo process for the same path run in sequence. These checks reduce accidental
-overwrites, but they are not an atomic compare-and-swap against external editors or separate processes and do not
-guarantee crash durability on every filesystem. Avoid editing the Glossary File elsewhere while GlossaryGo is saving
-it.
+Term changes save only to the effective Glossary File. A first Add creates a missing file exclusively with `0600`
+permissions; the default support directory is created with `0700` permissions. Later saves reread and validate the
+latest source, write a restricted sibling temporary file, recheck the selected file, and replace it only after the
+write has completed. Saves submitted by this GlossaryGo process for the same path run in sequence. These checks reduce
+accidental overwrites, but they are not an atomic compare-and-swap against external editors or separate processes and
+do not guarantee crash durability on every filesystem. Avoid editing the Glossary File elsewhere while GlossaryGo is
+saving it.
 
 ## Testing
 
@@ -109,17 +114,21 @@ See [Testing GlossaryGo](TESTING.md) for local Raycast setup, automated checks, 
 
 ## Privacy
 
-GlossaryGo reads only the glossary file you select. Existing glossary content and text entered in the term form stay on
-your device and are held in memory while the command is open. When you explicitly submit a term change, the save
-service writes a restrictive sibling temporary copy before atomically replacing the selected Glossary File. Normal
-failures remove that temporary copy, but a crash or cleanup failure can leave it beside the selected file for manual
-removal. GlossaryGo does not otherwise persist glossary content, log it, send it over the network, or include it in
+GlossaryGo reads only the effective Glossary File. Existing glossary content and text entered in the term form stay on
+your device and are held in memory while the command is open. A valid explicit first Add may create the file; later
+changes use a restrictive sibling temporary copy before replacing it. Normal failures remove files created by the
+failed operation, but a crash or cleanup failure can leave an incomplete first file or temporary copy for manual
+recovery. GlossaryGo does not otherwise persist glossary content, log it, send it over the network, or include it in
 telemetry. Content leaves the command only when you explicitly copy a term or definition to the clipboard.
 
 ## Troubleshooting
 
-- **The file cannot be selected or loaded:** Confirm that it ends in `.yaml`, is readable, uses valid UTF-8, and is no
-  larger than 5 MiB. Select a different file from the extension preferences if necessary.
+- **No Glossary File is selected:** Add the first term to create GlossaryGo's default file, or select a custom `.yaml`
+  file in extension preferences.
+- **A custom file cannot be recreated:** Confirm that its existing parent folder is writable. GlossaryGo does not
+  create missing custom folders.
+- **The file cannot be loaded:** Confirm that it ends in `.yaml`, is readable, uses valid UTF-8, and is no larger than
+  5 MiB. Select a different file from the extension preferences if necessary.
 - **The glossary is rejected:** Confirm that the file contains one YAML document with only the `terms` root field and
   that every entry has only a non-empty `term` and `definition`. Remove duplicate terms and unsupported YAML features
   such as anchors, aliases, merge keys, or custom tags.
