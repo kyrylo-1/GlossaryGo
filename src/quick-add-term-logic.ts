@@ -47,6 +47,6 @@ export const runQuickAddTerm = async (options: QuickAddTermOptions): Promise<boo
     return false;
   }
 
-  await options.onSuccess().catch(() => undefined);
+  await options.onSuccess().catch(() => null);
   return true;
 };

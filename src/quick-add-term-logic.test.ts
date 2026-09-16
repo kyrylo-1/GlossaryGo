@@ -93,7 +93,7 @@ describe("runQuickAddTerm target selection", () => {
   });
 });
 
-describe("runQuickAddTerm save failures", () => {
+describe("runQuickAddTerm success feedback", () => {
   test("returns success when success feedback fails after the glossary is saved", async () => {
     const glossaryFile = await createTemporaryPath("glossary.yaml");
 
@@ -110,7 +110,9 @@ describe("runQuickAddTerm save failures", () => {
       { definition: "Application Programming Interface", term: "API" },
     ]);
   });
+});
 
+describe("runQuickAddTerm save failures", () => {
   test("reports a Unicode-equivalent duplicate without reporting success", async () => {
     const glossaryFile = await writeGlossary("terms:\n  - term: Éclair\n    definition: Existing definition\n");
     const onFailure = vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue();
