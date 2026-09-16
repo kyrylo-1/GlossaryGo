@@ -20,7 +20,7 @@ import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
-import { getTermListItemContent } from "./utils/term-list-item-content";
+import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 import type { Term } from "./utils/types";
 
 const runAction = (action: () => Promise<unknown>, failureTitle: string): void => {
@@ -210,7 +210,13 @@ const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ res
         : {})}
     >
       {result.terms.map((term) => (
-        <List.Item key={term.term} {...getTermListItemContent(term)} actions={<TermActions term={term} {...props} />} />
+        <List.Item
+          key={term.term}
+          id={term.term}
+          title={term.term}
+          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
+          actions={<TermActions term={term} {...props} />}
+        />
       ))}
     </List.Section>
   );
