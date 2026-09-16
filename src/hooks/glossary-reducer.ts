@@ -1,3 +1,5 @@
+import { areTermsEquivalent } from "../glossary/term-matching";
+import { rememberTerm, resolveRecentTerms } from "./recent-terms";
 import type { Term } from "../utils/types";
 
 export type CommandState =
@@ -8,6 +10,7 @@ export type CommandState =
 
 export type GlossaryReducerState = Readonly<{
   query: string;
+  recentTerms: readonly string[];
   state: CommandState;
 }>;
 
@@ -16,24 +19,36 @@ export type GlossaryAction =
   | Readonly<{ type: "loadMissing" }>
   | Readonly<{ type: "loadStarted" }>
   | Readonly<{ terms: readonly Term[]; type: "loadSucceeded" }>
+  | Readonly<{ name: string; type: "termUsed" }>
   | Readonly<{ query: string; type: "queryChanged" }>;
 
 export const glossaryReducer = (state: GlossaryReducerState, action: GlossaryAction): GlossaryReducerState => {
   switch (action.type) {
     case "loadFailed": {
-      return { query: state.query, state: { message: action.message, status: "error" } };
+      return { ...state, state: { message: action.message, status: "error" } };
     }
     case "loadStarted": {
-      return { query: state.query, state: { status: "loading" } };
+      return { ...state, state: { status: "loading" } };
     }
     case "loadMissing": {
-      return { query: state.query, state: { status: "missing" } };
+      return { ...state, recentTerms: [], state: { status: "missing" } };
     }
     case "loadSucceeded": {
-      return { query: state.query, state: { status: "ready", terms: action.terms } };
+      return {
+        ...state,
+        recentTerms: resolveRecentTerms(state.recentTerms, action.terms).map(({ term }) => term),
+        state: { status: "ready", terms: action.terms },
+      };
+    }
+    case "termUsed": {
+      if (state.state.status !== "ready") {
+        return state;
+      }
+      const match = state.state.terms.find(({ term }) => areTermsEquivalent(term, action.name));
+      return match ? { ...state, recentTerms: rememberTerm(state.recentTerms, match.term) } : state;
     }
     case "queryChanged": {
-      return { query: action.query, state: state.state };
+      return { ...state, query: action.query };
     }
   }
 };
