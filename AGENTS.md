@@ -22,11 +22,13 @@ Use only npm for this repo. Node.js 22.22.2 or newer is required.
 - `npm run lint`: run Raycast/ESLint checks; `npm run fix-lint` applies automatic fixes.
 - `npm test`: run the Vitest suite once.
 - `npm test -- src/hooks/search.test.ts`: run focused search tests.
-- `npm run check:format`: check Prettier formatting; `npm run format` formats the repository.
+- `npm run check:format`: check Oxfmt formatting; `npm run format` formats the repository.
+
+Keep `.prettierrc` aligned with `.oxfmtrc.json` because Raycast's lint command still invokes its bundled Prettier.
 
 ## Coding Style & Naming Conventions
 
-Use strict TypeScript, two-space indentation, double quotes, semicolons, and Prettier's 120-column width. Use kebab-case filenames, camelCase functions and variables, and PascalCase types and components. Follow ESLint's requirements for function expressions, explicit return types, type-only imports, and `type` aliases.
+Use strict TypeScript, two-space indentation, double quotes, semicolons, and Oxfmt's 120-column width. Use kebab-case filenames, camelCase functions and variables, and PascalCase types and components. Follow ESLint's requirements for function expressions, explicit return types, type-only imports, and `type` aliases.
 
 For TSX files, use the `vercel-react-best-practices` skill.
 
