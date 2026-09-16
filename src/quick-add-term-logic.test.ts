@@ -94,6 +94,23 @@ describe("runQuickAddTerm target selection", () => {
 });
 
 describe("runQuickAddTerm save failures", () => {
+  test("returns success when success feedback fails after the glossary is saved", async () => {
+    const glossaryFile = await createTemporaryPath("glossary.yaml");
+
+    await expect(
+      runQuickAddTerm({
+        arguments: { definition: "Application Programming Interface", term: "API" },
+        glossaryTarget: { createParent: false, path: glossaryFile },
+        onFailure: vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue(),
+        onSuccess: vi.fn<() => Promise<void>>().mockRejectedValue(new Error("Toast unavailable")),
+        saveChange: saveGlossaryChange,
+      }),
+    ).resolves.toBe(true);
+    await expect(loadGlossary(glossaryFile)).resolves.toEqual([
+      { definition: "Application Programming Interface", term: "API" },
+    ]);
+  });
+
   test("reports a Unicode-equivalent duplicate without reporting success", async () => {
     const glossaryFile = await writeGlossary("terms:\n  - term: Éclair\n    definition: Existing definition\n");
     const onFailure = vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue();
