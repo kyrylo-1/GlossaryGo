@@ -67,3 +67,11 @@ describe("glossaryReducer copy and reload ordering", () => {
     expect(glossaryReducer(copied, { terms: [], type: "loadSucceeded" }).recentTerms).toEqual([]);
   });
 });
+
+test("keeps a successful pending copy through a reload failure and validates on recovery", () => {
+  const loading: GlossaryReducerState = { query: "", recentTerms: [], state: { status: "loading" } };
+  const failed = glossaryReducer(loading, { message: "Unreadable", type: "loadFailed" });
+  const copied = glossaryReducer(failed, { name: "API", type: "termUsed" });
+  expect(glossaryReducer(copied, { terms, type: "loadSucceeded" }).recentTerms).toEqual(["API"]);
+  expect(glossaryReducer(copied, { terms: [], type: "loadSucceeded" }).recentTerms).toEqual([]);
+});

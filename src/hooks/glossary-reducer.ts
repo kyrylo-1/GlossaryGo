@@ -41,7 +41,7 @@ export const glossaryReducer = (state: GlossaryReducerState, action: GlossaryAct
       };
     }
     case "termUsed": {
-      if (state.state.status === "loading") {
+      if (state.state.status === "loading" || state.state.status === "error") {
         return { ...state, recentTerms: rememberTerm(state.recentTerms, action.name) };
       }
       if (state.state.status !== "ready") {
