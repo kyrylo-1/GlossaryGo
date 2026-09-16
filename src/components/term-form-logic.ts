@@ -18,9 +18,12 @@ export type TermFormValidation = Readonly<{
 
 type SubmissionLock = { current: boolean };
 
+export type TermFormMode = Readonly<{ mode: "add"; initialTerm?: string }> | Readonly<{ mode: "edit"; original: Term }>;
+
 type SubmissionMode = Readonly<{ mode: "add" }> | Readonly<{ mode: "edit"; original: Term }>;
 
 type SubmissionCallbacks = Readonly<{
+  onEditConflict: (message: string) => Promise<void>;
   onErrors: (errors: TermFormErrors) => void;
   onPostSaveFailure: () => Promise<void>;
   onSaved: (term: Term) => Promise<void>;
@@ -44,6 +47,12 @@ const validationMessages: Readonly<Record<TermFormField, string>> = {
 };
 
 const unknownSaveErrorMessage = "The glossary file could not be saved. Try again.";
+
+export const getInitialTerm = (mode: TermFormMode): Term => {
+  return mode.mode === "add"
+    ? { definition: "", term: mode.initialTerm ?? "" }
+    : { definition: mode.original.definition, term: mode.original.term };
+};
 
 export const validateTermField = (field: TermFormField, value: string): string | null => {
   return value.trim().length === 0 ? validationMessages[field] : null;
@@ -72,6 +81,14 @@ const createChange = (options: SubmitTermFormOptions, term: Term): GlossaryChang
 const handleSaveFailure = async (options: SubmitTermFormOptions, error: unknown): Promise<void> => {
   if (error instanceof GlossaryError && error.code === "duplicate-term") {
     options.onErrors({ term: error.message });
+    return;
+  }
+  if (
+    options.mode === "edit" &&
+    error instanceof GlossaryError &&
+    (error.code === "stale-term" || error.code === "file-changed")
+  ) {
+    await options.onEditConflict(error.message);
     return;
   }
   await options.onSaveFailure(error instanceof GlossaryError ? error.message : unknownSaveErrorMessage);

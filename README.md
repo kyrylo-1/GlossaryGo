@@ -11,7 +11,7 @@ a term, and select a result to read or copy its complete definition.
    extension preferences.
 
 GlossaryGo supports macOS and Windows. The selected file must be readable, contain exactly one YAML document, and be
-no larger than 5 MiB. Adding terms also requires the path to be a writable ordinary file with exactly one filesystem
+no larger than 5 MiB. Adding or editing terms also requires the path to be a writable ordinary file with exactly one filesystem
 link. Symbolic links and multiply hard-linked files may be searched, but GlossaryGo will not update them because
 replacement could change their link semantics. The `.yml` extension is not supported.
 
@@ -57,7 +57,16 @@ Use the result actions to copy the complete definition or term without closing t
 result, an empty glossary, or a no-match view to open a form in the same **Search Term** command. The current query is
 used as the initial term name. Names are trimmed when saved; definitions must contain non-whitespace text and otherwise
 retain their exact content. After a successful add, GlossaryGo searches for the saved name and reloads the glossary.
-Load-error views keep only file-recovery actions until the selected file is valid again.
+
+Choose **Edit Term** from a selected result to open the same form with that result's actual name and definition. Both
+fields are editable independently of the current query. A successful edit updates the selected entry in its existing
+file position, preserves its field comments, searches for the normalized saved name, and reloads the glossary. Renaming
+to another case- or Unicode-equivalent term is rejected, while changing only the selected term's case is allowed when
+no other entry conflicts.
+
+If the selected entry or file changes before an edit is saved, GlossaryGo refuses the stale edit and retains the entered
+values. Use the failure action to reload the current results before editing again; the query does not change. Load-error
+views keep only file-recovery actions until the selected file is valid again.
 
 Choose **Reload Glossary** after editing the file externally to reread and revalidate it. GlossaryGo does not watch the
 file automatically, and a failed reload shows an error instead of retaining stale results.
@@ -93,5 +102,6 @@ telemetry. Content leaves the command only when you explicitly copy a term or de
   term. Shorten or correct the prefix.
 - **Recent edits do not appear:** Choose **Reload Glossary** from the action panel. File changes are not loaded
   automatically.
-- **A term cannot be added:** Correct any field error shown in the form. If saving fails, use **Open Extension
-  Preferences** from the failure toast and select a writable ordinary `.yaml` file with one filesystem link.
+- **A term cannot be added or edited:** Correct any field error shown in the form. If saving fails, use the recovery
+  action from the failure toast. File conflicts offer **Reload Glossary**; other failures offer **Open Extension
+  Preferences** so you can select a writable ordinary `.yaml` file with one filesystem link.
