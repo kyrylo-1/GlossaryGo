@@ -71,7 +71,8 @@ terms:
 ## Manual checks in Raycast
 
 Start with the unmodified test glossary. Open the action panel to access **Copy Definition**, **Copy Term**, and
-**Reload Glossary**. Restore the test glossary and reload it after each scenario that changes its contents.
+**Add Term**, **Edit Term**, and **Reload Glossary**. Restore the test glossary and reload it after each scenario that
+changes its contents.
 
 | Check                 | Action                                                                                                             | Expected result                                                                |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
@@ -118,6 +119,29 @@ synthetic glossary before each scenario that changes the file.
 
 Automated tests cover validation, normalization, duplicate routing, double-submit guarding, and the post-save failure
 boundary, but they do not establish platform UI acceptance.
+
+## Edit Term acceptance matrix
+
+Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
+synthetic glossary before each scenario that changes the file.
+
+| Check                     | Action                                                                                                                          | Expected result                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Selected-result menu      | Search for `ap` and open API's actions.                                                                                         | Copy Definition and Copy Term are followed by **Add Term**, **Edit Term**, and **Reload Glossary**, in that order.                                    |
+| Empty or no-match view    | Load `terms: []`, then restore the glossary and search for `missing`; inspect both action panels.                               | **Add Term** remains available, while **Edit Term** is absent because neither view has a selected result.                                             |
+| Selected snapshot         | Search for `a`, select API, and choose **Edit Term**.                                                                           | **Term** contains `API` and **Definition** contains `Application Programming Interface`, independent of the query.                                    |
+| Name and definition       | Rename API to `Protocol` and enter a multiline definition with meaningful leading/trailing whitespace.                          | **Term Updated** appears; the form closes after reload, the query becomes `Protocol`, and the exact definition is shown and copied after reopening.   |
+| Existing-name collision   | Edit API and rename it `Apple`.                                                                                                 | A duplicate error appears on **Term**, the file is unchanged, and both entered values remain in the form.                                             |
+| Case-only rename          | Edit API and change only its name to `api`.                                                                                     | The selected entry is updated in its original file position and the query becomes `api`.                                                              |
+| Stale selected term       | Open Edit for API, change API's name or definition externally, then submit the open form.                                       | The stale snapshot is refused; the external contents and entered form values remain, and the toast offers **Reload Glossary**.                        |
+| File changed during save  | Arrange for the ordinary file to be replaced after submission begins but before GlossaryGo replaces it.                         | The edit is refused with the safe file-changed message; entered values remain, and **Reload Glossary** returns to results without changing the query. |
+| Conflict reload           | From either conflict toast, choose **Reload Glossary**.                                                                         | Current results reload and the form closes without retrying the edit or changing the query.                                                           |
+| Double submission         | Submit one valid edit twice rapidly.                                                                                            | Only one write occurs and the form remains loading until save and refresh complete.                                                                   |
+| Post-save refresh failure | Cause the file to become invalid or unavailable immediately after a successful edit replacement but before the reload finishes. | The edit stays successful and cannot be retried; Search Term shows its load-error recovery state, or safe saved/refresh feedback.                     |
+| Existing actions          | Copy API's term and definition, add a unique term, and explicitly reload after an external edit.                                | Copy, Add Term, search, and Reload Glossary behavior remains unchanged.                                                                               |
+
+Automated tests cover edit initialization, original-snapshot submission, normalized saved-name callbacks, duplicate and
+conflict routing, double-submit guarding, and post-save failure separation. They do not establish platform UI acceptance.
 
 Testing is complete when all automated commands pass and every manual check produces the expected result. Record any
 failed scenario with its query, synthetic input, and observed behavior before making a fix.

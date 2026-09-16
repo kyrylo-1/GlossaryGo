@@ -58,7 +58,30 @@ const AddTermAction = ({ glossaryFile, initialTerm, onSaved }: AddTermActionProp
   );
 };
 
-type SearchActionsProps = AddTermActionProps & Readonly<{ onReload: () => Promise<void> }>;
+type EditTermActionProps = Readonly<{
+  glossaryFile: string;
+  onReload: () => Promise<void>;
+  onSaved: (term: Term) => Promise<void>;
+  original: Term;
+}>;
+
+const EditTermAction = ({ glossaryFile, onReload, onSaved, original }: EditTermActionProps): ReactElement => {
+  return (
+    <Action.Push
+      title="Edit Term"
+      icon={Icon.Pencil}
+      target={
+        <TermForm glossaryFile={glossaryFile} mode="edit" onReload={onReload} onSaved={onSaved} original={original} />
+      }
+    />
+  );
+};
+
+type SearchActionsProps = AddTermActionProps &
+  Readonly<{
+    onEditConflictReload: () => Promise<void>;
+    onReload: () => Promise<void>;
+  }>;
 
 const EmptyGlossaryActions = (props: SearchActionsProps): ReactElement => {
   return (
@@ -100,6 +123,12 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
       />
       <ActionPanel.Section>
         <AddTermAction {...props} />
+        <EditTermAction
+          glossaryFile={props.glossaryFile}
+          onReload={props.onEditConflictReload}
+          onSaved={props.onSaved}
+          original={term}
+        />
         <ReloadAction onReload={props.onReload} />
       </ActionPanel.Section>
     </ActionPanel>
@@ -176,6 +205,10 @@ export default function Command(): ReactElement {
     },
     [pop, reload, setQuery],
   );
+  const onEditConflictReload = useCallback(async (): Promise<void> => {
+    await reload();
+    pop();
+  }, [pop, reload]);
 
   return (
     <List
@@ -189,6 +222,7 @@ export default function Command(): ReactElement {
       <CommandContent
         glossaryFile={glossaryFile}
         initialTerm={query}
+        onEditConflictReload={onEditConflictReload}
         onReload={reload}
         onSaved={onSaved}
         result={result}

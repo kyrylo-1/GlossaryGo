@@ -3,13 +3,22 @@ import { useRef, useState, type ReactElement } from "react";
 
 import { saveGlossaryChange } from "../glossary/save-glossary-change";
 import type { Term } from "../utils/types";
-import { runTermFormSubmission, type TermFormErrors, type TermFormValues, validateTermField } from "./term-form-logic";
+import {
+  getInitialTerm,
+  runTermFormSubmission,
+  type TermFormErrors,
+  type TermFormValues,
+  validateTermField,
+} from "./term-form-logic";
 
 export type TermFormProps = Readonly<{
   glossaryFile: string;
   onSaved: (term: Term) => Promise<void>;
 }> &
-  (Readonly<{ initialTerm?: string; mode: "add" }> | Readonly<{ mode: "edit"; original: Term }>);
+  (
+    | Readonly<{ initialTerm?: string; mode: "add" }>
+    | Readonly<{ mode: "edit"; onReload: () => Promise<void>; original: Term }>
+  );
 
 const openPreferences = (): void => {
   openExtensionPreferences().catch(() => null);
@@ -32,10 +41,18 @@ const showPostSaveFailure = async (): Promise<void> => {
   });
 };
 
-const getInitialTerm = (props: TermFormProps): Term => {
-  return props.mode === "add"
-    ? { definition: "", term: props.initialTerm ?? "" }
-    : { definition: props.original.definition, term: props.original.term };
+const showEditConflict = async (message: string, onReload: () => Promise<void>): Promise<void> => {
+  await showToast({
+    message: `${message} Current results must be reloaded before editing again. Your entered values remain in this form.`,
+    primaryAction: {
+      onAction: () => {
+        onReload().catch(() => null);
+      },
+      title: "Reload Glossary",
+    },
+    style: Toast.Style.Failure,
+    title: "Glossary Changed",
+  });
 };
 
 type TermFormModel = Readonly<{
@@ -51,6 +68,39 @@ type TermFormModel = Readonly<{
   termError: string | null;
 }>;
 
+type SubmitTermFormOptions = Readonly<{
+  onErrors: (errors: TermFormErrors) => void;
+  onSubmittingChange: (isSubmitting: boolean) => void;
+  props: TermFormProps;
+  submitting: { current: boolean };
+  values: TermFormValues;
+}>;
+
+const submitTermForm = async (options: SubmitTermFormOptions): Promise<boolean> => {
+  const { props } = options;
+  return runTermFormSubmission({
+    ...(props.mode === "edit" ? { original: props.original } : {}),
+    glossaryFile: props.glossaryFile,
+    mode: props.mode,
+    onEditConflict: async (message: string): Promise<void> => {
+      if (props.mode === "edit") {
+        await showEditConflict(message, props.onReload);
+      }
+    },
+    onErrors: options.onErrors,
+    onPostSaveFailure: showPostSaveFailure,
+    onSaveFailure: showSaveFailure,
+    onSaveSuccess: async () => {
+      await showToast({ style: Toast.Style.Success, title: props.mode === "add" ? "Term Added" : "Term Updated" });
+    },
+    onSaved: props.onSaved,
+    onSubmittingChange: options.onSubmittingChange,
+    saveChange: saveGlossaryChange,
+    submitting: options.submitting,
+    values: options.values,
+  });
+};
+
 const useTermForm = (props: TermFormProps): TermFormModel => {
   const [term, setTerm] = useState(() => getInitialTerm(props).term);
   const [definition, setDefinition] = useState(() => getInitialTerm(props).definition);
@@ -63,19 +113,10 @@ const useTermForm = (props: TermFormProps): TermFormModel => {
     setDefinitionError(errors.definition ?? null);
   };
   const handleSubmit = async (values: TermFormValues): Promise<boolean> => {
-    return runTermFormSubmission({
-      ...(props.mode === "edit" ? { original: props.original } : {}),
-      glossaryFile: props.glossaryFile,
-      mode: props.mode,
+    return submitTermForm({
       onErrors: applyErrors,
-      onPostSaveFailure: showPostSaveFailure,
-      onSaveFailure: showSaveFailure,
-      onSaveSuccess: async () => {
-        await showToast({ style: Toast.Style.Success, title: props.mode === "add" ? "Term Added" : "Term Updated" });
-      },
-      onSaved: props.onSaved,
       onSubmittingChange: setIsSubmitting,
-      saveChange: saveGlossaryChange,
+      props,
       submitting,
       values,
     });
