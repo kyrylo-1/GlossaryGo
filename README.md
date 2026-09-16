@@ -13,7 +13,7 @@ an entry by prefix, or open **Add Term** to add entries without first starting a
 Both commands share the same preference. After upgrading from a version where Glossary File belonged only to Search
 Term, Raycast may ask you to select the file once more at the extension level.
 
-GlossaryGo supports macOS and Windows. The selected file must be readable, contain exactly one YAML document, and be
+GlossaryGo supports macOS. The selected file must be readable, contain exactly one YAML document, and be
 no larger than 5 MiB. Changing terms also requires the path to be a writable ordinary file with exactly one filesystem
 link. Symbolic links and multiply hard-linked files may be searched, but GlossaryGo will not update them because
 replacement could change their link semantics. The `.yml` extension is not supported.

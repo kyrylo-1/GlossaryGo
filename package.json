@@ -6,8 +6,7 @@
   "icon": "extension-icon.png",
   "author": "kyrylo_avramenko",
   "platforms": [
-    "macOS",
-    "Windows"
+    "macOS"
   ],
   "categories": [
     "Productivity"

@@ -98,7 +98,7 @@ glossary and reload it after each scenario that changes its contents.
 
 ## Standalone Add Term acceptance matrix
 
-Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
+Run every check on macOS and record each result as passed, failed, or unverified. Restore the
 synthetic glossary before each scenario that changes the file.
 
 | Check                    | Action                                                                                                     | Expected result                                                                                                            |
@@ -119,7 +119,7 @@ synthetic glossary before each scenario that changes the file.
 
 ## Search Term Add Term acceptance matrix
 
-Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
+Run every check on macOS and record each result as passed, failed, or unverified. Restore the
 synthetic glossary before each scenario that changes the file.
 
 | Check                     | Action                                                                                                                 | Expected result                                                                                                                |
@@ -144,7 +144,7 @@ boundary, but they do not establish platform UI acceptance.
 
 ## Edit Term acceptance matrix
 
-Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Restore the
+Run every check on macOS and record each result as passed, failed, or unverified. Restore the
 synthetic glossary before each scenario that changes the file.
 
 | Check                     | Action                                                                                                                          | Expected result                                                                                                                                       |
@@ -167,7 +167,7 @@ conflict routing, double-submit guarding, and post-save failure separation. They
 
 ## Delete Term acceptance matrix
 
-Run every check on both macOS and Windows and record each platform as passed, failed, or unverified. Use only synthetic
+Run every check on macOS and record each result as passed, failed, or unverified. Use only synthetic
 glossary content. Restore the synthetic glossary before each scenario that changes the file.
 
 | Check                          | Action                                                                                                             | Expected result                                                                                                                                                             |
