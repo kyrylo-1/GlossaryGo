@@ -34,6 +34,8 @@ terms:
       and the reasons behind it.
 ```
 
+For editor validation, use the [GlossaryGo JSON Schema](glossary.schema.json).
+
 `term` and `definition` must both be non-empty strings. A term cannot have leading or trailing whitespace. Definitions
 may span multiple lines, and their content is preserved when displayed and copied. An empty glossary is valid:
 
