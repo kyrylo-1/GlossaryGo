@@ -101,7 +101,7 @@ export const runTermFormSubmission = async (options: SubmitTermFormOptions): Pro
     return false;
   }
 
-  await options.onSaveSuccess(validation.term);
+  await options.onSaveSuccess(validation.term).catch(() => null);
   try {
     await options.onSaved(validation.term);
   } catch {
