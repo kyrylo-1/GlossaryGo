@@ -2,6 +2,7 @@ import { constants, type BigIntStats } from "node:fs";
 import { access, chmod, lstat, open, rename, unlink, type FileHandle } from "node:fs/promises";
 import { TextDecoder } from "node:util";
 
+import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
 import {
   createFileChangedError,
   createUnreadableError,
@@ -10,7 +11,6 @@ import {
   GlossaryError,
 } from "./glossary-error";
 
-export const maximumGlossaryBytes = 5 * 1024 * 1024;
 const readChunkBytes = 64 * 1024;
 
 export type GlossaryFileMetadata = Readonly<{
@@ -30,14 +30,14 @@ export type GlossaryFileSnapshot = Readonly<{
 }>;
 
 const readGlossaryBytes = async (handle: FileHandle, size: bigint): Promise<Buffer> => {
-  if (size > BigInt(maximumGlossaryBytes)) {
+  if (size > BigInt(MAXIMUM_GLOSSARY_BYTES)) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
 
   const chunks: Buffer[] = [];
   let totalBytes = 0;
-  while (totalBytes <= maximumGlossaryBytes) {
-    const bytesRemaining = maximumGlossaryBytes + 1 - totalBytes;
+  while (totalBytes <= MAXIMUM_GLOSSARY_BYTES) {
+    const bytesRemaining = MAXIMUM_GLOSSARY_BYTES + 1 - totalBytes;
     const chunk = Buffer.allocUnsafe(Math.min(readChunkBytes, bytesRemaining));
     const { bytesRead } = await handle.read(chunk, 0, chunk.byteLength, null);
     if (bytesRead === 0) {
@@ -47,7 +47,7 @@ const readGlossaryBytes = async (handle: FileHandle, size: bigint): Promise<Buff
     totalBytes += bytesRead;
   }
 
-  if (totalBytes > maximumGlossaryBytes) {
+  if (totalBytes > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
 

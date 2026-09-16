@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { SEARCH_RESULT_LIMIT } from "../constants";
 import type { Term } from "../utils/types";
 import { searchTerms } from "./search";
 
@@ -11,6 +12,7 @@ describe("searchTerms query behavior", () => {
   test("an empty query sorts the full glossary and returns only the first five matches", () => {
     const terms = [term("Zulu"), term("echo"), term("Delta"), term("charlie"), term("Bravo"), term("alpha")];
 
+    expect(terms).toHaveLength(SEARCH_RESULT_LIMIT + 1);
     expect(searchTerms(terms, "")).toEqual({
       terms: [term("alpha"), term("Bravo"), term("charlie"), term("Delta"), term("echo")],
       totalMatchCount: 6,

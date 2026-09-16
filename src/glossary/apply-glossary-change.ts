@@ -1,10 +1,10 @@
 import { isMap, isScalar, isSeq, LineCounter } from "yaml";
 
+import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
 import { areTermsEquivalent } from "../hooks/search";
 import type { Term } from "../utils/types";
 import { parseGlossarySource } from "./glossary";
 import { GlossaryError } from "./glossary-error";
-import { maximumGlossaryBytes } from "./glossary-file";
 import { parseGlossaryTerms } from "./glossary-schema";
 import { parseGlossaryDocument, rejectUnsupportedYaml } from "./glossary-yaml";
 
@@ -64,7 +64,7 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   }
 
   const nextSource = document.toString();
-  if (Buffer.byteLength(nextSource, "utf8") > maximumGlossaryBytes) {
+  if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
   parseGlossarySource(nextSource);

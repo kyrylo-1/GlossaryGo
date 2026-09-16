@@ -1,5 +1,6 @@
 import { LineCounter } from "yaml";
 
+import { GLOSSARY_FILE_EXTENSION } from "../constants";
 import { GlossaryError } from "./glossary-error";
 import { readGlossarySource } from "./glossary-file";
 import { parseGlossaryTerms } from "./glossary-schema";
@@ -17,8 +18,8 @@ export { GlossaryError } from "./glossary-error";
 export type { GlossaryErrorCode } from "./glossary-error";
 
 export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
-  if (!path.endsWith(".yaml")) {
-    throw new GlossaryError("invalid-extension", "Choose a file with the .yaml extension.");
+  if (!path.endsWith(GLOSSARY_FILE_EXTENSION)) {
+    throw new GlossaryError("invalid-extension", `Choose a file with the ${GLOSSARY_FILE_EXTENSION} extension.`);
   }
 
   const source = await readGlossarySource(path);

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FileHandle } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { GLOSSARY_FILE_EXTENSION } from "../constants";
 import { applyGlossaryChange, type GlossaryChange } from "./apply-glossary-change";
 import { createFileChangedError, createUnreadableError, createUnwritableError, GlossaryError } from "./glossary-error";
 import {
@@ -100,8 +101,8 @@ const inspectForSave = async (path: string): Promise<GlossaryError | null> => {
 };
 
 export const saveGlossaryChange = async (path: string, change: GlossaryChange): Promise<void> => {
-  if (!path.endsWith(".yaml")) {
-    throw new GlossaryError("invalid-extension", "Choose a file with the .yaml extension.");
+  if (!path.endsWith(GLOSSARY_FILE_EXTENSION)) {
+    throw new GlossaryError("invalid-extension", `Choose a file with the ${GLOSSARY_FILE_EXTENSION} extension.`);
   }
   const inspection = inspectForSave(path);
   const queueKey = resolve(path);

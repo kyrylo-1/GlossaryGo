@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
+import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
 import { applyGlossaryChange } from "./apply-glossary-change";
 import { parseGlossarySource, type GlossaryError } from "./glossary";
-import { maximumGlossaryBytes } from "./glossary-file";
 
 const expectGlossaryError = (action: () => unknown, code: GlossaryError["code"]): void => {
   expect(action).toThrowError(expect.objectContaining({ code }));
@@ -279,20 +279,20 @@ describe("applyGlossaryChange edits and deletions", () => {
 describe("applyGlossaryChange serialized size", () => {
   test("accepts a serialized add exactly at the UTF-8 byte limit", () => {
     const serializedWithoutComment = "# \nterms:\n  - term: x\n    definition: y\n\n";
-    const comment = "x".repeat(maximumGlossaryBytes - Buffer.byteLength(serializedWithoutComment, "utf8"));
+    const comment = "x".repeat(MAXIMUM_GLOSSARY_BYTES - Buffer.byteLength(serializedWithoutComment, "utf8"));
     const next = applyGlossaryChange(`# ${comment}\nterms: []\n`, {
       term: { definition: "y", term: "x" },
       type: "add",
     });
 
-    expect(Buffer.byteLength(next, "utf8")).toBe(maximumGlossaryBytes);
+    expect(Buffer.byteLength(next, "utf8")).toBe(MAXIMUM_GLOSSARY_BYTES);
     expect(parseGlossarySource(next)).toEqual([{ definition: "y", term: "x" }]);
   });
 
   // eslint-disable-next-line vitest/expect-expect
   test("rejects a multibyte serialized add beyond the UTF-8 byte limit", () => {
     const serializedWithoutComment = "# \nterms:\n  - term: x\n    definition: y\n\n";
-    const neededBytes = maximumGlossaryBytes - Buffer.byteLength(serializedWithoutComment, "utf8") + 1;
+    const neededBytes = MAXIMUM_GLOSSARY_BYTES - Buffer.byteLength(serializedWithoutComment, "utf8") + 1;
     const comment = "é".repeat(Math.ceil(neededBytes / Buffer.byteLength("é", "utf8")));
 
     expectGlossaryError(

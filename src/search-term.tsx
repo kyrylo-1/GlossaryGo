@@ -15,6 +15,7 @@ import { useCallback, useRef, type ReactElement } from "react";
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
 import { TermForm } from "./components/term-form";
+import { SEARCH_RESULT_LIMIT } from "./constants";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
@@ -203,7 +204,11 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
 
 const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
   return (
-    <List.Section {...(result.totalMatchCount > 5 ? { title: `Showing 5 of ${result.totalMatchCount} matches` } : {})}>
+    <List.Section
+      {...(result.totalMatchCount > SEARCH_RESULT_LIMIT
+        ? { title: `Showing ${SEARCH_RESULT_LIMIT} of ${result.totalMatchCount} matches` }
+        : {})}
+    >
       {result.terms.map((term) => (
         <List.Item
           key={term.term}

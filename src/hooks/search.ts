@@ -1,3 +1,4 @@
+import { SEARCH_RESULT_LIMIT } from "../constants";
 import type { Term } from "../utils/types";
 
 export type SearchResult = Readonly<{
@@ -41,7 +42,7 @@ export const searchTerms = (terms: readonly Term[], query: string): SearchResult
     .sort((left, right) => termCollator.compare(left.term, right.term));
 
   return Object.freeze({
-    terms: Object.freeze(matches.slice(0, 5)),
+    terms: Object.freeze(matches.slice(0, SEARCH_RESULT_LIMIT)),
     totalMatchCount: matches.length,
   });
 };
