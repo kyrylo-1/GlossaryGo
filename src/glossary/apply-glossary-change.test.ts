@@ -233,6 +233,15 @@ describe("applyGlossaryChange edits and deletions", () => {
     expect(next).toContain("# Glossary notes");
   });
 
+  test("deleting the last term retains its sequence-owned leading comment", () => {
+    const original = { definition: "Example", term: "API" };
+    const source = "terms:\n  # Sequence-owned note above only entry\n  - term: API\n    definition: Example\n";
+    const next = applyGlossaryChange(source, { original, type: "delete" });
+
+    expect(parseGlossarySource(next)).toEqual([]);
+    expect(next).toContain("# Sequence-owned note above only entry");
+  });
+
   test("removes deleted entry comments while retaining root, sequence, and surviving comments", () => {
     const source =
       "# Root\nterms: # Sequence\n  # Sequence-owned note above first entry\n  - term: API # Remove term\n    definition: Interface # Remove definition\n  # Keep this entry\n  - term: HTTP # Keep term\n    definition: Protocol # Keep definition\n";
