@@ -172,3 +172,6 @@ retry behavior, and post-save failure separation. They do not establish platform
 
 Testing is complete when all automated commands pass and every manual check produces the expected result. Record any
 failed scenario with its query, synthetic input, and observed behavior before making a fix.
+
+See the [KYR-16 final verification record](docs/verification/2026-09-15-kyr-16.md) for the integrated automated,
+review, and macOS live-test results.
