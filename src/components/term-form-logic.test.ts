@@ -176,6 +176,29 @@ describe("runTermFormSubmission guarding", () => {
 });
 
 describe("runTermFormSubmission post-save handling", () => {
+  test("continues navigation when the success notification fails", async () => {
+    const callbacks = createCallbacks();
+    callbacks.onSaveSuccess.mockRejectedValue(new Error("notification failed"));
+    const submitting = { current: false };
+
+    await expect(
+      runTermFormSubmission({
+        ...callbacks,
+        glossaryFile: "/tmp/glossary.yaml",
+        mode: "add",
+        saveChange: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>().mockResolvedValue(),
+        submitting,
+        values,
+      }),
+    ).resolves.toBe(true);
+
+    expect(callbacks.onSaved).toHaveBeenCalledWith({ definition: values.definition, term: "API" });
+    expect(callbacks.onSaveFailure).not.toHaveBeenCalled();
+    expect(callbacks.onPostSaveFailure).not.toHaveBeenCalled();
+    expect(callbacks.onSubmittingChange).not.toHaveBeenLastCalledWith(false);
+    expect(submitting.current).toBe(true);
+  });
+
   test("does not report or unlock a persisted save when post-save refresh fails", async () => {
     const callbacks = createCallbacks();
     callbacks.onSaved.mockRejectedValue(new Error("refresh failed"));

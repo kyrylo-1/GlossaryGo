@@ -89,7 +89,7 @@ describe("saveGlossaryChange invalid sources", () => {
     await expect(
       saveGlossaryChange(path, { term: { definition: "Application Programming Interface", term: "API" }, type: "add" }),
     ).rejects.toEqual(expect.objectContaining({ code }));
-    await expect(readFile(path)).resolves.toEqual(original);
+    expect((await readFile(path)).equals(original)).toBe(true);
     await expect(readdir(dirname(path))).resolves.toEqual(["glossary.yaml"]);
   });
 
@@ -102,7 +102,7 @@ describe("saveGlossaryChange invalid sources", () => {
     await expect(
       saveGlossaryChange(path, { term: { definition: "Interface", term: "API" }, type: "add" }),
     ).rejects.toEqual(expect.objectContaining({ code: "too-large" }));
-    await expect(readFile(path)).resolves.toEqual(original);
+    expect((await readFile(path)).equals(original)).toBe(true);
     await expect(readdir(dirname(path))).resolves.toEqual(["glossary.yaml"]);
   });
 });
