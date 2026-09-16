@@ -235,12 +235,13 @@ describe("applyGlossaryChange edits and deletions", () => {
 
   test("removes deleted entry comments while retaining root, sequence, and surviving comments", () => {
     const source =
-      "# Root\nterms: # Sequence\n  # Remove this entry\n  - term: API # Remove term\n    definition: Interface # Remove definition\n  # Keep this entry\n  - term: HTTP # Keep term\n    definition: Protocol # Keep definition\n";
+      "# Root\nterms: # Sequence\n  # Sequence-owned note above first entry\n  - term: API # Remove term\n    definition: Interface # Remove definition\n  # Keep this entry\n  - term: HTTP # Keep term\n    definition: Protocol # Keep definition\n";
     const next = applyGlossaryChange(source, { original: { definition: "Interface", term: "API" }, type: "delete" });
 
     expect(parseGlossarySource(next)).toEqual([{ definition: "Protocol", term: "HTTP" }]);
     expect(next).toContain("# Root");
     expect(next).toContain("# Sequence");
+    expect(next).toContain("# Sequence-owned note above first entry");
     expect(next).toContain("# Keep this entry");
     expect(next).toContain("# Keep term");
     expect(next).toContain("# Keep definition");
