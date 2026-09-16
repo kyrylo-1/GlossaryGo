@@ -19,9 +19,9 @@ export type TermFormProps = Readonly<{
   (
     | Readonly<{
         createParent?: boolean;
+        focusTermOnMount?: boolean;
         initialTerm?: string;
         mode: "add";
-        resetAfterSave?: boolean;
         submitTitle?: string;
       }>
     | Readonly<{ mode: "edit"; onReload: () => Promise<void>; original: Term }>
@@ -77,7 +77,6 @@ type TermFormModel = Readonly<{
 
 type SubmitTermFormOptions = Readonly<{
   onErrors: (errors: TermFormErrors) => void;
-  onResetAfterSave: () => void;
   onSubmittingChange: (isSubmitting: boolean) => void;
   props: TermFormProps;
   submitting: { current: boolean };
@@ -98,7 +97,6 @@ const submitTermForm = async (options: SubmitTermFormOptions): Promise<boolean> 
     },
     onErrors: options.onErrors,
     onPostSaveFailure: showPostSaveFailure,
-    ...(props.mode === "add" && props.resetAfterSave ? { onResetAfterSave: options.onResetAfterSave } : {}),
     onSaveFailure: showSaveFailure,
     onSaveSuccess: async () => {
       await showToast({ style: Toast.Style.Success, title: props.mode === "add" ? "Term Added" : "Term Updated" });
@@ -111,7 +109,7 @@ const submitTermForm = async (options: SubmitTermFormOptions): Promise<boolean> 
   });
 };
 
-const useTermForm = (props: TermFormProps, focusTermField: () => void): TermFormModel => {
+const useTermForm = (props: TermFormProps): TermFormModel => {
   const [term, setTerm] = useState(() => getInitialTerm(props).term);
   const [definition, setDefinition] = useState(() => getInitialTerm(props).definition);
   const [termError, setTermError] = useState<string | null>(null);
@@ -125,13 +123,6 @@ const useTermForm = (props: TermFormProps, focusTermField: () => void): TermForm
   const handleSubmit = async (values: TermFormValues): Promise<boolean> => {
     return submitTermForm({
       onErrors: applyErrors,
-      onResetAfterSave: () => {
-        setTerm("");
-        setDefinition("");
-        setTermError(null);
-        setDefinitionError(null);
-        focusTermField();
-      },
       onSubmittingChange: setIsSubmitting,
       props,
       submitting,
@@ -161,8 +152,7 @@ const useTermForm = (props: TermFormProps, focusTermField: () => void): TermForm
 };
 
 export const TermForm = (props: TermFormProps): ReactElement => {
-  const termField = useRef<Form.TextField>(null);
-  const model = useTermForm(props, () => termField.current?.focus());
+  const model = useTermForm(props);
 
   return (
     <Form
@@ -183,8 +173,8 @@ export const TermForm = (props: TermFormProps): ReactElement => {
       navigationTitle={props.mode === "add" ? "Add Term" : "Edit Term"}
     >
       <Form.TextField
+        autoFocus={props.mode === "add" && props.focusTermOnMount === true}
         id="term"
-        ref={termField}
         title="Term"
         value={model.term}
         onBlur={() => model.setTermError(validateTermField("term", model.term))}

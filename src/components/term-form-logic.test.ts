@@ -154,6 +154,25 @@ describe("runTermFormSubmission failures", () => {
     expect(callbacks.onSubmittingChange).toHaveBeenLastCalledWith(false);
     expect(submitting.current).toBe(false);
   });
+
+  test("does not leave the form or alter entered values when saving fails", async () => {
+    const callbacks = createCallbacks();
+    const enteredValues = { definition: "Definition stays", term: "Term stays" };
+
+    await runTermFormSubmission({
+      ...callbacks,
+      glossaryFile: "/tmp/glossary.yaml",
+      mode: "add",
+      saveChange: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>().mockRejectedValue(new Error()),
+      submitting: { current: false },
+      values: enteredValues,
+    });
+
+    expect(enteredValues).toEqual({ definition: "Definition stays", term: "Term stays" });
+    expect(callbacks.onSaveSuccess).not.toHaveBeenCalled();
+    expect(callbacks.onSaved).not.toHaveBeenCalled();
+    expect(callbacks.onSaveFailure).toHaveBeenCalledWith("The glossary file could not be saved. Try again.");
+  });
 });
 
 describe("runTermFormSubmission edit failure routing", () => {
@@ -253,32 +272,6 @@ describe("runTermFormSubmission guarding", () => {
     expect(saveChange).toHaveBeenCalledTimes(1);
     pendingSave.resolve(1);
     await expect(first).resolves.toBe(true);
-  });
-});
-
-describe("runTermFormSubmission reusable add form", () => {
-  test("unlocks a reusable add form after resetting it for another term", async () => {
-    const callbacks = createCallbacks();
-    const onResetAfterSave = vi.fn<() => void>();
-    const saveChange = vi.fn<(path: string, change: GlossaryChange) => Promise<void>>().mockResolvedValue();
-    const submitting = { current: false };
-    const options = {
-      ...callbacks,
-      glossaryFile: "/tmp/glossary.yaml",
-      mode: "add" as const,
-      onResetAfterSave,
-      saveChange,
-      submitting,
-      values,
-    };
-
-    await expect(runTermFormSubmission(options)).resolves.toBe(true);
-    await expect(runTermFormSubmission(options)).resolves.toBe(true);
-
-    expect(saveChange).toHaveBeenCalledTimes(2);
-    expect(onResetAfterSave).toHaveBeenCalledTimes(2);
-    expect(callbacks.onSubmittingChange.mock.calls).toEqual([[true], [false], [true], [false]]);
-    expect(submitting.current).toBe(false);
   });
 });
 
