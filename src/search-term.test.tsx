@@ -27,7 +27,9 @@ const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].
 }));
 const names = (): Array<string | null> =>
   screen.queryAllByTestId("result").map((row) => row.getAttribute("aria-label"));
-const search = (value: string): void => fireEvent.change(screen.getByRole("textbox"), { target: { value } });
+const search = (value: string): void => {
+  fireEvent.change(screen.getByRole("textbox"), { target: { value } });
+};
 const copy = async (name: string, title = "Copy Definition"): Promise<void> => {
   raycastApiMocks.copy.mockClear();
   raycastApiMocks.showToast.mockClear();
@@ -37,7 +39,9 @@ const copy = async (name: string, title = "Copy Definition"): Promise<void> => {
   await waitFor(() => expect(raycastApiMocks.showToast).toHaveBeenCalled());
   search("");
 };
-const reload = (): void => fireEvent.click(screen.getAllByRole("button", { name: "Reload Glossary" })[0]);
+const reload = (): void => {
+  fireEvent.click(screen.getAllByRole("button", { name: "Reload Glossary" })[0]);
+};
 
 beforeEach(() => {
   vi.clearAllMocks();

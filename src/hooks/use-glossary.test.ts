@@ -9,7 +9,7 @@ describe("glossaryReducer", () => {
   test("changes the query without discarding ready terms", () => {
     const state: GlossaryReducerState = { query: "a", recentTerms: [], state: { status: "ready", terms } };
 
-    expect(glossaryReducer(state, { query: "ap", recentTerms: [], type: "queryChanged" })).toEqual({
+    expect(glossaryReducer(state, { query: "ap", type: "queryChanged" })).toEqual({
       query: "ap",
       recentTerms: [],
       state: { status: "ready", terms },
@@ -56,5 +56,14 @@ describe("glossaryReducer recovery", () => {
       recentTerms: [],
       state: { status: "missing" },
     });
+  });
+});
+
+describe("glossaryReducer copy and reload ordering", () => {
+  test("retains a successful copy during reload and validates it against the loaded glossary", () => {
+    const loading: GlossaryReducerState = { query: "", recentTerms: [], state: { status: "loading" } };
+    const copied = glossaryReducer(loading, { name: "API", type: "termUsed" });
+    expect(glossaryReducer(copied, { terms, type: "loadSucceeded" }).recentTerms).toEqual(["API"]);
+    expect(glossaryReducer(copied, { terms: [], type: "loadSucceeded" }).recentTerms).toEqual([]);
   });
 });
