@@ -279,7 +279,6 @@ export default function Command(): ReactElement {
     <List
       filtering={false}
       isLoading={state.status === "loading"}
-      isShowingDetail={state.status === "ready" && result.terms.length > 0}
       onSearchTextChange={setQuery}
       searchBarPlaceholder="Search terms by prefix"
       searchText={query}
