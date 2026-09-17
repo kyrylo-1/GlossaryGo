@@ -32,6 +32,10 @@ For TSX files, use the `vercel-react-best-practices` skill.
 
 ## Testing Guidelines
 
+Read `TESTING.md` before implementing features, changing behavior, fixing regressions, or running acceptance tests.
+Update its affected scenarios in the same change as every feature addition, behavior change, or regression fix.
+Use it as the acceptance plan for live Raycast testing and report automated results separately from observed UI results.
+
 Use Vitest with descriptive `describe` and `test` names. Cover changed behavior, especially invalid YAML, duplicate terms, Unicode prefix matching, and reload failures. No numeric coverage threshold is configured. Before submitting code changes, run tests, lint, formatting checks, and the build. For UI changes, manually verify search, reload, and clipboard actions in Raycast.
 
 ## Commit & Pull Request Guidelines
