@@ -16,14 +16,7 @@ Update affected testing scenarios in the same change. Report automated checks se
 
 ## Commands
 
-Use only npm. Require Node.js 22.22.2 or newer.
-
-- `npm ci`: install locked dependencies.
-- `npm run dev`: Raycast development mode.
-- `npm run build`: build extension.
-- `npm run lint` / `npm run fix-lint`: check / fix Raycast and ESLint rules.
-- `npm test`: Vitest once. `npm test -- src/hooks/search.test.ts`: focused search tests.
-- `npm run check:format` / `npm run format`: check / apply Prettier.
+Look at scripts in package.json
 
 ## Style and tests
 
