@@ -1,52 +1,53 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+GlossaryGo: Raycast extension for searching private local YAML glossary.
 
-GlossaryGo is a Raycast extension for searching a private local YAML glossary.
+## Structure and context
 
-- `src/search-term.tsx` implements the command UI.
-- `src/glossary/` contains glossary file loading, decoding, validation, and their tests.
-- `src/hooks/` contains glossary state, reload handling, and search logic; `src/utils/` contains shared helpers.
-- Tests live beside source files as `*.test.ts`; `assets/` contains the extension icon.
-- `package.json` defines the Raycast command and preferences; `glossary.schema.json` describes the glossary format.
+- `src/search-term.tsx`: command UI.
+- `src/glossary/`: loading, decoding, validation, tests.
+- `src/hooks/`: state, reload, search. `src/utils/`: shared helpers.
+- `*.test.ts`: tests beside source. `assets/`: extension icon.
+- `package.json`: commands, preferences. `glossary.schema.json`: format.
 
-Read `CONTEXT.md` before changing domain terminology and `README.md` before changing glossary validation or search behavior.
+Read `CONTEXT.md` before changing domain terminology. Read `README.md` before changing validation or search behavior.
+Read `TESTING.md` before features, behavior changes, regression fixes, or acceptance tests.
+Update affected testing scenarios in the same change. Report automated checks separately from live Raycast evidence.
 
-## Build, Test, and Development Commands
+## Commands
 
-Use only npm for this repo. Node.js 22.22.2 or newer is required.
+Use only npm. Require Node.js 22.22.2 or newer.
 
-- `npm ci`: install dependencies from `package-lock.json`.
-- `npm run dev`: start Raycast development mode.
-- `npm run build`: build the extension.
-- `npm run lint`: run Raycast/ESLint checks; `npm run fix-lint` applies automatic fixes.
-- `npm test`: run the Vitest suite once.
-- `npm test -- src/hooks/search.test.ts`: run focused search tests.
-- `npm run check:format`: check Prettier formatting; `npm run format` formats the repository.
+- `npm ci`: install locked dependencies.
+- `npm run dev`: Raycast development mode.
+- `npm run build`: build extension.
+- `npm run lint` / `npm run fix-lint`: check / fix Raycast and ESLint rules.
+- `npm test`: Vitest once. `npm test -- src/hooks/search.test.ts`: focused search tests.
+- `npm run check:format` / `npm run format`: check / apply Prettier.
 
-## Coding Style & Naming Conventions
+## Style and tests
 
-Use strict TypeScript, two-space indentation, double quotes, semicolons, and Prettier's 120-column width. Use kebab-case filenames, camelCase functions and variables, and PascalCase types and components. Follow ESLint's requirements for function expressions, explicit return types, type-only imports, and `type` aliases.
+Strict TypeScript; two spaces; double quotes; semicolons; Prettier width 120.
+Use kebab-case filenames, camelCase functions/variables, PascalCase types/components.
+Follow ESLint: function expressions, explicit return types, type-only imports, `type` aliases.
+For TSX, use `vercel-react-best-practices` skill.
 
-For TSX files, use the `vercel-react-best-practices` skill.
+Use descriptive Vitest `describe` / `test` names. Cover changed behavior, especially invalid YAML, duplicates,
+Unicode prefixes, reload failures. No numeric coverage threshold.
+Before submitting code, run tests, lint, formatting checks, build.
+For UI changes, verify search, reload, clipboard in Raycast using `TESTING.md`.
 
-## Testing Guidelines
+## Commits and PRs
 
-Read `TESTING.md` before implementing features, changing behavior, fixing regressions, or running acceptance tests.
-Update its affected scenarios in the same change as every feature addition, behavior change, or regression fix.
-Use it as the acceptance plan for live Raycast testing and report automated results separately from observed UI results.
+Use concise, action-oriented subjects; imperative, `feat:`, or `refactor:` styles match history. Keep commits focused.
+PRs explain problem, resulting behavior, validation; link issues and include screenshots for visible UI changes.
 
-Use Vitest with descriptive `describe` and `test` names. Cover changed behavior, especially invalid YAML, duplicate terms, Unicode prefix matching, and reload failures. No numeric coverage threshold is configured. Before submitting code changes, run tests, lint, formatting checks, and the build. For UI changes, manually verify search, reload, and clipboard actions in Raycast.
+## Privacy and agent rules
 
-## Commit & Pull Request Guidelines
+Keep glossary content local and in memory. Only permitted persistence: explicit Add Term, Edit Term, or Delete Term
+through glossary save service to effective Glossary File. Target user-selected `.yaml` when configured; otherwise
+`glossary.yaml` under Raycast's `environment.supportPath`. Never persist content elsewhere, log it, or transmit it.
+Use synthetic test data.
 
-Recent history mixes imperative subjects with `feat:` and `refactor:` prefixes. Write concise, action-oriented subjects and keep commits focused. PRs should explain the problem, resulting behavior, and validation; link relevant issues and include screenshots for visible UI changes.
-
-## Privacy & Agent Instructions
-
-Keep glossary content local and in memory. The only permitted persistence is an explicit Add Term, Edit Term, or
-Delete Term write through the glossary save service to the effective Glossary File: the user-selected `.yaml` file when
-configured, otherwise `glossary.yaml` under Raycast's `environment.supportPath`. Never persist glossary content
-elsewhere, log it, or transmit it. Use synthetic glossary data in tests.
-
-Preserve unrelated working-tree changes. Agents must provide deletion commands for the user instead of deleting files because of the DSG hook. When a commit is requested, delegate its creation to a separate Luna agent with low reasoning.
+Preserve unrelated worktree changes. DSG hook blocks file deletion: provide deletion commands instead.
+When committing, delegate creation to separate Luna agent with low reasoning.
