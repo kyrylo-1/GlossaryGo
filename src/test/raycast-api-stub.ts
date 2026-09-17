@@ -15,13 +15,14 @@ type FieldProps = Readonly<{
   autoFocus?: boolean;
   error?: string;
   id: string;
-  onBlur?: () => void;
+  onBlur?: (event: Readonly<{ target: Readonly<{ value: string }> }>) => void;
+  ref?: (instance: globalThis.HTMLInputElement | globalThis.HTMLTextAreaElement | null) => void;
   onChange?: (value: string) => void;
   title?: string;
   value?: string;
 }>;
 type SubmitProps = Readonly<{
-  onSubmit: (values: Readonly<{ definition: string; term: string }>) => Promise<boolean>;
+  onSubmit: (values: Readonly<{ definition: string; term: string }>) => unknown;
   title: string;
 }>;
 
@@ -29,7 +30,7 @@ export const raycastApiMocks = {
   closeMainWindow: vi.fn<() => Promise<void>>().mockResolvedValue(),
   copy: vi.fn<(content: string) => Promise<void>>().mockResolvedValue(),
   showInFinder: vi.fn<() => Promise<void>>().mockResolvedValue(),
-  showToast: vi.fn<() => Promise<void>>().mockResolvedValue(),
+  showToast: vi.fn<(options: unknown) => Promise<void>>().mockResolvedValue(),
 };
 
 const action = ({ onAction, title }: ActionProps): ReactElement =>
@@ -50,7 +51,9 @@ const submitForm = ({ onSubmit, title }: SubmitProps): ReactElement =>
     "button",
     {
       onClick: () => {
-        onSubmit({ definition: getFieldValue("definition"), term: getFieldValue("term") }).catch(() => null);
+        Promise.resolve(onSubmit({ definition: getFieldValue("definition"), term: getFieldValue("term") })).catch(
+          () => null,
+        );
       },
       type: "button",
     },
@@ -67,6 +70,7 @@ const renderField = (element: "input" | "textarea", props: FieldProps): ReactEle
       "data-testid": props.id,
       onBlur: props.onBlur,
       onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) => props.onChange?.(event.target.value),
+      ref: props.ref,
       value: props.value,
     }),
     props.error ? createElement("span", { role: "alert" }, props.error) : null,

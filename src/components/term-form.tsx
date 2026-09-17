@@ -1,4 +1,5 @@
 import { Action, ActionPanel, Form, Icon, openExtensionPreferences, showToast, Toast } from "@raycast/api";
+import { useForm } from "@raycast/utils";
 import { useRef, useState, type ReactElement } from "react";
 
 import { saveGlossaryChange } from "../glossary/save-glossary-change";
@@ -62,19 +63,6 @@ const showEditConflict = async (message: string, onReload: () => Promise<void>):
   });
 };
 
-type TermFormModel = Readonly<{
-  definition: string;
-  definitionError: string | null;
-  handleSubmit: (values: TermFormValues) => Promise<boolean>;
-  isSubmitting: boolean;
-  onDefinitionChange: (value: string) => void;
-  onTermChange: (value: string) => void;
-  setDefinitionError: (error: string | null) => void;
-  setTermError: (error: string | null) => void;
-  term: string;
-  termError: string | null;
-}>;
-
 type SubmitTermFormOptions = Readonly<{
   onErrors: (errors: TermFormErrors) => void;
   onSubmittingChange: (isSubmitting: boolean) => void;
@@ -109,46 +97,33 @@ const submitTermForm = async (options: SubmitTermFormOptions): Promise<boolean> 
   });
 };
 
+type TermFormModel = Pick<ReturnType<typeof useForm<TermFormValues>>, "handleSubmit" | "itemProps"> &
+  Readonly<{ isSubmitting: boolean }>;
+
 const useTermForm = (props: TermFormProps): TermFormModel => {
-  const [term, setTerm] = useState(() => getInitialTerm(props).term);
-  const [definition, setDefinition] = useState(() => getInitialTerm(props).definition);
-  const [termError, setTermError] = useState<string | null>(null);
-  const [definitionError, setDefinitionError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitting = useRef(false);
-  const applyErrors = (errors: TermFormErrors): void => {
-    setTermError(errors.term ?? null);
-    setDefinitionError(errors.definition ?? null);
-  };
-  const handleSubmit = async (values: TermFormValues): Promise<boolean> => {
-    return submitTermForm({
-      onErrors: applyErrors,
-      onSubmittingChange: setIsSubmitting,
-      props,
-      submitting,
-      values,
-    });
-  };
-  const onDefinitionChange = (value: string): void => {
-    setDefinition(value);
-    setDefinitionError(null);
-  };
-  const onTermChange = (value: string): void => {
-    setTerm(value);
-    setTermError(null);
-  };
-  return {
-    definition,
-    definitionError,
-    handleSubmit,
-    isSubmitting,
-    onDefinitionChange,
-    onTermChange,
-    setDefinitionError,
-    setTermError,
-    term,
-    termError,
-  };
+  const { handleSubmit, itemProps, setValidationError } = useForm<TermFormValues>({
+    initialValues: getInitialTerm(props),
+    onSubmit: (values) =>
+      submitTermForm({
+        onErrors: (errors) => {
+          setValidationError("term", errors.term);
+          setValidationError("definition", errors.definition);
+        },
+        onSubmittingChange: setIsSubmitting,
+        props,
+        submitting,
+        values,
+      }),
+    validation: {
+      term: (value) => validateTermField("term", value ?? ""),
+      // Validation order follows the fields so submission focuses Term before Definition.
+      // eslint-disable-next-line sort-keys
+      definition: (value) => validateTermField("definition", value ?? ""),
+    },
+  });
+  return { handleSubmit, isSubmitting, itemProps };
 };
 
 export const TermForm = (props: TermFormProps): ReactElement => {
@@ -174,21 +149,10 @@ export const TermForm = (props: TermFormProps): ReactElement => {
     >
       <Form.TextField
         autoFocus={props.mode === "add" && props.focusTermOnMount === true}
-        id="term"
         title="Term"
-        value={model.term}
-        onBlur={() => model.setTermError(validateTermField("term", model.term))}
-        onChange={model.onTermChange}
-        {...(model.termError === null ? {} : { error: model.termError })}
+        {...model.itemProps.term}
       />
-      <Form.TextArea
-        id="definition"
-        title="Definition"
-        value={model.definition}
-        onBlur={() => model.setDefinitionError(validateTermField("definition", model.definition))}
-        onChange={model.onDefinitionChange}
-        {...(model.definitionError === null ? {} : { error: model.definitionError })}
-      />
+      <Form.TextArea title="Definition" {...model.itemProps.definition} />
       <Form.Description title="Glossary File" text={props.glossaryFile} />
     </Form>
   );

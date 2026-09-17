@@ -4,7 +4,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import type * as RaycastUtils from "@raycast/utils";
 import Command from "./add-term";
+import { TermForm } from "./components/term-form";
 import { GlossaryError } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import { raycastApiMocks } from "./test/raycast-api-stub";
@@ -13,7 +15,10 @@ const mocks = vi.hoisted(() => ({
   saveGlossaryChange: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>(),
 }));
 
-vi.mock("@raycast/utils", () => ({ showFailureToast: vi.fn<(...args: unknown[]) => void>() }));
+vi.mock("@raycast/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof RaycastUtils>()),
+  showFailureToast: vi.fn<(...args: unknown[]) => void>(),
+}));
 vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => ({
     createParent: false,
@@ -93,7 +98,9 @@ describe("standalone Add Term command", () => {
     expect(valueOf("term")).toBe("Retained Term");
     expect(valueOf("definition")).toBe("Retained definition");
   });
+});
 
+describe("Add Term validation", () => {
   test("focuses the first invalid field and keeps whitespace errors until valid correction", async () => {
     render(<Command />);
     fireEvent.change(screen.getByTestId("term"), { target: { value: "  " } });
@@ -128,8 +135,58 @@ describe("standalone Add Term command", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
     await screen.findByRole("heading", { name: "Term Added" });
     expect(mocks.saveGlossaryChange).toHaveBeenLastCalledWith("/tmp/glossary.yaml", {
-      type: "add", term: { term: "Corrected", definition: " Literal\nDefinition " },
+      term: { definition: " Literal\nDefinition ", term: "Corrected" },
+      type: "add",
     });
   });
+});
 
+describe("Edit Term form recovery", () => {
+  test("prefills the captured entry and retains corrections on conflict until explicit reload", async () => {
+    const original = { definition: "Original\nDefinition", term: "Original" };
+    const onReload = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const onSaved = vi.fn<() => Promise<void>>().mockResolvedValue();
+    mocks.saveGlossaryChange.mockRejectedValueOnce(new GlossaryError("stale-term", "Entry changed."));
+    mocks.saveGlossaryChange.mockResolvedValueOnce();
+    render(
+      <TermForm
+        glossaryFile="/tmp/glossary.yaml"
+        mode="edit"
+        original={original}
+        onReload={onReload}
+        onSaved={onSaved}
+      />,
+    );
+    expect(valueOf("term")).toBe(original.term);
+    expect(valueOf("definition")).toBe(original.definition);
+    fireEvent.change(screen.getByTestId("term"), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Update Term" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Term must contain non-whitespace text.");
+    expect(globalThis.document.activeElement).toBe(screen.getByTestId("term"));
+    fireEvent.change(screen.getByTestId("term"), { target: { value: " Renamed " } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: " Corrected\nDefinition " } });
+    fireEvent.click(screen.getByRole("button", { name: "Update Term" }));
+    await waitFor(() =>
+      expect(raycastApiMocks.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Glossary Changed" })),
+    );
+    expect(valueOf("term")).toBe(" Renamed ");
+    expect(valueOf("definition")).toBe(" Corrected\nDefinition ");
+    expect(onReload).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    const toast = raycastApiMocks.showToast.mock.calls.find(
+      ([options]) => (options as { title?: string }).title === "Glossary Changed",
+    )?.[0] as { primaryAction: { onAction: () => void } };
+    toast.primaryAction.onAction();
+    await waitFor(() => expect(onReload).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "Update Term" }));
+    await waitFor(() =>
+      expect(onSaved).toHaveBeenCalledWith({ definition: " Corrected\nDefinition ", term: "Renamed" }),
+    );
+    expect(mocks.saveGlossaryChange).toHaveBeenLastCalledWith("/tmp/glossary.yaml", {
+      original,
+      term: { definition: " Corrected\nDefinition ", term: "Renamed" },
+      type: "edit",
+    });
+  });
 });

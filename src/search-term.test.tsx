@@ -8,12 +8,16 @@ import type * as GlossaryModule from "./glossary/glossary";
 import Command from "./search-term";
 import { raycastApiMocks } from "./test/raycast-api-stub";
 import type { Term } from "./utils/types";
+import type * as RaycastUtils from "@raycast/utils";
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn<(path: string) => Promise<readonly Term[]>>(),
   path: "/tmp/first.yaml",
 }));
-vi.mock("@raycast/utils", () => ({ showFailureToast: vi.fn<() => Promise<void>>().mockResolvedValue() }));
+vi.mock("@raycast/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof RaycastUtils>()),
+  showFailureToast: vi.fn<() => Promise<void>>().mockResolvedValue(),
+}));
 vi.mock("./glossary/glossary", async (importOriginal) => ({
   ...(await importOriginal<typeof GlossaryModule>()),
   loadGlossary: mocks.load,
