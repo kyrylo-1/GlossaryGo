@@ -75,3 +75,34 @@ describe("searchTerms Unicode and limits", () => {
     });
   });
 });
+
+describe("recent terms", () => {
+  test("shows recent terms first for an empty query using current definitions", () => {
+    expect(searchTerms([term("Alpha"), term("Zulu", "Updated")], "", ["Zulu", "Alpha"])).toEqual({
+      terms: [term("Zulu", "Updated"), term("Alpha")],
+      totalMatchCount: 2,
+    });
+  });
+
+  test("falls back alphabetically when all history entries are stale", () => {
+    expect(searchTerms([term("Zulu"), term("Alpha")], "", ["Deleted"])).toEqual({
+      terms: [term("Alpha"), term("Zulu")],
+      totalMatchCount: 2,
+    });
+  });
+
+  test("shows only valid recent terms for whitespace queries and keeps the five-result cap", () => {
+    const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].map((name) => term(name));
+    expect(searchTerms(terms, " \t", ["Missing", "Zulu", "Foxtrot", "Echo", "Delta", "Charlie", "Bravo"])).toEqual({
+      terms: [term("Zulu"), term("Foxtrot"), term("Echo"), term("Delta"), term("Charlie")],
+      totalMatchCount: 6,
+    });
+  });
+
+  test("keeps typed prefix matches alphabetical regardless of history", () => {
+    expect(searchTerms([term("API"), term("ADR"), term("Zulu")], "a", ["Zulu", "API"])).toEqual({
+      terms: [term("ADR"), term("API")],
+      totalMatchCount: 2,
+    });
+  });
+});

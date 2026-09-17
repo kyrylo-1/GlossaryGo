@@ -8,6 +8,7 @@ type ContainerProps = Readonly<{
   actions?: ReactNode;
   children?: ReactNode;
   markdown?: string;
+  metadata?: ReactNode;
   navigationTitle?: string;
 }>;
 type FieldProps = Readonly<{
@@ -73,7 +74,12 @@ const renderField = (element: "input" | "textarea", props: FieldProps): ReactEle
 
 const PushAction = ({ target, title }: Readonly<{ target: ReactNode; title: string }>): ReactElement => {
   const [opened, setOpened] = useState(false);
-  return opened ? createElement("div", {}, target) : action({ onAction: () => setOpened(true), title });
+  return createElement(
+    "div",
+    {},
+    action({ onAction: () => setOpened(true), title }),
+    opened ? createElement("div", {}, target, action({ onAction: () => setOpened(false), title: "Back" })) : null,
+  );
 };
 
 export const Action = Object.assign(action, {
@@ -82,8 +88,15 @@ export const Action = Object.assign(action, {
   SubmitForm: submitForm,
 });
 export const ActionPanel = Object.assign(actionPanel, { Section: actionPanel });
-export const Detail = ({ actions, markdown, navigationTitle }: ContainerProps): ReactElement =>
-  createElement("section", {}, createElement("h1", {}, navigationTitle), createElement("pre", {}, markdown), actions);
+export const Detail = ({ actions, markdown, metadata, navigationTitle }: ContainerProps): ReactElement =>
+  createElement(
+    "section",
+    {},
+    createElement("h1", {}, navigationTitle),
+    createElement("pre", {}, markdown),
+    metadata,
+    actions,
+  );
 export const Form = Object.assign(
   ({ actions, children }: ContainerProps): ReactElement => createElement("section", {}, children, actions),
   {
@@ -92,53 +105,61 @@ export const Form = Object.assign(
     TextField: (props: FieldProps): ReactElement => renderField("input", props),
   },
 );
-export const Icon = { Checkmark: "checkmark", Finder: "finder", Pencil: "pencil", Plus: "plus" };
+export const Icon = { Checkmark: "checkmark", Document: "document", Finder: "finder", Pencil: "pencil", Plus: "plus" };
 export const Toast = { Style: { Failure: "failure", Success: "success" } };
 export const closeMainWindow = raycastApiMocks.closeMainWindow;
 export const openExtensionPreferences = vi.fn<() => Promise<void>>().mockResolvedValue();
 export const showInFinder = raycastApiMocks.showInFinder;
 export const showToast = raycastApiMocks.showToast;
 
-type ListProps = ContainerProps &
+export const Clipboard = { copy: raycastApiMocks.copy };
+export const Alert = { ActionStyle: { Cancel: "cancel", Destructive: "destructive" } };
+export const confirmAlert = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+const pop = vi.fn<() => void>();
+export const useNavigation = (): { pop: () => void } => ({ pop });
+
+const listContainer = ({
+  children,
+  isShowingDetail,
+  onSearchTextChange,
+  searchText,
+}: ContainerProps &
   Readonly<{
-    onSearchTextChange?: (query: string) => void;
-    searchText?: string;
-  }>;
+    isShowingDetail: boolean;
+    onSearchTextChange: (value: string) => void;
+    searchText: string;
+  }>): ReactElement =>
+  createElement(
+    "main",
+    { "data-showing-detail": isShowingDetail },
+    createElement("input", {
+      "aria-label": "Search terms",
+      onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) => onSearchTextChange(event.target.value),
+      value: searchText,
+    }),
+    children,
+  );
+const listSection = ({ children, title }: ContainerProps & Readonly<{ title?: string }>): ReactElement =>
+  createElement("section", {}, title ? createElement("h2", {}, title) : null, children);
 const listItem = ({
   actions,
   detail,
   title,
-}: ContainerProps & Readonly<{ detail?: ReactNode; title: string }>): ReactElement =>
-  createElement("article", {}, createElement("h2", {}, title), detail, actions);
-const listDetail = ({ markdown, metadata }: ContainerProps & Readonly<{ metadata?: ReactNode }>): ReactElement =>
-  createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata);
-export const List = Object.assign(
-  ({ children, onSearchTextChange, searchText }: ListProps): ReactElement =>
-    createElement(
-      "section",
-      {},
-      createElement("input", {
-        "aria-label": "Search",
-        onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) =>
-          onSearchTextChange?.(event.target.value),
-        value: searchText,
-      }),
-      children,
-    ),
+}: ContainerProps & Readonly<{ detail: ReactNode; title: string }>): ReactElement =>
+  createElement("article", { "aria-label": title, "data-testid": "result" }, title, detail, actions);
+const listDetail = Object.assign(
+  ({ markdown, metadata }: ContainerProps & Readonly<{ metadata?: ReactNode }>): ReactElement =>
+    createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata),
   {
-    EmptyView: ({ actions, title }: ContainerProps & Readonly<{ title: string }>): ReactElement =>
-      createElement("div", {}, title, actions),
-    Item: Object.assign(listItem, {
-      Detail: Object.assign(listDetail, {
-        Metadata: Object.assign(actionPanel, {
-          Label: ({ title }: Readonly<{ title: string }>): ReactElement => createElement("span", {}, title),
-        }),
-      }),
+    Metadata: Object.assign(actionPanel, {
+      Label: ({ text, title }: Readonly<{ text?: string; title: string }>): ReactElement =>
+        createElement("div", {}, createElement("span", {}, title), createElement("span", {}, text)),
     }),
-    Section: actionPanel,
   },
 );
-export const Alert = { ActionStyle: { Cancel: "cancel", Destructive: "destructive" } };
-export const confirmAlert = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
-export const useNavigation = (): Readonly<{ pop: () => void }> => ({ pop: (): void => {} });
-export const Clipboard = { copy: raycastApiMocks.copy };
+export const List = Object.assign(listContainer, {
+  EmptyView: ({ actions, title }: ContainerProps & Readonly<{ title: string }>): ReactElement =>
+    createElement("section", {}, createElement("h2", {}, title), actions),
+  Item: Object.assign(listItem, { Detail: listDetail }),
+  Section: listSection,
+});

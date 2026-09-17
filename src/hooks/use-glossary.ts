@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch } from "react";
 
 import { GlossaryError, loadGlossary } from "../glossary/glossary";
-import { getGlossaryTarget } from "../glossary/get-glossary-target";
+import type { GlossaryTarget } from "../glossary/glossary-target";
 import { searchTerms, type SearchResult } from "./search";
-import { glossaryReducer, type CommandState } from "./glossary-reducer";
+import { glossaryReducer, type CommandState, type GlossaryAction } from "./glossary-reducer";
 
 export type { CommandState } from "./glossary-reducer";
 
 type GlossaryController = Readonly<{
   createParent: boolean;
   glossaryFile: string;
+  isRecent: boolean;
   query: string;
+  recordTerm: (name: string) => void;
   reload: () => Promise<void>;
   result: SearchResult;
   setQuery: (query: string) => void;
@@ -26,9 +28,7 @@ const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
 };
 
-export const useGlossary = (): GlossaryController => {
-  const { createParent, path: glossaryFile } = getGlossaryTarget();
-  const [model, dispatch] = useReducer(glossaryReducer, { query: "", state: { status: "loading" } });
+const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryAction>): (() => Promise<void>) => {
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -52,13 +52,7 @@ export const useGlossary = (): GlossaryController => {
         }
       }
     }
-  }, [glossaryFile]);
-  const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
-  const result = useMemo(
-    () => (model.state.status === "ready" ? searchTerms(model.state.terms, model.query) : EMPTY_SEARCH_RESULT),
-    [model.query, model.state],
-  );
-
+  }, [dispatch, glossaryFile]);
   useEffect(() => {
     let isActive = true;
     queueMicrotask(() => {
@@ -72,5 +66,31 @@ export const useGlossary = (): GlossaryController => {
     };
   }, [reload]);
 
-  return { createParent, glossaryFile, query: model.query, reload, result, setQuery, state: model.state };
+  return reload;
+};
+
+export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget): GlossaryController => {
+  const [model, dispatch] = useReducer(glossaryReducer, { query: "", recentTerms: [], state: { status: "loading" } });
+  const reload = useGlossaryReload(glossaryFile, dispatch);
+  const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
+  const recordTerm = useCallback((name: string) => dispatch({ name, type: "termUsed" }), []);
+  const result = useMemo(
+    () =>
+      model.state.status === "ready"
+        ? searchTerms(model.state.terms, model.query, model.recentTerms)
+        : EMPTY_SEARCH_RESULT,
+    [model.query, model.recentTerms, model.state],
+  );
+
+  return {
+    createParent,
+    glossaryFile,
+    isRecent: model.query.trim().length === 0 && model.recentTerms.length > 0,
+    query: model.query,
+    recordTerm,
+    reload,
+    result,
+    setQuery,
+    state: model.state,
+  };
 };

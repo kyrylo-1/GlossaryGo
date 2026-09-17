@@ -78,16 +78,29 @@ canonically equivalent Unicode text as the same. For example, `a` matches `API`,
 Definitions are never searched.
 
 Matches are sorted in case-insensitive, accent-sensitive, locale-aware ascending order. GlossaryGo displays at most
-the first five results; when more exist, it reports `Showing 5 of N matches`. With an empty query, the first five terms
-from the sorted glossary are shown.
+the first five results; when more exist, it reports `Showing 5 of N matches`.
+
+With an empty or whitespace-only query, **Recent Terms** shows up to five previously copied terms, most recent first.
+A successful **Copy Definition** or **Copy Term** records that term; typing and moving the selection do not. Reusing a
+term moves it to the front without duplicates. History holds at most 20 names and evicts the least recently used name
+when full. If no valid history remains, the first five terms from the alphabetically sorted glossary are shown.
+Typed prefix searches always keep alphabetical ordering, including terms that have never been copied.
+
+History stays in memory for the current Search Term command session and resets when that command is unmounted or its
+effective Glossary File path changes. Reload removes names no longer present in the glossary and displays current
+names and definitions; a missing file clears history, and a failed reload hides results until recovery. Renaming a
+term removes its old history entry unless the new name is case- or Unicode-equivalent. History is never written to
+the Glossary File, Raycast storage, logs, or the network.
 
 Definitions wrap as literal prose in the split-pane preview; Markdown-like characters are displayed as text. Choose
 **View Full Definition** to open the selected definition in a full-width, scrollable reading view. Its navigation title
-identifies the term, and its actions include **Copy Definition**, **Copy Term**, and **Reveal Glossary in Finder**. Go
-back to return to the same search query. The preview omits file metadata to leave more room for reading.
+identifies the term, and its actions include **Copy Definition**, **Copy Term**, and **Reveal Glossary in Finder**.
+Successful copies from either view update Recent Terms. Go back to return to the same search query. The preview omits
+file metadata to leave more room for reading.
 
 For a selected result, actions appear in this order: **Copy Definition**, **Copy Term**, **View Full Definition**,
-**Add Term**, **Edit Term**, **Delete Term**, **Reload Glossary**, and **Reveal Glossary in Finder**. Copy actions do not close the command. Choose
+**Add Term**, **Edit Term**, **Delete Term**, **Reload Glossary**, and **Reveal Glossary in Finder**. Copy actions do not
+close the command. Choose
 **Add Term** from a result, an empty glossary, a missing-glossary onboarding view, or a no-match view to open a form in
 the same **Search Term** command. Those views do not offer Edit or Delete. The current query is used as the initial term
 name. Names are trimmed when saved; definitions must contain non-whitespace text and otherwise retain their exact
