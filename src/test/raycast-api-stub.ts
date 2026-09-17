@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { createElement, type ReactElement, type ReactNode } from "react";
+import { createElement, useState, type ReactElement, type ReactNode } from "react";
 import { vi } from "vitest";
 
 type ActionProps = Readonly<{ onAction?: () => void; title: string }>;
@@ -72,8 +72,18 @@ const renderField = (element: "input" | "textarea", props: FieldProps): ReactEle
     props.error ? createElement("span", { role: "alert" }, props.error) : null,
   );
 
+const PushAction = ({ target, title }: Readonly<{ target: ReactNode; title: string }>): ReactElement => {
+  const [opened, setOpened] = useState(false);
+  return createElement(
+    "div",
+    {},
+    action({ onAction: () => setOpened(true), title }),
+    opened ? createElement("div", {}, target, action({ onAction: () => setOpened(false), title: "Back" })) : null,
+  );
+};
+
 export const Action = Object.assign(action, {
-  Push: action,
+  Push: PushAction,
   Style: { Destructive: "destructive" },
   SubmitForm: submitForm,
 });
@@ -95,7 +105,7 @@ export const Form = Object.assign(
     TextField: (props: FieldProps): ReactElement => renderField("input", props),
   },
 );
-export const Icon = { Checkmark: "checkmark", Finder: "finder", Pencil: "pencil", Plus: "plus" };
+export const Icon = { Checkmark: "checkmark", Document: "document", Finder: "finder", Pencil: "pencil", Plus: "plus" };
 export const Toast = { Style: { Failure: "failure", Success: "success" } };
 export const closeMainWindow = raycastApiMocks.closeMainWindow;
 export const openExtensionPreferences = vi.fn<() => Promise<void>>().mockResolvedValue();
@@ -110,16 +120,18 @@ export const useNavigation = (): { pop: () => void } => ({ pop });
 
 const listContainer = ({
   children,
+  isShowingDetail,
   onSearchTextChange,
   searchText,
 }: ContainerProps &
   Readonly<{
+    isShowingDetail: boolean;
     onSearchTextChange: (value: string) => void;
     searchText: string;
   }>): ReactElement =>
   createElement(
     "main",
-    {},
+    { "data-showing-detail": isShowingDetail },
     createElement("input", {
       "aria-label": "Search terms",
       onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) => onSearchTextChange(event.target.value),
@@ -135,12 +147,16 @@ const listItem = ({
   title,
 }: ContainerProps & Readonly<{ detail: ReactNode; title: string }>): ReactElement =>
   createElement("article", { "aria-label": title, "data-testid": "result" }, title, detail, actions);
-const listDetail = Object.assign(Detail, {
-  Metadata: Object.assign(actionPanel, {
-    Label: ({ text, title }: Readonly<{ text?: string; title: string }>): ReactElement =>
-      createElement("div", {}, createElement("span", {}, title), createElement("span", {}, text)),
-  }),
-});
+const listDetail = Object.assign(
+  ({ markdown, metadata }: ContainerProps & Readonly<{ metadata?: ReactNode }>): ReactElement =>
+    createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata),
+  {
+    Metadata: Object.assign(actionPanel, {
+      Label: ({ text, title }: Readonly<{ text?: string; title: string }>): ReactElement =>
+        createElement("div", {}, createElement("span", {}, title), createElement("span", {}, text)),
+    }),
+  },
+);
 export const List = Object.assign(listContainer, {
   EmptyView: ({ actions, title }: ContainerProps & Readonly<{ title: string }>): ReactElement =>
     createElement("section", {}, createElement("h2", {}, title), actions),

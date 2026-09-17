@@ -3,6 +3,7 @@ import {
   ActionPanel,
   Alert,
   confirmAlert,
+  Detail,
   Icon,
   List,
   openExtensionPreferences,
@@ -194,15 +195,17 @@ const NoMatchActions = (props: SearchActionsProps): ReactElement => {
 
 type TermActionsProps = SearchActionsProps & Readonly<{ term: Term }>;
 
-const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
+type CopyTermActionsProps = Readonly<{ onTermUsed: (name: string) => void; term: Term }>;
+
+const CopyTermActions = ({ onTermUsed, term }: CopyTermActionsProps): ReactElement => {
   return (
-    <ActionPanel>
+    <>
       <Action
         title="Copy Definition"
         icon={Icon.Clipboard}
         onAction={() =>
           runAction(
-            () => copyWithFeedback(term.definition, "Definition", () => props.onTermUsed(term.term)),
+            () => copyWithFeedback(term.definition, "Definition", () => onTermUsed(term.term)),
             "Failed to Copy Definition",
           )
         }
@@ -211,8 +214,40 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         title="Copy Term"
         icon={Icon.Clipboard}
         onAction={() =>
-          runAction(() => copyWithFeedback(term.term, "Term", () => props.onTermUsed(term.term)), "Failed to Copy Term")
+          runAction(() => copyWithFeedback(term.term, "Term", () => onTermUsed(term.term)), "Failed to Copy Term")
         }
+      />
+    </>
+  );
+};
+
+const FullDefinition = ({
+  glossaryFile,
+  onTermUsed,
+  term,
+}: CopyTermActionsProps & Readonly<{ glossaryFile: string }>): ReactElement => {
+  return (
+    <Detail
+      navigationTitle={term.term}
+      markdown={renderPlainTextAsMarkdown(term.definition)}
+      actions={
+        <ActionPanel>
+          <CopyTermActions onTermUsed={onTermUsed} term={term} />
+          <RevealGlossaryFileAction glossaryFile={glossaryFile} />
+        </ActionPanel>
+      }
+    />
+  );
+};
+
+const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
+  return (
+    <ActionPanel>
+      <CopyTermActions onTermUsed={props.onTermUsed} term={term} />
+      <Action.Push
+        title="View Full Definition"
+        icon={Icon.Document}
+        target={<FullDefinition glossaryFile={props.glossaryFile} onTermUsed={props.onTermUsed} term={term} />}
       />
       <ActionPanel.Section>
         <AddTermAction {...props} />

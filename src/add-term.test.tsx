@@ -63,7 +63,7 @@ describe("standalone Add Term command", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
 
     expect(await screen.findByRole("heading", { name: "Term Added" })).toBeTruthy();
-    expect(screen.getByText(/API/).textContent).toContain("First line\nSecond line");
+    expect(screen.getByText(/API/).textContent).toContain("First line  \nSecond line");
 
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(raycastApiMocks.closeMainWindow).toHaveBeenCalledOnce();
