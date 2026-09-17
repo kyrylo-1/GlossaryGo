@@ -8,6 +8,7 @@ type ContainerProps = Readonly<{
   actions?: ReactNode;
   children?: ReactNode;
   markdown?: string;
+  metadata?: ReactNode;
   navigationTitle?: string;
 }>;
 type FieldProps = Readonly<{
@@ -87,8 +88,15 @@ export const Action = Object.assign(action, {
   SubmitForm: submitForm,
 });
 export const ActionPanel = Object.assign(actionPanel, { Section: actionPanel });
-export const Detail = ({ actions, markdown, navigationTitle }: ContainerProps): ReactElement =>
-  createElement("section", {}, createElement("h1", {}, navigationTitle), createElement("pre", {}, markdown), actions);
+export const Detail = ({ actions, markdown, metadata, navigationTitle }: ContainerProps): ReactElement =>
+  createElement(
+    "section",
+    {},
+    createElement("h1", {}, navigationTitle),
+    createElement("pre", {}, markdown),
+    metadata,
+    actions,
+  );
 export const Form = Object.assign(
   ({ actions, children }: ContainerProps): ReactElement => createElement("section", {}, children, actions),
   {
@@ -144,7 +152,8 @@ const listDetail = Object.assign(
     createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata),
   {
     Metadata: Object.assign(actionPanel, {
-      Label: ({ title }: Readonly<{ title: string }>): ReactElement => createElement("span", {}, title),
+      Label: ({ text, title }: Readonly<{ text?: string; title: string }>): ReactElement =>
+        createElement("div", {}, createElement("span", {}, title), createElement("span", {}, text)),
     }),
   },
 );
