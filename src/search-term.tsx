@@ -245,16 +245,7 @@ const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ res
           key={term.term}
           id={term.term}
           title={term.term}
-          detail={
-            <List.Item.Detail
-              markdown={renderPlainTextAsMarkdown(term.definition)}
-              metadata={
-                <List.Item.Detail.Metadata>
-                  <List.Item.Detail.Metadata.Label title="Glossary File" text={props.glossaryFile} />
-                </List.Item.Detail.Metadata>
-              }
-            />
-          }
+          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
           actions={<TermActions term={term} {...props} />}
         />
       ))}

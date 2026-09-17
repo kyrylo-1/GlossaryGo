@@ -52,6 +52,45 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+describe("Search Term result details", () => {
+  test("keeps literal term content and existing actions without exposing the glossary path", async () => {
+    const definition = "Literal # heading\nA *definition* with `code`.\nRésumé.";
+    mocks.load.mockResolvedValue([{ definition, term: "Résumé" }]);
+    render(<Command />);
+    const result = within(await screen.findByRole("article", { name: "Résumé" }));
+
+    expect(
+      result.getByText("```\nLiteral # heading\nA *definition* with `code`.\nRésumé.\n```", {
+        normalizer: (text) => text,
+      }),
+    ).toBeTruthy();
+    expect(result.queryByText("Glossary File")).toBeNull();
+    expect(result.queryByText("/tmp/first.yaml")).toBeNull();
+    expect(result.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "Copy Definition",
+      "Copy Term",
+      "Add Term",
+      "Edit Term",
+      "Delete Term",
+      "Reload Glossary",
+      "Reveal Glossary in Finder",
+    ]);
+
+    fireEvent.click(result.getByRole("button", { name: "Copy Definition" }));
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenCalledWith(definition));
+    fireEvent.click(result.getByRole("button", { name: "Copy Term" }));
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenCalledWith("Résumé"));
+    fireEvent.click(result.getByRole("button", { name: "Reveal Glossary in Finder" }));
+    expect(raycastApiMocks.showInFinder).toHaveBeenCalledWith("/tmp");
+
+    mocks.load.mockResolvedValue([{ definition: "Updated definition", term: "Résumé" }]);
+    reload();
+    expect(await screen.findByText(/Updated definition/)).toBeTruthy();
+    expect(screen.queryByText("Glossary File")).toBeNull();
+    expect(screen.queryByText("/tmp/first.yaml")).toBeNull();
+  });
+});
+
 describe("Search Term recent history", () => {
   test("records both successful copy actions, deduplicates repeats, and leaves typing alphabetical", async () => {
     render(<Command />);
