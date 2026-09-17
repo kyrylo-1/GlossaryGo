@@ -1,102 +1,120 @@
 # Testing GlossaryGo
 
-Use this plan for Codex acceptance testing in Raycast. Test observable outcomes against the current product contract;
-discover controls from the live UI instead of relying on fixed coordinates, menu positions, or remembered labels.
-`README.md` defines expected behavior, `CONTEXT.md` defines terminology, and `package.json` lists current commands,
-preferences, runtime requirements, and scripts. A disagreement between those sources and the UI is a finding to resolve,
-not a reason to silently change the expected result.
+Use for Codex acceptance testing in Raycast. Test observable product outcomes. Discover controls from live UI;
+never depend on fixed coordinates, menu positions, remembered labels.
+`README.md`: behavior. `CONTEXT.md`: terminology. `package.json`: commands, preferences, runtime, scripts.
+Source/UI disagreement is a finding to resolve; do not silently change expectations.
 
 ## Prepare a run
 
-1. Read `AGENTS.md` and the sources above. Record the checkout, branch, commit, uncommitted changes, and requested scope.
-   For a full acceptance run, cover every scenario below and each current command. For a feature change, cover its
-   affected scenarios plus a search, edit, delete, and reload smoke test; identify anything left untested.
-2. Use the repository's npm workflow: satisfy the runtime requirement, run `npm ci` when dependencies need installation,
-   and start `npm run dev` from the checkout being tested. Confirm which checkout Raycast actually runs using local
-   development or installation metadata. Recheck after switching commands or restarting; an installed copy can differ
-   from the working checkout. If runtime identity cannot be established, report that limit on UI evidence.
-3. Load the available `computer-use:computer-use` skill before interacting with Raycast. Follow its current setup and
-   tool instructions; this document intentionally does not duplicate its API or installation paths. If the skill or
-   desktop is unavailable, complete independent checks and mark UI cases blocked with a concrete resumption step.
-4. Record the original Glossary File preference and development-mode state without exposing private glossary contents.
-   Select a dedicated, disposable synthetic `.yaml` fixture before opening glossary results or exercising writes.
-   Never copy, log, capture, or back up a personal glossary for testing. Read-only file assertions and fixture preparation
-   may use filesystem tools; exercise user-facing search and mutations through Raycast.
-5. Build synthetic data with enough terms to exceed the current result limit, deliberately different file and display
-   order, overlapping prefixes, accented names, canonically equivalent Unicode queries, multiline definitions, and
-   document/entry comments. Include a word found only in a definition. Keep the fixture's starting bytes in memory for
-   comparison and restoration. Use separate invalid fixtures for failure cases; never damage a real Glossary File.
+1. Read `AGENTS.md` and sources above. Record checkout, branch, commit, uncommitted changes, requested scope.
+   Full acceptance covers every scenario and current command. Feature checks cover affected scenarios plus
+   search/edit/delete/reload smoke tests. Identify untested cases.
+2. Use npm; satisfy runtime requirement. Run `npm ci` when dependencies need installation; `npm run dev` from tested
+   checkout. Confirm actual runtime checkout through development/installation metadata. Recheck after command switches
+   and restarts; installed copy may differ. Report unknown runtime identity as UI evidence limit.
+3. Load `computer-use:computer-use` skill before Raycast interaction. Follow current setup/tools; do not duplicate APIs
+   or installation paths here. If skill/desktop unavailable, finish independent checks; mark UI cases blocked with
+   concrete resumption step.
+4. Record original Glossary File preference and development-mode state without exposing private content.
+   Select dedicated disposable synthetic `.yaml` before opening results or writing. Never copy, log, capture, or back up
+   personal glossary for testing. Filesystem tools may prepare fixtures and perform read-only assertions;
+   exercise user-facing search/mutations through Raycast.
+5. Fixture needs more terms than result limit, differing file/display order, overlapping prefixes, accented names,
+   canonically equivalent queries, multiline definitions, document/entry comments, definition-only word.
+   Keep starting bytes in memory for comparison/restoration. Use separate invalid fixtures; never damage real file.
 
-For default-file tests, first establish that the effective default path is unused or already a disposable synthetic
-fixture. If it contains personal data, leave it intact and report the case blocked until an isolated target is available.
+Test default storage only when effective default path is unused or disposable synthetic fixture.
+If personal data exists there, leave intact; block case until isolated target is available.
 
 ## Observe, act, verify
 
-- Inspect current accessibility state before choosing a control. After each action or short action sequence, fetch fresh
-  state before deciding the next step. Resolve element identifiers again from that state.
-- Prefer named accessibility controls and keyboard navigation. When accessibility information is incomplete, inspect a
-  current screenshot and use its visible controls. Capture only synthetic data; keep evidence local.
-- Derive navigation and shortcuts from the current UI. An absent expected action is a finding, not a cue to invoke its
-  implementation directly and call that a UI pass.
-- Before each case, state the expected outcome. Afterward, compare the visible state and, for mutations, the synthetic
-  file's bytes or parsed content. A success toast alone does not establish persistence or correct targeting.
-- Verify copy actions with a local comparison to the synthetic expected value. Avoid printing existing clipboard data;
-  preserve and restore it in memory when the tools support that, and disclose any restoration limit.
-- Keep automated and live UI evidence distinct. If an error cannot be induced reliably in Raycast, cite its automated
-  coverage separately and leave its UI status untested or blocked.
+- Inspect current accessibility state before selecting control. Fetch fresh state after each action/short sequence;
+  resolve element identifiers again.
+- Prefer named accessibility controls and keyboard navigation. If state incomplete, inspect current screenshot and use
+  visible controls. Capture only synthetic data; keep evidence local.
+- Derive navigation/shortcuts from current UI. Missing expected action is a finding; direct implementation calls are not
+  UI evidence.
+- State expected outcome before each case. Compare visible result and, for writes, synthetic bytes/parsed content.
+  Success toast alone proves neither persistence nor targeting.
+- Compare clipboard locally with synthetic expected value. Never print existing clipboard. Preserve/restore in memory
+  when tools support it; disclose restoration limits.
+- Separate automated/live evidence. Errors not reliably inducible in Raycast remain UI untested/blocked;
+  cite automated coverage separately.
 
 ## Acceptance scenarios
 
-Use the current README for exact limits, normalization rules, action availability, and post-save behavior. The cases
-below describe stable user outcomes; choose fresh synthetic values rather than depending on a fixed fixture inventory.
+Use current README for exact limits, normalization, action availability, post-save behavior.
+Choose fresh synthetic values; no fixed fixture inventory.
 
-| Area                        | Exercise                                                                                                                                                                                                                                          | Verify                                                                                                                                                                                                                                                                 |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Search                      | Empty query; matching prefix; mixed case and surrounding spaces; accent differences and canonical Unicode equivalents; definition-only and non-prefix queries.                                                                                    | Results follow the documented matching and ordering rules; names and definitions belong to the correct terms. Multiline definitions wrap as prose and preserve literal Markdown-like characters.                                                                       |
-| Definition reading          | Select a term with a long multiline definition and literal headings, emphasis, links, backticks, math-like delimiters, HTML-like text, and Unicode; open the full definition, scroll to the end, copy both values, reveal the file, then go back. | Preview wraps as literal prose without file metadata; the full-width reader displays every line and scrolls to the end; copying retains exact original text, Reveal remains accessible, and returning retains the query and selection.                                 |
-| Result limits               | Query more matches than the current cap, then narrow to a previously hidden term.                                                                                                                                                                 | Displayed count and total agree with the fixture and current contract; hidden results remain searchable.                                                                                                                                                               |
-| Selection and copying       | Navigate between results; copy a term and a multiline definition.                                                                                                                                                                                 | Each copied value belongs to the selected result and preserves its documented content; command behavior matches the contract.                                                                                                                                          |
-| Edit targeting              | Select a term whose file position differs from its displayed position, using a partial query; open edit.                                                                                                                                          | Both fields contain that selected term's actual values, independent of the query and display index.                                                                                                                                                                    |
-| Edit success                | Change only the definition, rename the term, and make a case-only rename.                                                                                                                                                                         | Exactly the intended entry changes; order, surviving comments, unrelated entries, and definition content are preserved as documented. Search and selection reflect the saved result.                                                                                   |
-| Edit rejection and cancel   | Try blank/whitespace fields and a name conflicting by case or canonical Unicode equivalence; correct each error; cancel an unsaved edit.                                                                                                          | Invalid changes never reach disk; submit focuses the first invalid field; errors clear after valid correction, including duplicate names; entered values remain available; cancellation leaves the file unchanged.                                                     |
-| Delete selection and cancel | Select a term in a different display/file position; open confirmation, then cancel.                                                                                                                                                               | Confirmation names the captured term; cancellation changes neither file nor query and does not trigger a reload.                                                                                                                                                       |
-| Delete success              | Confirm deletion with multiple matches, then delete the last match and finally the last entry.                                                                                                                                                    | Only the captured term is removed; surviving data/comments remain; query is retained; no-match and valid empty-glossary states expose the appropriate actions.                                                                                                         |
-| Stale operations            | Open an edit or delete confirmation, then externally change the selected synthetic entry before submitting.                                                                                                                                       | The stale mutation is refused without overwriting external changes; input retention, refresh, and retry follow the documented conflict behavior.                                                                                                                       |
-| Save failures               | Use a synthetic target that is non-writable or otherwise unsupported for writes.                                                                                                                                                                  | No false success or partial mutation; actionable recovery is available, and entered edit values are retained. Retry succeeds after fixing the condition.                                                                                                               |
-| Reload and recovery         | Change the synthetic file externally and explicitly reload; load invalid YAML, duplicate terms, or an unreadable target, then restore a valid target and reload.                                                                                  | Successful reload reflects new content; failed reload hides stale results and limits actions appropriately; recovery works without reinstalling.                                                                                                                       |
-| Empty and missing files     | Select an empty synthetic glossary and a safely isolated missing target.                                                                                                                                                                          | Each state offers its documented onboarding/recovery actions; edit/delete require a selected term. Read-only access and canceled/invalid input do not create files.                                                                                                    |
-| Add entry points            | Exercise every current add command or action, including form and inline entry where available; try valid, invalid, and duplicate input.                                                                                                           | All entry points use the effective Glossary File and shared validation; forms focus the first invalid field and clear errors after valid correction; successful entries become searchable; follow-up, cancellation, and failed-save behavior match the contract.       |
-| Preferences and targeting   | Switch between two synthetic Glossary Files; exercise default storage only when isolated as described above.                                                                                                                                      | Commands agree on the effective target; mutations affect only that target; preference changes and recovery are honored.                                                                                                                                                |
-| Persistence                 | Save changes, reopen the command, then perform the full restart check below.                                                                                                                                                                      | Saved edits remain and deleted terms stay absent from the same verified synthetic target.                                                                                                                                                                              |
-| Recent Terms                | Copy several terms using both copy actions from the preview and full reader, repeat one, type a prefix, then clear it. Navigate without copying and simulate a failed copy where feasible.                                                        | Empty or whitespace queries show up to five successfully copied names in most-recent-first order without duplicates. Passive navigation and failed copies do not record terms. Typed searches remain alphabetical. With no valid history, alphabetical results appear. |
-| Recent history lifecycle    | Reload after editing/removing a copied term; change the effective file; close and reopen Search Term.                                                                                                                                             | Reload uses current definitions and prunes missing names. History stays in memory, resets on target changes and command unmount, and is never written to disk or Raycast storage.                                                                                      |
+- **Search:** Try blank query, prefix, mixed case, surrounding spaces, accents, canonical Unicode equivalents,
+  definition-only and non-prefix queries. Verify matching/order, correct name/definition pairing, multiline prose
+  wrapping, literal Markdown-like characters.
+- **Definition reading:** Select long multiline definition with headings, emphasis, links, backticks, math-like
+  delimiters, HTML-like text, Unicode. Open full reader, scroll to end, copy both values, reveal file, return.
+  Verify literal preview without file metadata, every line in full-width reader, exact copied text, Reveal action,
+  retained query/selection.
+- **Result limits:** Exceed cap; narrow to previously hidden term. Verify displayed/total counts against fixture and
+  contract; hidden terms remain searchable.
+- **Selection and copying:** Navigate results; copy term and multiline definition. Verify selected-result targeting,
+  preserved content, documented command behavior.
+- **Edit targeting:** Select term with differing file/display position using partial query. Open edit;
+  verify actual selected fields, independent of query/display index.
+- **Edit success:** Change definition, rename, case-only rename. Verify only intended entry changes; preserve order,
+  surviving comments, unrelated entries, definition content. Search/selection reflect save.
+- **Edit rejection and cancel:** Try blank/whitespace fields and case-/Unicode-equivalent conflicts; correct errors;
+  cancel unsaved edit. Verify no invalid writes, first-invalid-field focus, errors clear after correction including
+  duplicates, input retained, canceled file unchanged.
+- **Delete selection and cancel:** Select differing file/display position; open confirmation; cancel.
+  Verify captured name, unchanged file/query, no reload.
+- **Delete success:** Confirm with multiple matches; delete last match, then last entry. Verify only captured entry
+  removed, surviving data/comments preserved, query retained, correct no-match/valid-empty actions.
+- **Stale operations:** Open edit/delete confirmation; externally change selected synthetic entry; submit.
+  Verify refusal without overwrite; documented input retention, refresh, retry.
+- **Save failures:** Use non-writable or otherwise unsupported synthetic target. Verify no false success/partial mutation,
+  actionable recovery, retained edit input, successful retry after repair.
+- **Reload and recovery:** Externally edit fixture; reload. Try invalid YAML, duplicates, unreadable target; restore valid
+  target; reload. Verify new content, hidden stale results and restricted actions on failure, recovery without reinstall.
+- **Empty and missing files:** Select empty glossary and safely isolated missing target. Verify documented
+  onboarding/recovery; edit/delete require selection. Read-only access and canceled/invalid input create nothing.
+- **Add entry points:** Exercise every add command/action, forms/inline input where available, valid/invalid/duplicate
+  input. Verify effective target, shared validation, first-invalid-field focus, errors clear after correction,
+  saved terms searchable, documented follow-up/cancel/failure behavior.
+- **Preferences and targeting:** Switch between two synthetic files. Test isolated default storage only as above.
+  Verify all commands agree on target; writes affect only target; preference changes/recovery honored.
+- **Persistence:** Save, reopen command, perform full restart below. Verify edits remain and deleted terms stay absent
+  from same verified synthetic target.
+- **Recent Terms:** Use both copy actions in preview/full reader; copy several terms, repeat one, type prefix, clear.
+  Navigate without copying; induce failed copy where feasible. Verify blank/whitespace query shows up to five
+  successfully copied names, newest first, no duplicates. Navigation/failed copies record nothing.
+  Typed search remains alphabetical; absent valid history falls back to alphabetical results.
+- **Recent history lifecycle:** Reload after editing/removing copied term; switch effective file; close/reopen Search Term.
+  Verify current definitions, missing-name pruning, memory-only history, reset on target change/command unmount,
+  no writes to disk/Raycast storage.
 
-Use automated tests for deterministic boundary and race checks such as file-size limits, linked files, write failures,
-and concurrent source changes. When those mechanisms change, run their focused tests and add a feasible UI recovery
-case. Do not label simulated component behavior as a live Raycast observation.
+Use automated tests for deterministic boundaries/races: file size, linked files, write failures, concurrent changes.
+When mechanisms change, run focused tests and add feasible UI recovery case.
+Simulated component behavior is not live Raycast evidence.
 
 ## Finish and report
 
-1. For code changes, run the current test, lint, formatting, and build scripts from `package.json`. For documentation-only
-   changes, check formatting and verify referenced files/scripts and agreement with the product contract. Record actual
-   commands, outcomes, and any pre-existing failures.
-2. For full restart persistence, stop only the development process associated with this run, quit Raycast completely,
-   verify it exited, relaunch, and reopen the command. Verify runtime identity and effective synthetic path again before
-   checking saved content. Reopening a command alone is not a full restart check. If switching runtimes prevents the
-   check, report it separately from successful command-reopen persistence.
-3. Restore synthetic fixtures byte-for-byte, the original preference, and the prior development-mode state. Verify
-   restoration without displaying personal glossary contents. Inspect repository status for accidental changes.
-   Follow `AGENTS.md`: provide exact cleanup commands for disposable files instead of deleting files yourself. Deleting
-   a synthetic term through the extension is a test case; deleting a filesystem file is cleanup.
-4. Report **test plan and findings** with checkout/runtime identity, scope, automated results, and one row per exercised
-   case: `scenario | expected | observed | pass/fail/blocked/not run | evidence`. Include failures, pending cases, blockers,
-   restoration status, and evidence limits. Keep run-specific values, screenshots, and findings out of this reusable plan.
+1. Code changes: run current test/lint/format/build scripts from `package.json`.
+   Docs only: check format, referenced files/scripts, product-contract agreement.
+   Record actual commands, outcomes, pre-existing failures.
+2. Full restart: stop only this run's development process; quit Raycast completely; verify exit; relaunch; reopen command.
+   Recheck runtime identity and effective synthetic path before saved-content assertions.
+   Command reopen alone is not full restart. If runtime switching blocks restart check, report separately from reopen pass.
+3. Restore synthetic bytes exactly, original preference, prior development-mode state. Verify without displaying private
+   content. Inspect repository status. Follow `AGENTS.md`: provide exact disposable-file cleanup commands; never delete
+   files yourself. Extension term deletion is a test; filesystem deletion is cleanup.
+4. Report **test plan and findings**: checkout/runtime identity, scope, automated results; one row per exercised case:
+   `scenario | expected | observed | pass/fail/blocked/not run | evidence`.
+   Include failures, pending cases, blockers, restoration, evidence limits.
+   Keep run-specific values/screenshots/findings out of reusable plan.
 
 ## Keep this plan current
 
-Every feature addition, behavior change, or regression fix must update the affected scenario in this file in the same
-change. Describe the observable outcome and recovery expectation; add a row only for a distinct user workflow. Reuse
-existing rows for new variants and remove obsolete expectations when behavior is intentionally retired. Keep exact UI
-labels, numeric limits, file paths, and script inventories in their existing source of truth rather than copying them
-here. Include the plan update and its validation status in the implementation handoff; future coverage is not evidence
-that the scenario was executed.
+Update affected scenarios with every feature, behavior change, regression fix in same change.
+Describe observable outcome and recovery. Add scenario only for distinct workflow; reuse cases for variants.
+Remove obsolete expectations when behavior intentionally retires. Keep exact UI labels, limits, paths, script inventories
+in existing sources of truth. Handoff includes plan update and validation status; planned coverage is not execution proof.
