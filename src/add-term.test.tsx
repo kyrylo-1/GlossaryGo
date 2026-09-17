@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import Command from "./add-term";
+import { GlossaryError } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import { raycastApiMocks } from "./test/raycast-api-stub";
 
@@ -92,4 +93,43 @@ describe("standalone Add Term command", () => {
     expect(valueOf("term")).toBe("Retained Term");
     expect(valueOf("definition")).toBe("Retained definition");
   });
+
+  test("focuses the first invalid field and keeps whitespace errors until valid correction", async () => {
+    render(<Command />);
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "  " } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: "\t" } });
+    screen.getByTestId("definition").focus();
+    fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+    expect(globalThis.document.activeElement).toBe(screen.getByTestId("term"));
+    expect(mocks.saveGlossaryChange).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("term"), { target: { value: " " } });
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "Valid" } });
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
+    await waitFor(() => expect(globalThis.document.activeElement).toBe(screen.getByTestId("definition")));
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: "Valid definition" } });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("clears a duplicate error after correction and saves the corrected name with literal definition", async () => {
+    mocks.saveGlossaryChange.mockRejectedValueOnce(new GlossaryError("duplicate-term", "Term already exists."));
+    mocks.saveGlossaryChange.mockResolvedValueOnce();
+    render(<Command />);
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "Duplicate" } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: " Literal\nDefinition " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Term already exists.");
+    expect(valueOf("term")).toBe("Duplicate");
+    expect(valueOf("definition")).toBe(" Literal\nDefinition ");
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "  Corrected  " } });
+    expect(screen.queryByRole("alert")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
+    await screen.findByRole("heading", { name: "Term Added" });
+    expect(mocks.saveGlossaryChange).toHaveBeenLastCalledWith("/tmp/glossary.yaml", {
+      type: "add", term: { term: "Corrected", definition: " Literal\nDefinition " },
+    });
+  });
+
 });
