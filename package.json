@@ -29,6 +29,12 @@
       "mode": "view"
     },
     {
+      "name": "reveal-glossary-file",
+      "title": "Reveal Glossary File",
+      "description": "Reveal your glossary file or its nearest existing folder in Finder",
+      "mode": "no-view"
+    },
+    {
       "name": "quick-add-term",
       "title": "Quick Add Term",
       "description": "Quickly add a term and definition to your local glossary",
