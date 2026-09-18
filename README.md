@@ -50,6 +50,14 @@ strings are supported.
 Open **Add Term**. Enter **Term** and multiline **Definition**; choose **Save Term**. Saved names are trimmed.
 Definitions require non-whitespace text; remaining content stays exact.
 
+Every successful add sorts the complete stored terms sequence, including previously unsorted entries, by name.
+File order uses locale-independent JavaScript ordinal string comparison: NFC-normalized lowercase names first,
+then NFC-normalized original names, then original names to break ties. Accents remain distinct; ordering is identical
+across locales. Existing YAML entries move with their attached comments and scalar styles; decoded definition content
+stays exact. The same ordering applies to Add inside Search Term, standalone Add Term, and Quick Add Term.
+Edit keeps the selected file position; Delete keeps surviving entries in their current order. Opening, searching,
+reloading, canceling, and failed saves never sort or rewrite the file.
+
 After save, **Term Added** keeps saved fields visible. **Add Another Term** opens pristine form focused on **Term**;
 **Done** closes command. Failed saves retain both inputs and show actionable error. No saved drafts.
 Form shows effective Glossary File path and **Reveal Glossary in Finder**.
