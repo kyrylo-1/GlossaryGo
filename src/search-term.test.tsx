@@ -242,7 +242,7 @@ describe("full definition reader recency", () => {
     await waitFor(() => expect(raycastApiMocks.showToast).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     search("");
-    expect(names()).toEqual(["Zulu"]);
+    expect(names()).toEqual(["Zulu", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]);
   });
 });
 
@@ -291,15 +291,15 @@ describe("Search Term recent history", () => {
     render(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
     await copy("Zulu");
-    await waitFor(() => expect(names()).toEqual(["Zulu"]));
+    await waitFor(() => expect(names()).toEqual(["Zulu", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]));
     await copy("Bravo", "Copy Term");
-    await waitFor(() => expect(names()).toEqual(["Bravo", "Zulu"]));
+    await waitFor(() => expect(names()).toEqual(["Bravo", "Zulu", "Alpha", "Charlie", "Delta", "Echo", "Foxtrot"]));
     await copy("Zulu");
-    await waitFor(() => expect(names()).toEqual(["Zulu", "Bravo"]));
+    await waitFor(() => expect(names()).toEqual(["Zulu", "Bravo", "Alpha", "Charlie", "Delta", "Echo", "Foxtrot"]));
     search("a");
     expect(names()).toEqual(["Alpha"]);
     search("");
-    expect(names()).toEqual(["Zulu", "Bravo"]);
+    expect(names()).toEqual(["Zulu", "Bravo", "Alpha", "Charlie", "Delta", "Echo", "Foxtrot"]);
   });
 
   test("does not record a failed copy or passive search", async () => {
@@ -310,7 +310,28 @@ describe("Search Term recent history", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy Term" }));
     await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenCalledWith("Zulu"));
     search("");
-    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo"]);
+    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
+  });
+});
+
+describe("Search Term complete result list", () => {
+  test("renders every broad-prefix match without an overflow message and copies the last definition", async () => {
+    mocks.load.mockResolvedValue(
+      ["A07", "A06", "A05", "A04", "A03", "A02", "A01"].map((term) => ({
+        definition: `${term} original definition`,
+        term,
+      })),
+    );
+    render(<Command />);
+    await screen.findByRole("article", { name: "A01" });
+    search("a");
+
+    expect(names()).toEqual(["A01", "A02", "A03", "A04", "A05", "A06", "A07"]);
+    expect(screen.queryByText(/Showing 5 of/)).toBeNull();
+
+    const last = within(screen.getByRole("article", { name: "A07" }));
+    fireEvent.click(last.getByRole("button", { name: "Copy Definition" }));
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith("A07 original definition"));
   });
 });
 
@@ -321,27 +342,26 @@ describe("Search Term history lifecycle", () => {
     await copy("Zulu");
     mocks.load.mockResolvedValue(terms.filter(({ term }) => term !== "Zulu"));
     reload();
-    await screen.findByRole("article", { name: "Alpha" });
+    await waitFor(() => expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]));
     mocks.load.mockResolvedValue(terms);
     reload();
-    await screen.findByRole("article", { name: "Alpha" });
-    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo"]);
+    await waitFor(() => expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]));
   });
 
   test("isolates history when the effective glossary changes and when the command reopens", async () => {
     const view = render(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
     await copy("Zulu");
-    await waitFor(() => expect(names()).toEqual(["Zulu"]));
+    await waitFor(() => expect(names()).toEqual(["Zulu", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]));
     mocks.path = "/tmp/second.yaml";
     view.rerender(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
-    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo"]);
+    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
     await copy("Zulu");
     view.unmount();
     render(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
-    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo"]);
+    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
   });
 
   test("hides history after a failed reload and refreshes definitions on recovery", async () => {
