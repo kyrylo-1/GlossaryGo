@@ -11,7 +11,7 @@ const expectGlossaryError = (action: () => unknown, code: GlossaryError["code"])
 // This group covers independent add mutations in one source-validation flow.
 // eslint-disable-next-line max-lines-per-function
 describe("applyGlossaryChange additions", () => {
-  test("appends to an empty glossary without changing definition text", () => {
+  test("adds to an empty glossary without changing definition text", () => {
     const term = { definition: "  first line\nsecond line\n", term: "API" };
     const next = applyGlossaryChange("# My glossary\nterms: []\n", { term, type: "add" });
     expect(parseGlossarySource(next)).toEqual([term]);
@@ -38,8 +38,8 @@ describe("applyGlossaryChange additions", () => {
       "literal and folded definitions",
       "terms:\n  - term: Literal\n    definition: |\n      first line\n      second line\n  - term: Folded\n    definition: >\n      folded line\n      continues\n",
       [
-        { definition: "first line\nsecond line\n", term: "Literal" },
         { definition: "folded line continues\n", term: "Folded" },
+        { definition: "first line\nsecond line\n", term: "Literal" },
       ],
     ],
     ["a document end marker", "terms: []\n...\n", []],
@@ -50,7 +50,58 @@ describe("applyGlossaryChange additions", () => {
     expect(parseGlossarySource(next)).toEqual([...existingTerms, { definition: "New definition", term: "New" }]);
   });
 
-  test("retains root and sequence comments when appending", () => {
+  test("sorts the complete previously unsorted sequence with case-insensitive normalized ordinal names", () => {
+    const names = ["Ωmega", "Zulu", "cafe\u0301", "Éclair", "beta", "Ångström", "cafe"];
+    const source = `terms:\n${names.map((name) => `  - term: ${name}\n    definition: ${name} definition\n`).join("")}`;
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Alpha definition", term: " Alpha " },
+      type: "add",
+    });
+
+    expect(parseGlossarySource(next).map(({ term }) => term)).toEqual([
+      "Alpha",
+      "beta",
+      "cafe",
+      "cafe\u0301",
+      "Zulu",
+      "Ångström",
+      "Éclair",
+      "Ωmega",
+    ]);
+  });
+
+  test("produces identical saved bytes from different entry orders", () => {
+    const firstSource = "terms:\n  - term: Zulu\n    definition: Last\n  - term: Alpha\n    definition: First\n";
+    const secondSource = "terms:\n  - term: Alpha\n    definition: First\n  - term: Zulu\n    definition: Last\n";
+    const change = { term: { definition: "Middle", term: "beta" }, type: "add" } as const;
+
+    expect(applyGlossaryChange(firstSource, change)).toBe(applyGlossaryChange(secondSource, change));
+  });
+
+  test("moves commented and styled YAML entries while preserving exact decoded definitions", () => {
+    const source =
+      "# Root note\nterms: # Sequence note\n  # Sequence leading note\n  - term: \"Zulu\" # Zulu term\n    definition: |+ # Zulu definition\n      last line\n\n  # Alpha entry\n  - term: 'Alpha' # Alpha term\n    definition: '  first: # []  ' # Alpha definition\n  # Folded entry\n  - term: Folded\n    definition: >-\n      folded line\n      continues\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "  middle\nline\n", term: "beta" },
+      type: "add",
+    });
+
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "  first: # []  ", term: "Alpha" },
+      { definition: "  middle\nline\n", term: "beta" },
+      { definition: "folded line continues", term: "Folded" },
+      { definition: "last line\n\n", term: "Zulu" },
+    ]);
+    expect(next).toContain("# Root note");
+    expect(next).toContain("# Sequence note");
+    expect(next).toContain("# Sequence leading note");
+    expect(next).toContain("# Alpha entry\n  - term: 'Alpha' # Alpha term");
+    expect(next).toContain("definition: '  first: # []  ' # Alpha definition");
+    expect(next).toContain("# Folded entry\n  - term: Folded\n    definition: >-");
+    expect(next).toContain('term: "Zulu" # Zulu term\n    definition: |+ # Zulu definition');
+  });
+
+  test("retains root and sequence comments when adding", () => {
     const source =
       "# Root note\nterms: # Sequence note\n  # Existing entry note\n  - term: API # Term note\n    definition: Interface # Definition note\n";
     const next = applyGlossaryChange(source, { term: { definition: "Hypertext", term: "HTML" }, type: "add" });
@@ -66,7 +117,7 @@ describe("applyGlossaryChange additions", () => {
     expect(next).toContain("# Definition note");
   });
 
-  test("normalizes surrounding submitted term whitespace before appending", () => {
+  test("normalizes surrounding submitted term whitespace before adding", () => {
     const next = applyGlossaryChange("terms: []\n", {
       term: { definition: "Interface", term: "  API  " },
       type: "add",
@@ -83,7 +134,7 @@ describe("applyGlossaryChange additions", () => {
     expectGlossaryError(() => applyGlossaryChange("terms: []\n", { term, type: "add" }), "invalid-schema");
   });
 
-  test("does not tighten existing whitespace-only definition validation while appending", () => {
+  test("does not tighten existing whitespace-only definition validation while adding", () => {
     const source = 'terms:\n  - term: Existing\n    definition: "   "\n';
     const next = applyGlossaryChange(source, { term: { definition: "New definition", term: "New" }, type: "add" });
 
@@ -97,7 +148,7 @@ describe("applyGlossaryChange additions", () => {
   test.each([
     ["case-insensitive duplicate", "API", "api"],
     ["canonically equivalent Unicode duplicate", "café", "cafe\u0301"],
-  ])("rejects a %s after appending", (_label, existing, submitted) => {
+  ])("rejects a %s after adding", (_label, existing, submitted) => {
     const source = `terms:\n  - term: ${existing}\n    definition: Existing\n`;
     expectGlossaryError(
       () => applyGlossaryChange(source, { term: { definition: "Replacement", term: submitted }, type: "add" }),
@@ -105,7 +156,7 @@ describe("applyGlossaryChange additions", () => {
     );
   });
 
-  test("allows accent-distinct terms when appending", () => {
+  test("allows accent-distinct terms when adding", () => {
     const source = "terms:\n  - term: cafe\n    definition: Plain\n";
     const next = applyGlossaryChange(source, { term: { definition: "Accented", term: "café" }, type: "add" });
     expect(parseGlossarySource(next)).toEqual([
@@ -222,6 +273,20 @@ describe("applyGlossaryChange edits and deletions", () => {
         }),
       "stale-term",
     );
+  });
+
+  test("deleting from an unsorted sequence preserves the surviving order", () => {
+    const source =
+      "terms:\n  - term: Zulu\n    definition: Last\n  - term: Remove\n    definition: Removed\n  - term: Alpha\n    definition: First\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "Last", term: "Zulu" },
+      { definition: "First", term: "Alpha" },
+    ]);
   });
 
   test("deleting the last term retains an empty glossary and glossary comments", () => {
