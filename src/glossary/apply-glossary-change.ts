@@ -3,7 +3,7 @@ import { isMap, isScalar, isSeq, type YAMLSeq } from "yaml";
 import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
 import type { Term } from "../utils/types";
 import { GlossaryError } from "./glossary-error";
-import { areTermsEquivalent } from "./term-matching";
+import { resolveSelectedIndex } from "./entry-identity";
 import { compareTermNames } from "./term-name-order";
 import { parseValidatedGlossarySource } from "./validated-glossary-source";
 
@@ -39,7 +39,7 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
     document.addIn(["terms"], document.createNode(term));
     sortTermsSequence(sequence, [...terms, term]);
   } else {
-    const index = terms.findIndex((term) => areTermsEquivalent(term.term, change.original.term));
+    const index = resolveSelectedIndex(source, terms, change.original);
     if (
       index === -1 ||
       terms[index].term !== change.original.term ||
@@ -68,7 +68,7 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
     }
   }
 
-  const nextSource = document.toString();
+  const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${document.toString()}`;
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }

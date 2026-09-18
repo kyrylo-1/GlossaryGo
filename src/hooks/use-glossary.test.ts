@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { parseGlossarySource } from "../glossary/glossary";
 import type { Term } from "../utils/types";
 import { glossaryReducer, type GlossaryReducerState } from "./glossary-reducer";
 
@@ -62,8 +63,8 @@ describe("glossaryReducer recovery", () => {
 describe("glossaryReducer copy and reload ordering", () => {
   test("retains a successful copy during reload and validates it against the loaded glossary", () => {
     const loading: GlossaryReducerState = { query: "", recentTerms: [], state: { status: "loading" } };
-    const copied = glossaryReducer(loading, { name: "API", type: "termUsed" });
-    expect(glossaryReducer(copied, { terms, type: "loadSucceeded" }).recentTerms).toEqual(["API"]);
+    const copied = glossaryReducer(loading, { term: terms[0], type: "termUsed" });
+    expect(glossaryReducer(copied, { terms, type: "loadSucceeded" }).recentTerms).toEqual([terms[0]]);
     expect(glossaryReducer(copied, { terms: [], type: "loadSucceeded" }).recentTerms).toEqual([]);
   });
 });
@@ -71,7 +72,21 @@ describe("glossaryReducer copy and reload ordering", () => {
 test("keeps a successful pending copy through a reload failure and validates on recovery", () => {
   const loading: GlossaryReducerState = { query: "", recentTerms: [], state: { status: "loading" } };
   const failed = glossaryReducer(loading, { message: "Unreadable", type: "loadFailed" });
-  const copied = glossaryReducer(failed, { name: "API", type: "termUsed" });
-  expect(glossaryReducer(copied, { terms, type: "loadSucceeded" }).recentTerms).toEqual(["API"]);
+  const copied = glossaryReducer(failed, { term: terms[0], type: "termUsed" });
+  expect(glossaryReducer(copied, { terms, type: "loadSucceeded" }).recentTerms).toEqual([terms[0]]);
   expect(glossaryReducer(copied, { terms: [], type: "loadSucceeded" }).recentTerms).toEqual([]);
+});
+
+test("records a completed pending copy against current entry identity after reload", () => {
+  const before = parseGlossarySource("terms: [{ term: API, definition: First }, { term: API, definition: Second }]\n");
+  const after = parseGlossarySource(
+    "terms: [{ term: AAA, definition: Added }, { term: API, definition: First }, { term: API, definition: Second }]\n",
+  );
+  const current: GlossaryReducerState = { query: "", recentTerms: [], state: { status: "ready", terms: after } };
+  expect(glossaryReducer(current, { term: before[1], type: "termUsed" }).recentTerms[0]).toBe(after[2]);
+  const removed = parseGlossarySource("terms: [{ term: API, definition: First }]\n");
+  expect(
+    glossaryReducer({ ...current, state: { status: "ready", terms: removed } }, { term: before[1], type: "termUsed" })
+      .recentTerms,
+  ).toEqual([]);
 });

@@ -504,19 +504,34 @@ describe("saveGlossaryChange queue recovery", () => {
     await expect(loadGlossary(path)).resolves.toEqual([{ definition: "Transfer protocol", term: "HTTP" }]);
   });
 
-  test("skips replacement when an edit produces identical source", async () => {
-    const source = "terms:\n  - term: API\n    definition: Interface\n";
-    const path = await writeGlossary(source);
-    const before = await stat(path);
+  test.each(["", "\uFEFF"])(
+    "skips replacement when a loaded unchanged edit preserves source prefix %j",
+    async (prefix) => {
+      const source = `${prefix}terms:\n  - term: API\n    definition: Interface\n`;
+      const path = await writeGlossary(source);
+      const before = await stat(path);
 
-    await saveGlossaryChange(path, {
-      original: { definition: "Interface", term: "API" },
-      term: { definition: "Interface", term: "API" },
-      type: "edit",
-    });
+      await saveGlossaryChange(path, {
+        original: (await loadGlossary(path))[0],
+        term: { definition: "Interface", term: "API" },
+        type: "edit",
+      });
 
-    const after = await stat(path);
-    expect(after.ino).toBe(before.ino);
-    await expect(readFile(path, "utf8")).resolves.toBe(source);
-  });
+      const after = await stat(path);
+      expect(after.ino).toBe(before.ino);
+      await expect(readFile(path, "utf8")).resolves.toBe(source);
+    },
+  );
+});
+
+test("retains a source BOM through additions, edits, and deletions", async () => {
+  const path = await writeGlossary("\uFEFFterms:\n  - term: API\n    definition: Interface\n");
+  await saveGlossaryChange(path, { term: { definition: "Protocol", term: "HTTP" }, type: "add" });
+  expect((await readFile(path, "utf8")).startsWith("\uFEFF")).toBe(true);
+  const entries = await loadGlossary(path);
+  await saveGlossaryChange(path, { original: entries[1], term: { definition: "Updated", term: "HTTP" }, type: "edit" });
+  expect((await readFile(path, "utf8")).startsWith("\uFEFF")).toBe(true);
+  await saveGlossaryChange(path, { original: (await loadGlossary(path))[1], type: "delete" });
+  expect((await readFile(path, "utf8")).startsWith("\uFEFF")).toBe(true);
+  await expect(loadGlossary(path)).resolves.toEqual([{ definition: "Interface", term: "API" }]);
 });

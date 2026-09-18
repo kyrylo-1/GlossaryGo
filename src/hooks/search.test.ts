@@ -74,7 +74,7 @@ describe("searchTerms Unicode and complete results", () => {
 
 describe("recent terms", () => {
   test("uses current definitions in the recent-first portion", () => {
-    expect(searchTerms([term("Alpha"), term("Zulu", "Updated")], "", ["Zulu"])).toEqual({
+    expect(searchTerms([term("Alpha"), term("Zulu", "Updated")], "", [term("Zulu")])).toEqual({
       terms: [term("Zulu", "Updated"), term("Alpha")],
       totalMatchCount: 2,
     });
@@ -83,30 +83,40 @@ describe("recent terms", () => {
   test("places every current recent term before the remaining alphabetical glossary", () => {
     const all = ["A07", "A06", "A05", "A04", "A03", "A02", "A01"].map((name) => term(name));
 
-    expect(searchTerms(all, " ", ["A07", "A02", "Deleted"])).toEqual({
+    expect(searchTerms(all, " ", [term("A07"), term("A02"), term("Deleted")])).toEqual({
       terms: [term("A07"), term("A02"), term("A01"), term("A03"), term("A04"), term("A05"), term("A06")],
       totalMatchCount: 7,
     });
   });
 
   test("falls back alphabetically when all history entries are stale", () => {
-    expect(searchTerms([term("Zulu"), term("Alpha")], "", ["Deleted"])).toEqual({
+    expect(searchTerms([term("Zulu"), term("Alpha")], "", [term("Deleted")])).toEqual({
       terms: [term("Alpha"), term("Zulu")],
       totalMatchCount: 2,
     });
   });
 
   test("does not duplicate equivalent current recent names", () => {
-    expect(searchTerms([term("Résumé"), term("Zulu")], "", ["résumé", "RÉSUMÉ", "Zulu"])).toEqual({
+    expect(searchTerms([term("Résumé"), term("Zulu")], "", [term("résumé"), term("RÉSUMÉ"), term("Zulu")])).toEqual({
       terms: [term("Résumé"), term("Zulu")],
       totalMatchCount: 2,
     });
   });
 
   test("keeps typed prefix matches alphabetical regardless of history", () => {
-    expect(searchTerms([term("API"), term("ADR"), term("Zulu")], "a", ["Zulu", "API"])).toEqual({
+    expect(searchTerms([term("API"), term("ADR"), term("Zulu")], "a", [term("Zulu"), term("API")])).toEqual({
       terms: [term("ADR"), term("API")],
       totalMatchCount: 2,
     });
   });
+});
+
+test("keeps every sibling visible when an identical entry is recent", () => {
+  const first = term("API", "Same");
+  const second = term("API", "Same");
+  const entries = [first, second, term("Alpha")];
+  const result = searchTerms(entries, "", [second]);
+  expect(result.totalMatchCount).toBe(3);
+  expect(result.terms[0]).toBe(second);
+  expect(result.terms.filter((entry) => entry.term === "API")).toHaveLength(2);
 });

@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { createElement, useState, type ReactElement, type ReactNode } from "react";
+import { createElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { vi } from "vitest";
 import type { KeyboardShortcut } from "@raycast/api";
 
@@ -136,20 +136,56 @@ export const confirmAlert = vi.fn<() => Promise<boolean>>().mockResolvedValue(fa
 const pop = vi.fn<() => void>();
 export const useNavigation = (): { pop: () => void } => ({ pop });
 
-const listContainer = ({
+// Models native host selection from mounted rows, including its loading reset.
+/* eslint-disable react-hooks/set-state-in-effect, react-hooks/refs -- Synchronize the synthetic native host with mounted result DOM. */
+// eslint-disable-next-line max-lines-per-function
+const ListContainer = ({
   children,
   isShowingDetail,
   onSearchTextChange,
+  onSelectionChange,
   searchText,
+  selectedItemId,
 }: ContainerProps &
   Readonly<{
     isShowingDetail: boolean;
     onSearchTextChange: (value: string) => void;
+    onSelectionChange?: (id: string | null) => void;
     searchText: string;
-  }>): ReactElement =>
-  createElement(
+    selectedItemId?: string;
+  }>): ReactElement => {
+  const container = useRef<globalThis.HTMLElement>(null);
+  const [nativeSelection, setNativeSelection] = useState<string | null>(null);
+  useEffect(() => {
+    const ids: string[] = [];
+    container.current?.querySelectorAll<globalThis.HTMLElement>("article").forEach((row) => {
+      if (row.dataset.entryId) {
+        ids.push(row.dataset.entryId);
+      }
+    });
+    const candidate = selectedItemId ?? nativeSelection;
+    const next = candidate && ids.includes(candidate) ? candidate : (ids[0] ?? null);
+    if (next !== nativeSelection) {
+      setNativeSelection(next);
+      onSelectionChange?.(next);
+    }
+  }, [children, nativeSelection, onSelectionChange, selectedItemId]);
+  return createElement(
     "main",
-    { "data-showing-detail": isShowingDetail },
+    {
+      "data-selected-item-id": nativeSelection,
+      "data-showing-detail": isShowingDetail,
+      onClick: (event: Readonly<{ target: globalThis.EventTarget | null }>) => {
+        if (event.target instanceof globalThis.Element) {
+          const id = event.target.closest<globalThis.HTMLElement>("article")?.dataset.entryId;
+          if (id) {
+            setNativeSelection(id);
+            onSelectionChange?.(id);
+          }
+        }
+      },
+      ref: container,
+    },
     createElement("input", {
       "aria-label": "Search terms",
       onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) => onSearchTextChange(event.target.value),
@@ -157,14 +193,26 @@ const listContainer = ({
     }),
     children,
   );
+};
+
+/* eslint-enable react-hooks/set-state-in-effect, react-hooks/refs */
 const listSection = ({ children, title }: ContainerProps & Readonly<{ title?: string }>): ReactElement =>
   createElement("section", {}, title ? createElement("h2", {}, title) : null, children);
 const listItem = ({
   actions,
   detail,
   title,
-}: ContainerProps & Readonly<{ detail: ReactNode; title: string }>): ReactElement =>
-  createElement("article", { "aria-label": title, "data-testid": "result" }, title, detail, actions);
+  subtitle,
+  id,
+}: ContainerProps & Readonly<{ detail: ReactNode; title: string; subtitle?: string; id?: string }>): ReactElement =>
+  createElement(
+    "article",
+    { "aria-label": title, "data-entry-id": id, "data-testid": "result" },
+    title,
+    subtitle ? createElement("span", { "data-testid": "subtitle" }, subtitle) : null,
+    detail,
+    actions,
+  );
 const listDetail = Object.assign(
   ({ markdown, metadata }: ContainerProps & Readonly<{ metadata?: ReactNode }>): ReactElement =>
     createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata),
@@ -175,7 +223,7 @@ const listDetail = Object.assign(
     }),
   },
 );
-export const List = Object.assign(listContainer, {
+export const List = Object.assign(ListContainer, {
   EmptyView: ({ actions, title }: ContainerProps & Readonly<{ title: string }>): ReactElement =>
     createElement("section", {}, createElement("h2", {}, title), actions),
   Item: Object.assign(listItem, { Detail: listDetail }),

@@ -7,7 +7,7 @@ import { validateTermForm, type TermFormValues } from "./components/term-form-lo
 export type QuickAddTermArguments = TermFormValues;
 
 export type QuickAddTermFailure = Readonly<{
-  kind: "duplicate" | "save" | "validation";
+  kind: "save" | "validation";
   message: string;
 }>;
 
@@ -41,7 +41,7 @@ export const runQuickAddTerm = async (options: QuickAddTermOptions): Promise<boo
     }
   } catch (error: unknown) {
     await options.onFailure({
-      kind: error instanceof GlossaryError && error.code === "duplicate-term" ? "duplicate" : "save",
+      kind: "save",
       message: error instanceof GlossaryError ? error.message : unknownSaveErrorMessage,
     });
     return false;

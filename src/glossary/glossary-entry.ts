@@ -1,9 +1,8 @@
-import { isNode, isScalar, type LineCounter, type Pair } from "yaml";
+import { isScalar, type LineCounter, type Pair } from "yaml";
 
 import { getEntryPairs, getNodeRange } from "./glossary-entry-fields";
 import { createLocatedError } from "./glossary-error";
 import type { SourceRange } from "./glossary-types";
-import { areTermsEquivalent } from "./term-matching";
 import type { Term } from "../utils/types";
 
 const parseTermValue = (termPair: Pair<unknown, unknown>, index: number, lineCounter: LineCounter): string => {
@@ -44,22 +43,12 @@ const parseDefinitionValue = (
 export const parseGlossaryEntry = (
   entry: unknown,
   index: number,
-  terms: readonly Term[],
   lineCounter: LineCounter,
   sequenceRange: SourceRange,
 ): Term => {
   const { definitionPair, termPair } = getEntryPairs(entry, index, lineCounter, sequenceRange);
   const termValue = parseTermValue(termPair, index, lineCounter);
   const definitionValue = parseDefinitionValue(definitionPair, index, lineCounter);
-
-  if (terms.some((term) => areTermsEquivalent(term.term, termValue))) {
-    throw createLocatedError(
-      "duplicate-term",
-      `Entry ${index + 1} duplicates another term`,
-      lineCounter,
-      isNode(termPair.value) ? termPair.value.range : null,
-    );
-  }
 
   return Object.freeze({ definition: definitionValue, term: termValue });
 };

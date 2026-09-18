@@ -58,7 +58,7 @@ const readGlossaryBytes = async (handle: FileHandle, size: bigint): Promise<Buff
 
 const decodeGlossaryBytes = (bytes: Buffer): string => {
   try {
-    return new TextDecoder("utf8", { fatal: true }).decode(bytes);
+    return new TextDecoder("utf8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
     throw new GlossaryError("invalid-encoding", "The glossary file must use valid UTF-8.");
   }

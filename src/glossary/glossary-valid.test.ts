@@ -45,7 +45,7 @@ describe("loadGlossary duplicate and safe errors", () => {
     ["case-insensitive", "API", "api"],
     ["canonically equivalent", "éclair", "e\u0301clair"],
     ["Unicode case-equivalent", "ΟΣ", "οσ"],
-  ])("rejects %s duplicate terms", async (_label, firstTerm, duplicateTerm) => {
+  ])("loads %s same-name entries independently", async (_label, firstTerm, duplicateTerm) => {
     const path = await writeGlossary(`
 terms:
   - term: ${firstTerm}
@@ -54,9 +54,10 @@ terms:
     definition: Second
 `);
 
-    await expect(loadGlossary(path)).rejects.toEqual(
-      new GlossaryError("duplicate-term", "Entry 2 duplicates another term near line 5.", 5),
-    );
+    await expect(loadGlossary(path)).resolves.toEqual([
+      { definition: "First", term: firstTerm },
+      { definition: "Second", term: duplicateTerm },
+    ]);
   });
 
   test("never exposes glossary values in a validation error", async () => {

@@ -38,7 +38,7 @@ export const parseGlossaryTerms = (document: ParsedGlossaryDocument, lineCounter
   const termsSequence = getTermsSequence(document.contents, lineCounter);
   const terms: Term[] = [];
   for (const [index, entry] of termsSequence.items.entries()) {
-    terms.push(parseGlossaryEntry(entry, index, terms, lineCounter, termsSequence.range));
+    terms.push(parseGlossaryEntry(entry, index, lineCounter, termsSequence.range));
   }
   return Object.freeze(terms);
 };

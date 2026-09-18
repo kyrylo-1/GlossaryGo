@@ -51,11 +51,6 @@ const validationCases: ReadonlyArray<readonly [string, string, ExpectedGlossaryE
       message: "Entry 1 must contain exactly the term and definition fields near line 2.",
     },
   ],
-  [
-    "duplicate terms after schema validation",
-    "terms:\n  - term: API\n    definition: First\n  - term: api\n    definition: Second\n",
-    { code: "duplicate-term", line: 4, message: "Entry 2 duplicates another term near line 4." },
-  ],
 ];
 
 describe("Glossary source validation parity", () => {

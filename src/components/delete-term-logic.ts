@@ -1,3 +1,4 @@
+import { captureSelectedTerm } from "../glossary/entry-identity";
 import type { GlossaryChange } from "../glossary/apply-glossary-change";
 import { GlossaryError } from "../glossary/glossary";
 import type { Term } from "../utils/types";
@@ -27,10 +28,7 @@ export const runDeleteTerm = async (options: DeleteTermOptions): Promise<boolean
   }
 
   options.deleting.current = true;
-  const original = {
-    definition: options.original.definition,
-    term: options.original.term,
-  };
+  const original = captureSelectedTerm(options.original);
   let confirmed: boolean;
   try {
     confirmed = await options.confirmDelete(original);

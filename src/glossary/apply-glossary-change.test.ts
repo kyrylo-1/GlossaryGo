@@ -26,7 +26,7 @@ describe("applyGlossaryChange additions", () => {
     ],
     [
       "a flow sequence",
-      'terms: [{ term: "API", definition: "Interface" }]\n',
+      'terms: [{ definition: "Interface", term: "API" }]\n',
       [{ definition: "Interface", term: "API" }],
     ],
     [
@@ -144,16 +144,14 @@ describe("applyGlossaryChange additions", () => {
     ]);
   });
 
-  // eslint-disable-next-line vitest/expect-expect
   test.each([
-    ["case-insensitive duplicate", "API", "api"],
-    ["canonically equivalent Unicode duplicate", "café", "cafe\u0301"],
-  ])("rejects a %s after adding", (_label, existing, submitted) => {
+    ["API", "api"],
+    ["café", "cafe\u0301"],
+    ["API", "API"],
+  ])("allows independent additions named %s and %s", (existing, submitted) => {
     const source = `terms:\n  - term: ${existing}\n    definition: Existing\n`;
-    expectGlossaryError(
-      () => applyGlossaryChange(source, { term: { definition: "Replacement", term: submitted }, type: "add" }),
-      "duplicate-term",
-    );
+    const next = applyGlossaryChange(source, { term: { definition: "Existing", term: submitted }, type: "add" });
+    expect(parseGlossarySource(next)).toHaveLength(2);
   });
 
   test("allows accent-distinct terms when adding", () => {
@@ -236,18 +234,17 @@ describe("applyGlossaryChange edits and deletions", () => {
     expect(next).toContain("# Definition comment");
   });
 
-  // eslint-disable-next-line vitest/expect-expect
-  test("rejects an edit that renames to another entry's equivalent term", () => {
+  test("allows renaming an entry to another entry's equivalent name", () => {
     const source = "terms:\n  - term: API\n    definition: Interface\n  - term: HTTP\n    definition: Protocol\n";
-    expectGlossaryError(
-      () =>
-        applyGlossaryChange(source, {
-          original: { definition: "Interface", term: "API" },
-          term: { definition: "Updated", term: "http" },
-          type: "edit",
-        }),
-      "duplicate-term",
-    );
+    const next = applyGlossaryChange(source, {
+      original: parseGlossarySource(source)[0],
+      term: { definition: "Updated", term: "http" },
+      type: "edit",
+    });
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "Updated", term: "http" },
+      { definition: "Protocol", term: "HTTP" },
+    ]);
   });
 
   // eslint-disable-next-line vitest/expect-expect
@@ -365,4 +362,73 @@ describe("applyGlossaryChange serialized size", () => {
       "too-large",
     );
   });
+});
+
+const duplicateSource =
+  "terms:\n  - term: API # first\n    definition: Same\n  - term: API # second\n    definition: Same\n";
+
+describe("captured duplicate entry identity", () => {
+  test("edits and deletes only the selected identical sibling", () => {
+    const selected = parseGlossarySource(duplicateSource)[1];
+    const edited = applyGlossaryChange(duplicateSource, {
+      original: selected,
+      term: { definition: "Second updated", term: "API" },
+      type: "edit",
+    });
+    expect(parseGlossarySource(edited)).toEqual([
+      { definition: "Same", term: "API" },
+      { definition: "Second updated", term: "API" },
+    ]);
+    expect(edited).toContain("# first");
+    expect(edited).toContain("# second");
+    const deleted = applyGlossaryChange(duplicateSource, { original: selected, type: "delete" });
+    expect(parseGlossarySource(deleted)).toEqual([{ definition: "Same", term: "API" }]);
+    expect(deleted).toContain("# first");
+    expect(deleted).not.toContain("# second");
+  });
+
+  test.each(["# external comment\n", "terms: []\n"])(
+    "refuses a captured duplicate after a source change: %s",
+    (replacement) => {
+      const selected = parseGlossarySource(duplicateSource)[1];
+      const changed = replacement.startsWith("#") ? replacement + duplicateSource : replacement;
+      expect(() => applyGlossaryChange(changed, { original: selected, type: "delete" })).toThrowError(
+        expect.objectContaining({ code: "stale-term" }),
+      );
+    },
+  );
+
+  test("refuses ambiguous selection without captured source identity", () => {
+    expect(() =>
+      applyGlossaryChange(duplicateSource, { original: { definition: "Same", term: "API" }, type: "delete" }),
+    ).toThrowError(expect.objectContaining({ code: "stale-term" }));
+  });
+});
+
+test("refuses captured selection after insertion, reordering, or add sorting changes positions", () => {
+  const source =
+    "terms:\n  - term: Zulu\n    definition: Last\n  - term: API # first\n    definition: Same\n  - term: API # second\n    definition: Same\n";
+  const selected = parseGlossarySource(source)[2];
+  const shifted = source.replace("terms:\n", "terms:\n  - term: AAA\n    definition: Inserted\n");
+  const reordered = source
+    .replace("# first", "# placeholder")
+    .replace("# second", "# first")
+    .replace("# placeholder", "# second");
+  const sorted = applyGlossaryChange(source, { term: { definition: "New", term: "BBB" }, type: "add" });
+  for (const changed of [shifted, reordered, sorted]) {
+    expect(() => applyGlossaryChange(changed, { original: selected, type: "delete" })).toThrowError(
+      expect.objectContaining({ code: "stale-term" }),
+    );
+    expect(() =>
+      applyGlossaryChange(changed, { original: selected, term: { definition: "Updated", term: "API" }, type: "edit" }),
+    ).toThrowError(expect.objectContaining({ code: "stale-term" }));
+  }
+});
+
+test("keeps same-name ties in their original order during deterministic add sorting", () => {
+  const source =
+    "terms:\n  - term: Zulu\n    definition: Last\n  - term: API # first\n    definition: First\n  - term: API # second\n    definition: Second\n";
+  const next = applyGlossaryChange(source, { term: { definition: "Third", term: "API" }, type: "add" });
+  expect(parseGlossarySource(next).map(({ definition }) => definition)).toEqual(["First", "Second", "Third", "Last"]);
+  expect(next.indexOf("# first")).toBeLessThan(next.indexOf("# second"));
 });
