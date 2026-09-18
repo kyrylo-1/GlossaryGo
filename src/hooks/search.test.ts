@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
 
-import { SEARCH_RESULT_LIMIT } from "../constants";
 import type { Term } from "../utils/types";
 import { searchTerms } from "./search";
 
@@ -9,12 +8,11 @@ const term = (name: string, definition = `${name} definition`): Term => {
 };
 
 describe("searchTerms query behavior", () => {
-  test("an empty query sorts the full glossary and returns only the first five matches", () => {
+  test("an empty query returns every alphabetical glossary term", () => {
     const terms = [term("Zulu"), term("echo"), term("Delta"), term("charlie"), term("Bravo"), term("alpha")];
 
-    expect(terms).toHaveLength(SEARCH_RESULT_LIMIT + 1);
     expect(searchTerms(terms, "")).toEqual({
-      terms: [term("alpha"), term("Bravo"), term("charlie"), term("Delta"), term("echo")],
+      terms: [term("alpha"), term("Bravo"), term("charlie"), term("Delta"), term("echo"), term("Zulu")],
       totalMatchCount: 6,
     });
   });
@@ -35,7 +33,7 @@ describe("searchTerms query behavior", () => {
   });
 });
 
-describe("searchTerms Unicode and limits", () => {
+describe("searchTerms Unicode and complete results", () => {
   test("is accent-sensitive while matching canonically equivalent Unicode", () => {
     const terms = [term("eclair"), term("éclair")];
 
@@ -59,13 +57,11 @@ describe("searchTerms Unicode and limits", () => {
     expect(searchTerms([term("क्षत्र")], "क")).toEqual({ terms: [term("क्षत्र")], totalMatchCount: 1 });
   });
 
-  test("returns all five matches when the total is exactly five", () => {
-    const terms = [term("A5"), term("A3"), term("A1"), term("A4"), term("A2")];
+  test("returns every prefix match instead of truncating to five", () => {
+    const all = ["A07", "A06", "A05", "A04", "A03", "A02", "A01"].map((name) => term(name));
+    const alphabetical = [...all].reverse();
 
-    expect(searchTerms(terms, "a")).toEqual({
-      terms: [term("A1"), term("A2"), term("A3"), term("A4"), term("A5")],
-      totalMatchCount: 5,
-    });
+    expect(searchTerms(all, "a")).toEqual({ terms: alphabetical, totalMatchCount: 7 });
   });
 
   test("treats a whitespace-only query as empty", () => {
@@ -77,10 +73,19 @@ describe("searchTerms Unicode and limits", () => {
 });
 
 describe("recent terms", () => {
-  test("shows recent terms first for an empty query using current definitions", () => {
-    expect(searchTerms([term("Alpha"), term("Zulu", "Updated")], "", ["Zulu", "Alpha"])).toEqual({
+  test("uses current definitions in the recent-first portion", () => {
+    expect(searchTerms([term("Alpha"), term("Zulu", "Updated")], "", ["Zulu"])).toEqual({
       terms: [term("Zulu", "Updated"), term("Alpha")],
       totalMatchCount: 2,
+    });
+  });
+
+  test("places every current recent term before the remaining alphabetical glossary", () => {
+    const all = ["A07", "A06", "A05", "A04", "A03", "A02", "A01"].map((name) => term(name));
+
+    expect(searchTerms(all, " ", ["A07", "A02", "Deleted"])).toEqual({
+      terms: [term("A07"), term("A02"), term("A01"), term("A03"), term("A04"), term("A05"), term("A06")],
+      totalMatchCount: 7,
     });
   });
 
@@ -91,11 +96,10 @@ describe("recent terms", () => {
     });
   });
 
-  test("shows only valid recent terms for whitespace queries and keeps the five-result cap", () => {
-    const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].map((name) => term(name));
-    expect(searchTerms(terms, " \t", ["Missing", "Zulu", "Foxtrot", "Echo", "Delta", "Charlie", "Bravo"])).toEqual({
-      terms: [term("Zulu"), term("Foxtrot"), term("Echo"), term("Delta"), term("Charlie")],
-      totalMatchCount: 6,
+  test("does not duplicate equivalent current recent names", () => {
+    expect(searchTerms([term("Résumé"), term("Zulu")], "", ["résumé", "RÉSUMÉ", "Zulu"])).toEqual({
+      terms: [term("Résumé"), term("Zulu")],
+      totalMatchCount: 2,
     });
   });
 

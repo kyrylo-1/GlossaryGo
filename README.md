@@ -89,13 +89,14 @@ or files and never changes glossary contents.
 Search matches term-name prefixes only, never definitions. Query is trimmed; matching ignores case, preserves accents,
 and treats canonically equivalent Unicode as equal. `a` matches `API`; `e` does not match `éclair`.
 
-Matches sort case-insensitively, accent-sensitively, in locale-aware ascending order. Display limit: first five.
-Additional matches show `Showing 5 of N matches`.
+Matches sort case-insensitively, accent-sensitively, in locale-aware ascending order. Every match appears in Raycast's
+native scrollable list.
 
-Empty/whitespace query shows **Recent Terms**: up to five copied terms, most recent first. Successful **Copy Definition**
-or **Copy Term** records term. Typing and selection do not. Reuse moves term first without duplicates.
-History holds 20 names; evicts least recently used when full. Without valid history, show first five alphabetical terms.
-Typed prefixes always sort alphabetically, including never-copied terms.
+Empty/whitespace queries show copied terms first, then every remaining term in alphabetical order; the section subtitle
+is **Recent terms first** when current history is present. Successful **Copy Definition** or **Copy Term** records a term.
+Typing and selection do not. Reuse moves a term first without duplicates. History holds 20 names; evicts least recently
+used when full. Without valid history, every term appears alphabetically. Typed prefixes always sort alphabetically,
+including never-copied terms.
 
 History stays in memory during Search Term session; resets on command unmount or effective file path change.
 Reload prunes missing names and shows current names/definitions. Missing file clears history; failed reload hides results

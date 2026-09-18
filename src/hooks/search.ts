@@ -1,5 +1,4 @@
-import { SEARCH_RESULT_LIMIT } from "../constants";
-import { termStartsWith } from "../glossary/term-matching";
+import { areTermsEquivalent, termStartsWith } from "../glossary/term-matching";
 import type { Term } from "../utils/types";
 
 import { resolveRecentTerms } from "./recent-terms";
@@ -13,16 +12,23 @@ const termCollator = new Intl.Collator([], { sensitivity: "accent", usage: "sort
 
 export const searchTerms = (terms: readonly Term[], query: string, history: readonly string[] = []): SearchResult => {
   const normalizedQuery = query.trim();
-  const recent = normalizedQuery.length === 0 ? resolveRecentTerms(history, terms) : [];
+  const alphabetical = terms
+    .filter(({ term }) => termStartsWith(term, normalizedQuery))
+    .sort((left, right) => termCollator.compare(left.term, right.term));
+  const recent =
+    normalizedQuery.length === 0
+      ? resolveRecentTerms(history, terms).filter(
+          (entry, index, resolved) =>
+            !resolved.slice(0, index).some(({ term }) => areTermsEquivalent(term, entry.term)),
+        )
+      : [];
   const matches =
     recent.length > 0
-      ? recent
-      : terms
-          .filter(({ term }) => termStartsWith(term, normalizedQuery))
-          .sort((left, right) => termCollator.compare(left.term, right.term));
+      ? [...recent, ...alphabetical.filter(({ term }) => !recent.some((entry) => areTermsEquivalent(entry.term, term)))]
+      : alphabetical;
 
   return Object.freeze({
-    terms: Object.freeze(matches.slice(0, SEARCH_RESULT_LIMIT)),
+    terms: Object.freeze(matches),
     totalMatchCount: matches.length,
   });
 };

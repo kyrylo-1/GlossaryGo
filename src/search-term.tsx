@@ -18,7 +18,6 @@ import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
 import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-action";
 import { TermForm } from "./components/term-form";
-import { SEARCH_RESULT_LIMIT } from "./constants";
 import { getGlossaryTarget } from "./glossary/get-glossary-target";
 import type { GlossaryTarget } from "./glossary/glossary-target";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
@@ -272,14 +271,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
 
 const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
   return (
-    <List.Section
-      title={props.isRecent ? "Recent Terms" : "Terms"}
-      subtitle={
-        result.totalMatchCount > SEARCH_RESULT_LIMIT
-          ? `Showing ${SEARCH_RESULT_LIMIT} of ${result.totalMatchCount} ${props.isRecent ? "recent terms" : "matches"}`
-          : ""
-      }
-    >
+    <List.Section title="Terms" subtitle={props.isRecent ? "Recent terms first" : ""}>
       {result.terms.map((term) => (
         <List.Item
           key={term.term}
