@@ -6,6 +6,28 @@ discover controls from the live UI instead of relying on fixed coordinates, menu
 preferences, runtime requirements, and scripts. A disagreement between those sources and the UI is a finding to resolve,
 not a reason to silently change the expected result.
 
+## Continuous integration and manual evidence
+
+`.github/workflows/ci.yml` runs on pull requests and pushes to `main`. Separate macOS checks named `Lint`, `Tests`,
+and `Build` install dependencies with `npm ci` and run the corresponding scripts from `package.json`. Node.js is pinned
+to 22.22.2, matching the package's minimum runtime requirement. Each check fails on a nonzero
+exit; a failed check does not cancel the others. The workflow does not publish the extension. It creates check
+results, not branch-protection rules; requiring them for merges is a separate repository setting.
+
+CI uses repository code and synthetic test fixtures only. Never supply a user's Glossary File, local preferences,
+private glossary content, or personal clipboard data to CI, logs, caches, or artifacts. The npm cache contains
+dependency downloads, not test fixtures or glossary content.
+
+Passing CI is automated evidence, not proof of live Raycast search, reload, clipboard behavior, runtime identity,
+or persisted changes after a full restart. Run the affected manual scenarios below and report them separately.
+Formatting checks also remain part of local verification; the workflow's checks do not replace the full acceptance plan.
+
+When validating workflow changes, verify its triggers, runtime, locked dependency installation, and all three commands.
+In a disposable synthetic checkout, deliberately introduce a lint error, a failing test assertion, and a build error
+one at a time; confirm each command exits nonzero, restore the fixture, and rerun the clean checks. When authorized to
+publish a test pull request, also confirm each corresponding GitHub check fails and that clean changes recover it.
+Report local command evidence separately from GitHub-hosted runs; an unexecuted hosted failure test remains not run.
+
 ## Prepare a run
 
 1. Read `AGENTS.md` and the sources above. Record the checkout, branch, commit, uncommitted changes, and requested scope.
