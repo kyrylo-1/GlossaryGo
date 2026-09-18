@@ -342,11 +342,10 @@ describe("Search Term history lifecycle", () => {
     await copy("Zulu");
     mocks.load.mockResolvedValue(terms.filter(({ term }) => term !== "Zulu"));
     reload();
-    await screen.findByRole("article", { name: "Alpha" });
+    await waitFor(() => expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]));
     mocks.load.mockResolvedValue(terms);
     reload();
-    await screen.findByRole("article", { name: "Alpha" });
-    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
+    await waitFor(() => expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]));
   });
 
   test("isolates history when the effective glossary changes and when the command reopens", async () => {
