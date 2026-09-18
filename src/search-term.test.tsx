@@ -439,3 +439,50 @@ describe("same-name result identity and actions", () => {
     expect(getEntryIdentity(deletion.original)?.index).toBe(2);
   });
 });
+
+test("preserves a never-copied selected sibling through rows disappearing during unchanged reload", async () => {
+  const source =
+    "terms: [{ term: API, definition: First }, { term: API, definition: Second }, { term: api, definition: Lowercase }]\n";
+  const entries = parseGlossarySource(source);
+  mocks.load.mockResolvedValue(entries);
+  render(<Command />);
+  await screen.findByRole("article", { name: "api" });
+  search("API");
+  const selected = screen.getByRole("article", { name: "api" });
+  fireEvent.click(selected);
+  const id = selected.dataset.entryId;
+  await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(id));
+  let finishLoad: (loaded: readonly Term[]) => void = (): never => {
+    throw new Error("Reload has not started");
+  };
+  // Hold the loader pending so native rows and selection disappear before recovery.
+  // eslint-disable-next-line promise/avoid-new
+  const pending = new Promise<readonly Term[]>((resolve) => {
+    finishLoad = resolve;
+  });
+  mocks.load.mockReturnValueOnce(pending);
+  fireEvent.click(within(selected).getByRole("button", { name: "Reload Glossary" }));
+  await waitFor(() => expect(screen.queryAllByTestId("result")).toHaveLength(0));
+  finishLoad(parseGlossarySource(source));
+  await screen.findByRole("article", { name: "api" });
+  await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(id));
+  expect(screen.getByRole("textbox").getAttribute("value")).toBe("API");
+  expect(raycastApiMocks.copy).not.toHaveBeenCalled();
+});
+
+test("chooses a current entry after changed-source reload instead of reusing a stale sibling ID", async () => {
+  const source = "terms: [{ term: API, definition: First }, { term: api, definition: Second }]\n";
+  mocks.load.mockResolvedValue(parseGlossarySource(source));
+  render(<Command />);
+  const selected = await screen.findByRole("article", { name: "api" });
+  fireEvent.click(selected);
+  const oldId = selected.dataset.entryId;
+  await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(oldId));
+  mocks.load.mockResolvedValue(parseGlossarySource("terms: [{ term: API, definition: Current }]\n"));
+  fireEvent.click(within(selected).getByRole("button", { name: "Reload Glossary" }));
+  await waitFor(() => expect(screen.queryAllByTestId("result")).toHaveLength(1));
+  const current = screen.getByRole("article", { name: "API" });
+  expect(current.dataset.entryId).not.toBe(oldId);
+  await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(current.dataset.entryId));
+  expect(within(current).getByTestId("preview").textContent).toBe("Current");
+});

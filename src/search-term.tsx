@@ -12,7 +12,7 @@ import {
   Toast,
   useNavigation,
 } from "@raycast/api";
-import { useCallback, useRef, type ReactElement } from "react";
+import { useCallback, useRef, useState, type ReactElement } from "react";
 
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
@@ -281,13 +281,15 @@ const getResultSubtitle = (term: Term, terms: readonly Term[], index: number): s
   return `Entry ${(identity?.index ?? index) + 1} · ${preview}`;
 };
 
+const getResultId = (term: Term, index: number): string => getEntryIdentity(term)?.id ?? `${index}`;
+
 const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
   return (
     <List.Section title="Terms" subtitle={props.isRecent ? "Recent terms first" : ""}>
       {result.terms.map((term, index) => (
         <List.Item
-          key={getEntryIdentity(term)?.id ?? `${index}`}
-          id={getEntryIdentity(term)?.id ?? `${index}`}
+          key={getResultId(term, index)}
+          id={getResultId(term, index)}
           title={term.term}
           subtitle={getResultSubtitle(term, result.terms, index)}
           detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
@@ -355,10 +357,31 @@ const CommandContent = ({
   return <ResultSection onReload={onReload} result={result} {...props} />;
 };
 
+const useResultSelection = (
+  status: CommandState["status"],
+  terms: readonly Term[],
+): Readonly<{
+  onSelectionChange: (id: string | null) => void;
+  selectedItemId: string;
+}> => {
+  const [selection, setSelection] = useState("");
+  const onSelectionChange = useCallback((id: string | null): void => {
+    // Loading removes all rows; its null callback must not erase the captured sibling.
+    if (id) {
+      setSelection(id);
+    }
+  }, []);
+  const currentIds = terms.map(getResultId);
+  const selectedItemId =
+    status === "ready" ? (currentIds.find((id) => id === selection) ?? currentIds[0] ?? "") : selection;
+  return { onSelectionChange, selectedItemId };
+};
+
 const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): ReactElement => {
   const { createParent, glossaryFile, isRecent, query, recordTerm, reload, result, setQuery, state } =
     useGlossary(target);
   const { pop } = useNavigation();
+  const { onSelectionChange, selectedItemId } = useResultSelection(state.status, result.terms);
   const onSaved = useCallback(
     async (term: Term): Promise<void> => {
       setQuery(term.term);
@@ -378,6 +401,8 @@ const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): Re
       isLoading={state.status === "loading"}
       isShowingDetail={state.status === "ready" && result.terms.length > 0}
       onSearchTextChange={setQuery}
+      onSelectionChange={onSelectionChange}
+      selectedItemId={selectedItemId}
       searchBarPlaceholder="Search terms by prefix"
       searchText={query}
     >
