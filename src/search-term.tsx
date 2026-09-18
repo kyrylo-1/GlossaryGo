@@ -5,6 +5,7 @@ import {
   confirmAlert,
   Detail,
   Icon,
+  Keyboard,
   List,
   openExtensionPreferences,
   showToast,
@@ -75,6 +76,7 @@ const AddTermAction = ({ createParent, glossaryFile, initialTerm, onSaved }: Add
   return (
     <Action.Push
       title="Add Term"
+      shortcut={Keyboard.Shortcut.Common.New}
       icon={Icon.Plus}
       target={
         <TermForm
@@ -100,6 +102,7 @@ const EditTermAction = ({ glossaryFile, onReload, onSaved, original }: EditTermA
   return (
     <Action.Push
       title="Edit Term"
+      shortcut={Keyboard.Shortcut.Common.Edit}
       icon={Icon.Pencil}
       target={
         <TermForm glossaryFile={glossaryFile} mode="edit" onReload={onReload} onSaved={onSaved} original={original} />
@@ -138,6 +141,7 @@ const DeleteTermAction = ({ glossaryFile, onReload, term }: DeleteTermActionProp
   return (
     <Action
       title="Delete Term"
+      shortcut={{ key: "x", modifiers: ["ctrl"] }}
       icon={Icon.Trash}
       style={Action.Style.Destructive}
       onAction={() =>
@@ -246,6 +250,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
       <CopyTermActions onTermUsed={props.onTermUsed} term={term} />
       <Action.Push
         title="View Full Definition"
+        shortcut={{ key: "v", modifiers: ["cmd", "shift"] }}
         icon={Icon.Document}
         target={<FullDefinition glossaryFile={props.glossaryFile} onTermUsed={props.onTermUsed} term={term} />}
       />

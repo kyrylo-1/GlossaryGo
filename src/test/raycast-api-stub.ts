@@ -2,8 +2,9 @@
 
 import { createElement, useState, type ReactElement, type ReactNode } from "react";
 import { vi } from "vitest";
+import type { KeyboardShortcut } from "@raycast/api";
 
-type ActionProps = Readonly<{ onAction?: () => void; title: string }>;
+type ActionProps = Readonly<{ onAction?: () => void; shortcut?: KeyboardShortcut; title: string }>;
 type ContainerProps = Readonly<{
   actions?: ReactNode;
   children?: ReactNode;
@@ -33,8 +34,12 @@ export const raycastApiMocks = {
   showToast: vi.fn<(options: unknown) => Promise<void>>().mockResolvedValue(),
 };
 
-const action = ({ onAction, title }: ActionProps): ReactElement =>
-  createElement("button", { onClick: onAction, type: "button" }, title);
+const action = ({ onAction, shortcut, title }: ActionProps): ReactElement =>
+  createElement(
+    "button",
+    { "data-shortcut": shortcut ? JSON.stringify(shortcut) : null, onClick: onAction, type: "button" },
+    title,
+  );
 
 const actionPanel = ({ children }: ContainerProps): ReactElement => createElement("div", {}, children);
 
@@ -76,14 +81,23 @@ const renderField = (element: "input" | "textarea", props: FieldProps): ReactEle
     props.error ? createElement("span", { role: "alert" }, props.error) : null,
   );
 
-const PushAction = ({ target, title }: Readonly<{ target: ReactNode; title: string }>): ReactElement => {
+const PushAction = ({ shortcut, target, title }: ActionProps & Readonly<{ target: ReactNode }>): ReactElement => {
   const [opened, setOpened] = useState(false);
   return createElement(
     "div",
     {},
-    action({ onAction: () => setOpened(true), title }),
+    action({ onAction: () => setOpened(true), shortcut, title }),
     opened ? createElement("div", {}, target, action({ onAction: () => setOpened(false), title: "Back" })) : null,
   );
+};
+
+export const Keyboard = {
+  Shortcut: {
+    Common: {
+      Edit: { key: "e", modifiers: ["cmd"] },
+      New: { key: "n", modifiers: ["cmd"] },
+    },
+  },
 };
 
 export const Action = Object.assign(action, {

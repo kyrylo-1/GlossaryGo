@@ -3,7 +3,10 @@
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { confirmAlert } from "@raycast/api";
 
+import { GlossaryError } from "./glossary/glossary";
+import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import type * as GlossaryModule from "./glossary/glossary";
 import Command from "./search-term";
 import { raycastApiMocks } from "./test/raycast-api-stub";
@@ -13,6 +16,7 @@ import type * as RaycastUtils from "@raycast/utils";
 const mocks = vi.hoisted(() => ({
   load: vi.fn<(path: string) => Promise<readonly Term[]>>(),
   path: "/tmp/first.yaml",
+  save: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>(),
 }));
 vi.mock("@raycast/utils", async (importOriginal) => ({
   ...(await importOriginal<typeof RaycastUtils>()),
@@ -25,6 +29,7 @@ vi.mock("./glossary/glossary", async (importOriginal) => ({
 vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => ({ createParent: false, path: mocks.path }),
 }));
+vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.save }));
 const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].map((term) => ({
   definition: `${term} definition`,
   term,
@@ -51,10 +56,126 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.path = "/tmp/first.yaml";
   mocks.load.mockResolvedValue(terms);
+  mocks.save.mockResolvedValue();
+  vi.mocked(confirmAlert).mockResolvedValue(false);
   raycastApiMocks.copy.mockResolvedValue();
   raycastApiMocks.showToast.mockResolvedValue();
 });
 afterEach(cleanup);
+
+const fieldValue = (id: string): string => {
+  const field = screen.getByTestId(id);
+  if (!(field instanceof globalThis.HTMLInputElement) && !(field instanceof globalThis.HTMLTextAreaElement)) {
+    throw new TypeError(`Missing ${id} field.`);
+  }
+  return field.value;
+};
+
+describe("Search Term action shortcuts", () => {
+  test("registers distinct shortcuts on selected actions and preserves default copy shortcuts", async () => {
+    render(<Command />);
+    const result = within(await screen.findByRole("article", { name: "Alpha" }));
+    expect(
+      result
+        .getAllByRole("button")
+        .slice(0, 2)
+        .map((button) => button.textContent),
+    ).toEqual(["Copy Definition", "Copy Term"]);
+    expect(result.getByRole("button", { name: "Copy Definition" }).dataset.shortcut).toBeUndefined();
+    expect(result.getByRole("button", { name: "Copy Term" }).dataset.shortcut).toBeUndefined();
+    const shortcuts = [
+      ["View Full Definition", { key: "v", modifiers: ["cmd", "shift"] }],
+      ["Add Term", { key: "n", modifiers: ["cmd"] }],
+      ["Edit Term", { key: "e", modifiers: ["cmd"] }],
+      ["Delete Term", { key: "x", modifiers: ["ctrl"] }],
+    ] as const;
+    for (const [title, shortcut] of shortcuts) {
+      expect(JSON.parse(result.getByRole("button", { name: title }).dataset.shortcut ?? "null")).toEqual(shortcut);
+    }
+  });
+});
+
+describe("Add shortcut availability", () => {
+  test.each([
+    { hasSelection: true, query: "Al", view: "selected" },
+    { hasSelection: false, query: "", view: "empty" },
+    { hasSelection: false, query: "", view: "missing" },
+    { hasSelection: false, query: "New term", view: "no-match" },
+  ])("keeps Add's shortcut and form available in the $view view", async ({ hasSelection, query, view }) => {
+    if (view === "empty") {
+      mocks.load.mockResolvedValue([]);
+    } else if (view === "missing") {
+      mocks.load.mockRejectedValue(new GlossaryError("missing", "Missing synthetic glossary."));
+    }
+    render(<Command />);
+    if (view === "no-match" || view === "selected") {
+      await screen.findByRole("article", { name: "Alpha" });
+      search(query);
+    }
+    const add = await screen.findByRole("button", { name: "Add Term" });
+    expect(JSON.parse(add.dataset.shortcut ?? "null")).toEqual({ key: "n", modifiers: ["cmd"] });
+    for (const name of ["Edit Term", "Delete Term", "View Full Definition"]) {
+      expect(screen.queryAllByRole("button", { name })).toHaveLength(hasSelection ? 1 : 0);
+    }
+    fireEvent.click(add);
+    expect(fieldValue("term")).toBe(query);
+    expect(fieldValue("definition")).toBe("");
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("Search Term mutation action wiring", () => {
+  test("opens Edit with selected values rather than the partial query", async () => {
+    render(<Command />);
+    await screen.findByRole("article", { name: "Alpha" });
+    search("Al");
+    fireEvent.click(screen.getByRole("button", { name: "Edit Term" }));
+    expect(fieldValue("term")).toBe("Alpha");
+    expect(fieldValue("definition")).toBe("Alpha definition");
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
+  test("keeps Delete confirmation, cancels without a write, and confirms only the captured term", async () => {
+    render(<Command />);
+    await screen.findByRole("article", { name: "Alpha" });
+    search("Al");
+    fireEvent.click(screen.getByRole("button", { name: "Delete Term" }));
+    await waitFor(() => expect(confirmAlert).toHaveBeenCalledOnce());
+    expect(confirmAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dismissAction: { style: "cancel", title: "Cancel" },
+        message: expect.stringContaining("Alpha"),
+        primaryAction: { style: "destructive", title: "Delete" },
+      }),
+    );
+    expect(mocks.save).not.toHaveBeenCalled();
+    expect(mocks.load).toHaveBeenCalledOnce();
+    const query = screen.getByRole("textbox", { name: "Search terms" });
+    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Al");
+    vi.mocked(confirmAlert).mockResolvedValue(true);
+    mocks.load.mockResolvedValue(terms.filter(({ term }) => term !== "Alpha"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete Term" }));
+    await screen.findByRole("heading", { name: "No Matching Terms" });
+    expect(mocks.save).toHaveBeenCalledExactlyOnceWith("/tmp/first.yaml", {
+      original: { definition: "Alpha definition", term: "Alpha" },
+      type: "delete",
+    });
+    expect(mocks.load).toHaveBeenCalledTimes(2);
+    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Al");
+  });
+});
+
+describe("Search Term recovery actions", () => {
+  test("offers only recovery actions after a load failure", async () => {
+    mocks.load.mockRejectedValue(new Error("unreadable"));
+    render(<Command />);
+    await screen.findByRole("heading", { name: "Glossary Could Not Be Loaded" });
+    expect(screen.queryByRole("button", { name: "Add Term" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit Term" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete Term" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "View Full Definition" })).toBeNull();
+  });
+});
 
 describe("definition reading from Search Term", () => {
   const definition = `# Literal heading\n**literal emphasis** [literal link](url) $math$\n\n${Array.from(
