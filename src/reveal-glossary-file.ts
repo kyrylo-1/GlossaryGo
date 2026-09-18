@@ -1,20 +1,28 @@
-import { openExtensionPreferences, showInFinder, showToast, Toast } from "@raycast/api";
+import { Alert, confirmAlert, openExtensionPreferences, showInFinder } from "@raycast/api";
 
 import { resolveRevealGlossaryPath } from "./components/reveal-glossary-path";
 import { getGlossaryTarget } from "./glossary/get-glossary-target";
 
 const showRecovery = async (title: string, message: string): Promise<void> => {
-  await showToast({
+  const openPreferences = await confirmAlert({
+    dismissAction: { title: "Done" },
     message,
-    primaryAction: {
-      onAction: () => {
-        openExtensionPreferences().catch(() => null);
-      },
-      title: "Open Extension Preferences",
-    },
-    style: Toast.Style.Failure,
+    primaryAction: { style: Alert.ActionStyle.Default, title: "Open Extension Preferences" },
     title,
   });
+  if (!openPreferences) {
+    return;
+  }
+
+  try {
+    await openExtensionPreferences();
+  } catch {
+    await confirmAlert({
+      message: "Open Raycast Settings, select Extensions > GlossaryGo, and choose a Glossary File manually.",
+      primaryAction: { title: "OK" },
+      title: "Could Not Open Preferences",
+    });
+  }
 };
 
 export default async function Command(): Promise<void> {

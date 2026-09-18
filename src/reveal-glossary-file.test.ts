@@ -7,23 +7,23 @@ import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "
 import Command from "./reveal-glossary-file";
 
 const api = vi.hoisted(() => ({
-  Toast: { Style: { Failure: "failure", Success: "success" } },
+  Alert: { ActionStyle: { Default: "default" } },
+  confirmAlert: vi.fn<(options: unknown) => Promise<boolean>>(),
   environment: { supportPath: "" },
   getPreferenceValues: vi.fn<() => { glossaryFile?: string }>(),
   openExtensionPreferences: vi.fn<() => Promise<void>>(),
   showInFinder: vi.fn<(path: string) => Promise<void>>(),
-  showToast: vi.fn<(options: unknown) => Promise<void>>(),
 }));
 
 vi.mock("@raycast/api", () => api);
 
 beforeEach(async () => {
   vi.resetAllMocks();
+  api.confirmAlert.mockResolvedValue(false);
   api.environment.supportPath = dirname(await createTemporaryPath("glossary.yaml"));
   api.getPreferenceValues.mockReturnValue({});
   api.openExtensionPreferences.mockResolvedValue();
   api.showInFinder.mockResolvedValue();
-  api.showToast.mockResolvedValue();
 });
 afterEach(removeTemporaryDirectories);
 
@@ -39,7 +39,7 @@ describe("Reveal Glossary File existing targets", () => {
       expect(api.showInFinder).toHaveBeenCalledExactlyOnceWith(path);
       expect(await readFile(path, "utf8")).toBe(contents);
       expect(existsSync(join(api.environment.supportPath, "glossary.yaml"))).toBe(false);
-      expect(api.showToast).not.toHaveBeenCalled();
+      expect(api.confirmAlert).not.toHaveBeenCalled();
     },
   );
 
@@ -66,7 +66,7 @@ describe("Reveal Glossary File missing targets", () => {
       expect(api.showInFinder).toHaveBeenCalledExactlyOnceWith(api.environment.supportPath);
       expect(existsSync(path)).toBe(false);
       expect(existsSync(join(api.environment.supportPath, "missing"))).toBe(false);
-      expect(api.showToast).toHaveBeenCalledWith(
+      expect(api.confirmAlert).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringMatching(/Add Term.*Preferences/u),
           primaryAction: expect.objectContaining({ title: "Open Extension Preferences" }),
@@ -84,7 +84,7 @@ describe("Reveal Glossary File missing targets", () => {
 
     expect(api.showInFinder).toHaveBeenCalledExactlyOnceWith(existingAncestor);
     expect(existsSync(join(existingAncestor, "missing"))).toBe(false);
-    expect(api.showToast).toHaveBeenCalledWith(expect.objectContaining({ title: "Glossary File Is Missing" }));
+    expect(api.confirmAlert).toHaveBeenCalledWith(expect.objectContaining({ title: "Glossary File Is Missing" }));
   });
 });
 
@@ -94,11 +94,10 @@ describe("Reveal Glossary File recovery", () => {
 
     await Command();
 
-    expect(api.showToast).toHaveBeenCalledWith(
+    expect(api.confirmAlert).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringMatching(/Finder.*try again/u),
         primaryAction: expect.objectContaining({ title: "Open Extension Preferences" }),
-        style: "failure",
         title: "Could Not Reveal Glossary",
       }),
     );
@@ -112,8 +111,8 @@ describe("Reveal Glossary File recovery", () => {
     await Command();
 
     expect(api.showInFinder).not.toHaveBeenCalled();
-    expect(api.showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u), style: "failure" }),
+    expect(api.confirmAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u) }),
     );
   });
 });
@@ -127,8 +126,8 @@ describe("Reveal Glossary File inaccessible locations", () => {
       await Command();
 
       expect(api.showInFinder).not.toHaveBeenCalled();
-      expect(api.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u), style: "failure" }),
+      expect(api.confirmAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u) }),
       );
     } finally {
       await chmod(dirname(path), 0o700);
@@ -142,8 +141,68 @@ describe("Reveal Glossary File inaccessible locations", () => {
     await Command();
 
     expect(api.showInFinder).not.toHaveBeenCalled();
-    expect(api.showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u), style: "failure" }),
+    expect(api.confirmAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u) }),
     );
+  });
+});
+
+describe("Reveal Glossary File recovery choices", () => {
+  test("offers a normal Preferences action after revealing the missing target ancestor", async () => {
+    api.confirmAlert.mockResolvedValueOnce(true);
+
+    await Command();
+
+    expect(api.confirmAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dismissAction: { title: "Done" },
+        primaryAction: { style: "default", title: "Open Extension Preferences" },
+      }),
+    );
+    expect(api.showInFinder).toHaveBeenCalledBefore(api.confirmAlert);
+    expect(api.openExtensionPreferences).toHaveBeenCalledExactlyOnceWith();
+    expect(api.openExtensionPreferences).toHaveBeenCalledAfter(api.confirmAlert);
+  });
+
+  test("dismisses recovery without opening Preferences or creating a glossary", async () => {
+    await Command();
+
+    expect(api.confirmAlert).toHaveBeenCalledOnce();
+    expect(api.openExtensionPreferences).not.toHaveBeenCalled();
+    expect(existsSync(join(api.environment.supportPath, "glossary.yaml"))).toBe(false);
+  });
+
+  test("provides manual settings guidance if opening Preferences fails", async () => {
+    api.confirmAlert.mockResolvedValueOnce(true);
+    api.openExtensionPreferences.mockRejectedValue(new Error("Preferences unavailable"));
+
+    await Command();
+
+    expect(api.confirmAlert).toHaveBeenCalledTimes(2);
+    expect(api.confirmAlert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        message: expect.stringMatching(/Raycast Settings.*GlossaryGo.*Glossary File/u),
+        primaryAction: { title: "OK" },
+        title: "Could Not Open Preferences",
+      }),
+    );
+  });
+});
+
+describe("Reveal Glossary File dialog lifetime", () => {
+  test("waits for the recovery choice after Finder opens", async () => {
+    const confirmation = Promise.withResolvers<boolean>();
+    const completed = vi.fn<() => void>();
+    api.confirmAlert.mockReturnValueOnce(confirmation.promise);
+
+    const command = Command().then(completed);
+    await vi.waitFor(() => expect(api.confirmAlert).toHaveBeenCalledOnce());
+
+    expect(api.showInFinder).toHaveBeenCalledOnce();
+    expect(completed).not.toHaveBeenCalled();
+    expect(api.openExtensionPreferences).not.toHaveBeenCalled();
+    confirmation.resolve(false);
+    await command;
+    expect(completed).toHaveBeenCalledOnce();
   });
 });

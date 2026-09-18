@@ -71,9 +71,10 @@ shared custom file preference when set, otherwise the default support-directory 
 works with invalid YAML, an empty glossary, or a blank file without reading or validating its contents.
 
 If the file is missing, Finder reveals the nearest existing folder, including when intermediate folders are absent.
-A **Glossary File Is Missing** message offers Preferences and explains how to create or select a file. Reveal never
-creates folders or files and never changes glossary contents. Path or Finder failures offer recovery guidance and
-**Open Extension Preferences**.
+A **Glossary File Is Missing** dialog stays available after Finder opens, explains how to create or select a file,
+and offers **Open Extension Preferences** or **Done**. Path or Finder failures use the same recovery dialog. If
+Preferences cannot open, a second dialog explains how to find the setting manually. Reveal never creates folders
+or files and never changes glossary contents.
 
 ## Searching and actions
 
