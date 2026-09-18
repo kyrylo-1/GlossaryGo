@@ -1,7 +1,7 @@
 # GlossaryGo
 
 Search and update private local YAML glossary in Raycast. **Search Term** finds prefixes; **Add Term** opens reusable
-form; **Quick Add Term** saves from root search.
+form; **Quick Add Term** saves from root search; **Reveal Glossary File** locates storage in Finder.
 
 ## Setup
 
@@ -63,6 +63,17 @@ Open **Quick Add Term** from root search. Enter required inline **Term** and **D
 No form opens. Names are trimmed; definitions retain entered content. Add Term validation and duplicate rules apply.
 **Term Added** appears only after successful save to effective file. Use **Add Term** for multiline definitions or
 successive entries.
+
+## Revealing the glossary file
+
+Open **Reveal Glossary File** from Raycast root search to select the effective Glossary File in Finder. It uses the
+shared custom file preference when set, otherwise the default support-directory file. It needs no search result and
+works with invalid YAML, an empty glossary, or a blank file without reading or validating its contents.
+
+If the file is missing, Finder reveals the nearest existing folder, including when intermediate folders are absent.
+A **Glossary File Is Missing** message offers Preferences and explains how to create or select a file. Reveal never
+creates folders or files and never changes glossary contents. Path or Finder failures offer recovery guidance and
+**Open Extension Preferences**.
 
 ## Searching and actions
 
