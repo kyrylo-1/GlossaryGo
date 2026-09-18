@@ -68,7 +68,7 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
     }
   }
 
-  const nextSource = document.toString();
+  const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${document.toString()}`;
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
