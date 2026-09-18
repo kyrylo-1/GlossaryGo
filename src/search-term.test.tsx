@@ -5,7 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { confirmAlert } from "@raycast/api";
 
-import { GlossaryError } from "./glossary/glossary";
+import { getEntryIdentity } from "./glossary/entry-identity";
+import { GlossaryError, parseGlossarySource } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import type * as GlossaryModule from "./glossary/glossary";
 import Command from "./search-term";
@@ -376,5 +377,65 @@ describe("Search Term history lifecycle", () => {
     reload();
     expect(await screen.findByText(/Updated definition/)).toBeTruthy();
     expect(names()).toEqual(["Zulu"]);
+  });
+});
+
+// Exercises the action graph on one captured sibling.
+// eslint-disable-next-line max-lines-per-function
+describe("same-name result identity and actions", () => {
+  const source =
+    "terms:\n  - term: API\n    definition: First definition\n  - term: API\n    definition: Second definition\n  - term: API\n    definition: Second definition\n";
+
+  test("shows distinct stable IDs and definition context, and copies only the selected sibling", async () => {
+    const entries = parseGlossarySource(source);
+    mocks.load.mockResolvedValue(entries);
+    render(<Command />);
+    await waitFor(() => expect(screen.getAllByRole("article", { name: "API" })).toHaveLength(3));
+    const rows = screen.getAllByRole("article", { name: "API" });
+    const ids = rows.map((row) => row.dataset.entryId);
+    expect(new Set(ids).size).toBe(3);
+    expect(within(rows[1]).getByTestId("subtitle").textContent).toContain("Entry 2 · Second definition");
+    fireEvent.click(within(rows[1]).getByRole("button", { name: "Copy Definition" }));
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenCalledWith("Second definition"));
+    await waitFor(() => expect(screen.getAllByRole("article", { name: "API" })[0].dataset.entryId).toBe(ids[1]));
+    expect(screen.getAllByRole("article", { name: "API" })).toHaveLength(3);
+    mocks.load.mockResolvedValue(parseGlossarySource(source));
+    reload();
+    await waitFor(() => expect(screen.getAllByRole("article", { name: "API" })[0].dataset.entryId).toBe(ids[1]));
+    expect(new Set(screen.getAllByRole("article", { name: "API" }).map((row) => row.dataset.entryId))).toEqual(
+      new Set(ids),
+    );
+  });
+
+  test("wires full reader, Edit, and confirmed Delete to the captured sibling", async () => {
+    const entries = parseGlossarySource(source);
+    mocks.load.mockResolvedValue(entries);
+    vi.mocked(confirmAlert).mockResolvedValue(true);
+    render(<Command />);
+    await waitFor(() => expect(screen.getAllByRole("article", { name: "API" })).toHaveLength(3));
+    const selected = within(screen.getAllByRole("article", { name: "API" })[2]);
+    fireEvent.click(selected.getByRole("button", { name: "View Full Definition" }));
+    expect(selected.getAllByText("Second definition", { exact: false }).length).toBeGreaterThan(0);
+    fireEvent.click(selected.getAllByRole("button", { name: "Copy Term" })[1]);
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenCalledWith("API"));
+    fireEvent.click(selected.getByRole("button", { name: "Edit Term" }));
+    expect(fieldValue("definition")).toBe("Second definition");
+    fireEvent.click(selected.getByRole("button", { name: "Update Term" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled());
+    const edit = mocks.save.mock.calls[0][1];
+    expect(edit.type).toBe("edit");
+    if (edit.type !== "edit") {
+      throw new TypeError("Expected edit change");
+    }
+    expect(getEntryIdentity(edit.original)?.index).toBe(2);
+    mocks.save.mockClear();
+    fireEvent.click(selected.getByRole("button", { name: "Delete Term" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled());
+    const deletion = mocks.save.mock.calls[0][1];
+    expect(deletion.type).toBe("delete");
+    if (deletion.type !== "delete") {
+      throw new TypeError("Expected delete change");
+    }
+    expect(getEntryIdentity(deletion.original)?.index).toBe(2);
   });
 });

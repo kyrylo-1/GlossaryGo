@@ -81,10 +81,6 @@ const createChange = (options: SubmitTermFormOptions, term: Term): GlossaryChang
 };
 
 const handleSaveFailure = async (options: SubmitTermFormOptions, error: unknown): Promise<void> => {
-  if (error instanceof GlossaryError && error.code === "duplicate-term") {
-    options.onErrors({ term: error.message });
-    return;
-  }
   if (
     options.mode === "edit" &&
     error instanceof GlossaryError &&

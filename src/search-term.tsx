@@ -18,6 +18,8 @@ import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
 import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-action";
 import { TermForm } from "./components/term-form";
+import { getEntryIdentity } from "./glossary/entry-identity";
+import { areTermsEquivalent } from "./glossary/term-matching";
 import { getGlossaryTarget } from "./glossary/get-glossary-target";
 import type { GlossaryTarget } from "./glossary/glossary-target";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
@@ -166,7 +168,7 @@ const DeleteTermAction = ({ glossaryFile, onReload, term }: DeleteTermActionProp
 type SearchActionsProps = AddTermActionProps &
   Readonly<{
     isRecent: boolean;
-    onTermUsed: (name: string) => void;
+    onTermUsed: (term: Term) => void;
     onEditConflictReload: () => Promise<void>;
     onReload: () => Promise<void>;
   }>;
@@ -198,7 +200,7 @@ const NoMatchActions = (props: SearchActionsProps): ReactElement => {
 
 type TermActionsProps = SearchActionsProps & Readonly<{ term: Term }>;
 
-type CopyTermActionsProps = Readonly<{ onTermUsed: (name: string) => void; term: Term }>;
+type CopyTermActionsProps = Readonly<{ onTermUsed: (term: Term) => void; term: Term }>;
 
 const CopyTermActions = ({ onTermUsed, term }: CopyTermActionsProps): ReactElement => {
   return (
@@ -208,7 +210,7 @@ const CopyTermActions = ({ onTermUsed, term }: CopyTermActionsProps): ReactEleme
         icon={Icon.Clipboard}
         onAction={() =>
           runAction(
-            () => copyWithFeedback(term.definition, "Definition", () => onTermUsed(term.term)),
+            () => copyWithFeedback(term.definition, "Definition", () => onTermUsed(term)),
             "Failed to Copy Definition",
           )
         }
@@ -217,7 +219,7 @@ const CopyTermActions = ({ onTermUsed, term }: CopyTermActionsProps): ReactEleme
         title="Copy Term"
         icon={Icon.Clipboard}
         onAction={() =>
-          runAction(() => copyWithFeedback(term.term, "Term", () => onTermUsed(term.term)), "Failed to Copy Term")
+          runAction(() => copyWithFeedback(term.term, "Term", () => onTermUsed(term)), "Failed to Copy Term")
         }
       />
     </>
@@ -269,14 +271,25 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
   );
 };
 
+const getResultSubtitle = (term: Term, terms: readonly Term[], index: number): string => {
+  const identity = getEntryIdentity(term);
+  const count = identity?.equivalentCount ?? terms.filter((entry) => areTermsEquivalent(entry.term, term.term)).length;
+  if (count < 2) {
+    return "";
+  }
+  const preview = term.definition.replaceAll(/\s+/gu, " ").trim().slice(0, 100);
+  return `Entry ${(identity?.index ?? index) + 1} · ${preview}`;
+};
+
 const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
   return (
     <List.Section title="Terms" subtitle={props.isRecent ? "Recent terms first" : ""}>
-      {result.terms.map((term) => (
+      {result.terms.map((term, index) => (
         <List.Item
-          key={term.term}
-          id={term.term}
+          key={getEntryIdentity(term)?.id ?? `${index}`}
+          id={getEntryIdentity(term)?.id ?? `${index}`}
           title={term.term}
+          subtitle={getResultSubtitle(term, result.terms, index)}
           detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
           actions={<TermActions term={term} {...props} />}
         />

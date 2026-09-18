@@ -34,11 +34,11 @@ export const captureEntryIdentities = (source: string, terms: readonly Term[]): 
       identities.set(
         entry,
         Object.freeze({
+          equivalentCount: group.length,
           id: `${fingerprint}:${index}`,
+          identicalCount: definitionCounts.get(entry.definition) ?? 0,
           index,
           source,
-          equivalentCount: group.length,
-          identicalCount: definitionCounts.get(entry.definition) ?? 0,
         }),
       );
     }
@@ -60,7 +60,7 @@ export const resolveSelectedIndex = (source: string, terms: readonly Term[], ori
 };
 
 export const captureSelectedTerm = (entry: Term): Term => {
-  const captured = Object.freeze({ term: entry.term, definition: entry.definition });
+  const captured = Object.freeze({ definition: entry.definition, term: entry.term });
   const identity = identities.get(entry);
   if (identity) {
     identities.set(captured, identity);

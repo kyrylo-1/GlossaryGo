@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch } from "react";
 
+import type { Term } from "../utils/types";
 import { GlossaryError, loadGlossary } from "../glossary/glossary";
 import type { GlossaryTarget } from "../glossary/glossary-target";
 import { searchTerms, type SearchResult } from "./search";
@@ -12,7 +13,7 @@ type GlossaryController = Readonly<{
   glossaryFile: string;
   isRecent: boolean;
   query: string;
-  recordTerm: (name: string) => void;
+  recordTerm: (term: Term) => void;
   reload: () => Promise<void>;
   result: SearchResult;
   setQuery: (query: string) => void;
@@ -73,7 +74,7 @@ export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget
   const [model, dispatch] = useReducer(glossaryReducer, { query: "", recentTerms: [], state: { status: "loading" } });
   const reload = useGlossaryReload(glossaryFile, dispatch);
   const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
-  const recordTerm = useCallback((name: string) => dispatch({ name, type: "termUsed" }), []);
+  const recordTerm = useCallback((term: Term) => dispatch({ term, type: "termUsed" }), []);
   const result = useMemo(
     () =>
       model.state.status === "ready"

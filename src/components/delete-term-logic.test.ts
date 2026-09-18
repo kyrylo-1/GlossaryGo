@@ -1,9 +1,7 @@
 import { describe, expect, test, vi, type Mock } from "vitest";
 
-import type { GlossaryChange } from "../glossary/apply-glossary-change";
-import { applyGlossaryChange } from "../glossary/apply-glossary-change";
-import { parseGlossarySource } from "../glossary/glossary";
-import { GlossaryError } from "../glossary/glossary";
+import { applyGlossaryChange, type GlossaryChange } from "../glossary/apply-glossary-change";
+import { GlossaryError, parseGlossarySource } from "../glossary/glossary";
 import type { Term } from "../utils/types";
 import { runDeleteTerm } from "./delete-term-logic";
 

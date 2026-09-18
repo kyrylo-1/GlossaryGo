@@ -3,7 +3,6 @@ import type { LineCounter } from "yaml";
 import type { SourceRange } from "./glossary-types";
 
 export type GlossaryErrorCode =
-  | "duplicate-term"
   | "invalid-encoding"
   | "invalid-extension"
   | "invalid-schema"

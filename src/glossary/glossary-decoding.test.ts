@@ -35,7 +35,7 @@ describe("loadGlossary decoding and size", () => {
 
 test("retains BOM in selection identity and refuses BOM-only source changes", async () => {
   const source = "terms:\n  - term: API\n    definition: First\n  - term: API\n    definition: Second\n";
-  const path = await writeGlossary("\uFEFF" + source);
+  const path = await writeGlossary(`\uFEFF${source}`);
   const selected = (await loadGlossary(path))[1];
   await writeFile(path, source);
   await expect(saveGlossaryChange(path, { original: selected, type: "delete" })).rejects.toEqual(

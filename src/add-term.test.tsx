@@ -120,14 +120,20 @@ describe("Add Term validation", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  test("clears a duplicate error after correction and saves the corrected name with literal definition", async () => {
-    mocks.saveGlossaryChange.mockRejectedValueOnce(new GlossaryError("duplicate-term", "Term already exists."));
+  test("retains same-name fields after source failure and retries with literal definition", async () => {
+    mocks.saveGlossaryChange.mockRejectedValueOnce(
+      new GlossaryError("invalid-schema", "The glossary source is invalid."),
+    );
     mocks.saveGlossaryChange.mockResolvedValueOnce();
     render(<Command />);
     fireEvent.change(screen.getByTestId("term"), { target: { value: "Duplicate" } });
     fireEvent.change(screen.getByTestId("definition"), { target: { value: " Literal\nDefinition " } });
     fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
-    expect((await screen.findByRole("alert")).textContent).toBe("Term already exists.");
+    await waitFor(() =>
+      expect(raycastApiMocks.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "The glossary source is invalid." }),
+      ),
+    );
     expect(valueOf("term")).toBe("Duplicate");
     expect(valueOf("definition")).toBe(" Literal\nDefinition ");
     fireEvent.change(screen.getByTestId("term"), { target: { value: "  Corrected  " } });

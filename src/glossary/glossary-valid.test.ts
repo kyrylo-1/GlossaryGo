@@ -55,8 +55,8 @@ terms:
 `);
 
     await expect(loadGlossary(path)).resolves.toEqual([
-      { term: firstTerm, definition: "First" },
-      { term: duplicateTerm, definition: "Second" },
+      { definition: "First", term: firstTerm },
+      { definition: "Second", term: duplicateTerm },
     ]);
   });
 

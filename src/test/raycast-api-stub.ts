@@ -163,8 +163,17 @@ const listItem = ({
   actions,
   detail,
   title,
-}: ContainerProps & Readonly<{ detail: ReactNode; title: string }>): ReactElement =>
-  createElement("article", { "aria-label": title, "data-testid": "result" }, title, detail, actions);
+  subtitle,
+  id,
+}: ContainerProps & Readonly<{ detail: ReactNode; title: string; subtitle?: string; id?: string }>): ReactElement =>
+  createElement(
+    "article",
+    { "aria-label": title, "data-entry-id": id, "data-testid": "result" },
+    title,
+    subtitle ? createElement("span", { "data-testid": "subtitle" }, subtitle) : null,
+    detail,
+    actions,
+  );
 const listDetail = Object.assign(
   ({ markdown, metadata }: ContainerProps & Readonly<{ metadata?: ReactNode }>): ReactElement =>
     createElement("div", {}, createElement("pre", { "data-testid": "preview" }, markdown), metadata),

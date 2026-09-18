@@ -1,5 +1,4 @@
-import { areTermsEquivalent } from "../glossary/term-matching";
-import { rememberTerm, resolveRecentTerms } from "./recent-terms";
+import { rememberTerm, resolveRecentTerm, resolveRecentTerms } from "./recent-terms";
 import type { Term } from "../utils/types";
 
 export type CommandState =
@@ -10,7 +9,7 @@ export type CommandState =
 
 export type GlossaryReducerState = Readonly<{
   query: string;
-  recentTerms: readonly string[];
+  recentTerms: readonly Term[];
   state: CommandState;
 }>;
 
@@ -19,7 +18,7 @@ export type GlossaryAction =
   | Readonly<{ type: "loadMissing" }>
   | Readonly<{ type: "loadStarted" }>
   | Readonly<{ terms: readonly Term[]; type: "loadSucceeded" }>
-  | Readonly<{ name: string; type: "termUsed" }>
+  | Readonly<{ term: Term; type: "termUsed" }>
   | Readonly<{ query: string; type: "queryChanged" }>;
 
 export const glossaryReducer = (state: GlossaryReducerState, action: GlossaryAction): GlossaryReducerState => {
@@ -36,19 +35,19 @@ export const glossaryReducer = (state: GlossaryReducerState, action: GlossaryAct
     case "loadSucceeded": {
       return {
         ...state,
-        recentTerms: resolveRecentTerms(state.recentTerms, action.terms).map(({ term }) => term),
+        recentTerms: resolveRecentTerms(state.recentTerms, action.terms),
         state: { status: "ready", terms: action.terms },
       };
     }
     case "termUsed": {
       if (state.state.status === "loading" || state.state.status === "error") {
-        return { ...state, recentTerms: rememberTerm(state.recentTerms, action.name) };
+        return { ...state, recentTerms: rememberTerm(state.recentTerms, action.term) };
       }
       if (state.state.status !== "ready") {
         return state;
       }
-      const match = state.state.terms.find(({ term }) => areTermsEquivalent(term, action.name));
-      return match ? { ...state, recentTerms: rememberTerm(state.recentTerms, match.term) } : state;
+      const match = resolveRecentTerm(action.term, state.state.terms);
+      return match ? { ...state, recentTerms: rememberTerm(state.recentTerms, match) } : state;
     }
     case "queryChanged": {
       return { ...state, query: action.query };

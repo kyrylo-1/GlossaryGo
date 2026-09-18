@@ -131,12 +131,12 @@ describe("runTermFormSubmission edit changes", () => {
 });
 
 describe("runTermFormSubmission failures", () => {
-  test("maps a duplicate failure to the Term field and allows correction", async () => {
+  test("reports source validation failure and allows retry", async () => {
     const callbacks = createCallbacks();
     const submitting = { current: false };
     const saveChange = vi
       .fn<(path: string, change: GlossaryChange) => Promise<void>>()
-      .mockRejectedValue(new GlossaryError("duplicate-term", "A term with this name already exists."));
+      .mockRejectedValue(new GlossaryError("invalid-schema", "The glossary source is invalid."));
 
     await expect(
       runTermFormSubmission({
@@ -149,8 +149,8 @@ describe("runTermFormSubmission failures", () => {
       }),
     ).resolves.toBe(false);
 
-    expect(callbacks.onErrors).toHaveBeenLastCalledWith({ term: "A term with this name already exists." });
-    expect(callbacks.onSaveFailure).not.toHaveBeenCalled();
+    expect(callbacks.onErrors).toHaveBeenLastCalledWith({});
+    expect(callbacks.onSaveFailure).toHaveBeenCalledWith("The glossary source is invalid.");
     expect(callbacks.onSubmittingChange).toHaveBeenLastCalledWith(false);
     expect(submitting.current).toBe(false);
   });
@@ -176,7 +176,7 @@ describe("runTermFormSubmission failures", () => {
 });
 
 describe("runTermFormSubmission edit failure routing", () => {
-  test("maps an edit duplicate to the Term field instead of conflict recovery", async () => {
+  test("reports edit source validation failure without conflict recovery", async () => {
     const callbacks = createCallbacks();
 
     await runTermFormSubmission({
@@ -186,14 +186,14 @@ describe("runTermFormSubmission edit failure routing", () => {
       original: { definition: "Old definition", term: "API" },
       saveChange: vi
         .fn<(path: string, change: GlossaryChange) => Promise<void>>()
-        .mockRejectedValue(new GlossaryError("duplicate-term", "A term with this name already exists.")),
+        .mockRejectedValue(new GlossaryError("invalid-schema", "The glossary source is invalid.")),
       submitting: { current: false },
       values,
     });
 
-    expect(callbacks.onErrors).toHaveBeenLastCalledWith({ term: "A term with this name already exists." });
+    expect(callbacks.onErrors).toHaveBeenLastCalledWith({});
     expect(callbacks.onEditConflict).not.toHaveBeenCalled();
-    expect(callbacks.onSaveFailure).not.toHaveBeenCalled();
+    expect(callbacks.onSaveFailure).toHaveBeenCalledWith("The glossary source is invalid.");
   });
 
   test.each([
