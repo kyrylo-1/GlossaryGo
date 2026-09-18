@@ -8,7 +8,7 @@
   "properties": {
     "terms": {
       "type": "array",
-      "$comment": "uniqueItems rejects exact duplicate entries only. At runtime, terms must be unique under Unicode NFC normalization plus case-insensitive comparison, even when definitions differ.",
+      "$comment": "Same-name entries, including identical term-and-definition pairs, are independent and permitted. Only the two string fields are stored.",
       "items": {
         "type": "object",
         "required": ["term", "definition"],
@@ -24,8 +24,7 @@
           }
         },
         "additionalProperties": false
-      },
-      "uniqueItems": true
+      }
     }
   },
   "additionalProperties": false
