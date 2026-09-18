@@ -110,6 +110,11 @@ Go back to same query.
 Selected-result action order: **Copy Definition**, **Copy Term**, **View Full Definition**, **Add Term**, **Edit Term**,
 **Delete Term**, **Reload Glossary**, **Reveal Glossary in Finder**. Copy does not close command.
 
+With a selected result, keyboard shortcuts appear beside actions: **View Full Definition** uses **⌘⇧V**, **Add Term** uses **⌘N**,
+**Edit Term** uses **⌘E**, and **Delete Term** uses **⌃X**. **Return** still copies the definition; **⌘Return**
+still copies the term. Shortcuts invoke the same actions, including Delete confirmation. **⌘N** remains available
+in empty-glossary, missing-file, and no-match views; selection-only shortcuts require a result.
+
 **Add Term** also appears in empty-glossary, missing-file, and no-match views. Those views have no Edit/Delete.
 Add opens form inside Search Term; current query pre-fills name. Shared trimming and definition rules apply.
 Successful add searches saved name and reloads.
