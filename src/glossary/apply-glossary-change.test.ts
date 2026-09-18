@@ -144,16 +144,14 @@ describe("applyGlossaryChange additions", () => {
     ]);
   });
 
-  // eslint-disable-next-line vitest/expect-expect
   test.each([
-    ["case-insensitive duplicate", "API", "api"],
-    ["canonically equivalent Unicode duplicate", "café", "cafe\u0301"],
-  ])("rejects a %s after adding", (_label, existing, submitted) => {
+    ["API", "api"],
+    ["café", "cafe\u0301"],
+    ["API", "API"],
+  ])("allows independent additions named %s and %s", (existing, submitted) => {
     const source = `terms:\n  - term: ${existing}\n    definition: Existing\n`;
-    expectGlossaryError(
-      () => applyGlossaryChange(source, { term: { definition: "Replacement", term: submitted }, type: "add" }),
-      "duplicate-term",
-    );
+    const next = applyGlossaryChange(source, { term: { definition: "Existing", term: submitted }, type: "add" });
+    expect(parseGlossarySource(next)).toHaveLength(2);
   });
 
   test("allows accent-distinct terms when adding", () => {
@@ -236,18 +234,17 @@ describe("applyGlossaryChange edits and deletions", () => {
     expect(next).toContain("# Definition comment");
   });
 
-  // eslint-disable-next-line vitest/expect-expect
-  test("rejects an edit that renames to another entry's equivalent term", () => {
+  test("allows renaming an entry to another entry's equivalent name", () => {
     const source = "terms:\n  - term: API\n    definition: Interface\n  - term: HTTP\n    definition: Protocol\n";
-    expectGlossaryError(
-      () =>
-        applyGlossaryChange(source, {
-          original: { definition: "Interface", term: "API" },
-          term: { definition: "Updated", term: "http" },
-          type: "edit",
-        }),
-      "duplicate-term",
-    );
+    const next = applyGlossaryChange(source, {
+      original: parseGlossarySource(source)[0],
+      term: { definition: "Updated", term: "http" },
+      type: "edit",
+    });
+    expect(parseGlossarySource(next)).toEqual([
+      { term: "http", definition: "Updated" },
+      { term: "HTTP", definition: "Protocol" },
+    ]);
   });
 
   // eslint-disable-next-line vitest/expect-expect
@@ -364,5 +361,46 @@ describe("applyGlossaryChange serialized size", () => {
       () => applyGlossaryChange(`# ${comment}\nterms: []\n`, { term: { definition: "y", term: "x" }, type: "add" }),
       "too-large",
     );
+  });
+});
+
+const duplicateSource =
+  "terms:\n  - term: API # first\n    definition: Same\n  - term: API # second\n    definition: Same\n";
+
+describe("captured duplicate entry identity", () => {
+  test("edits and deletes only the selected identical sibling", () => {
+    const selected = parseGlossarySource(duplicateSource)[1];
+    const edited = applyGlossaryChange(duplicateSource, {
+      original: selected,
+      term: { term: "API", definition: "Second updated" },
+      type: "edit",
+    });
+    expect(parseGlossarySource(edited)).toEqual([
+      { term: "API", definition: "Same" },
+      { term: "API", definition: "Second updated" },
+    ]);
+    expect(edited).toContain("# first");
+    expect(edited).toContain("# second");
+    const deleted = applyGlossaryChange(duplicateSource, { original: selected, type: "delete" });
+    expect(parseGlossarySource(deleted)).toEqual([{ term: "API", definition: "Same" }]);
+    expect(deleted).toContain("# first");
+    expect(deleted).not.toContain("# second");
+  });
+
+  test.each(["# external comment\n", "terms: []\n"])(
+    "refuses a captured duplicate after a source change: %s",
+    (replacement) => {
+      const selected = parseGlossarySource(duplicateSource)[1];
+      const changed = replacement.startsWith("#") ? replacement + duplicateSource : replacement;
+      expect(() => applyGlossaryChange(changed, { original: selected, type: "delete" })).toThrowError(
+        expect.objectContaining({ code: "stale-term" }),
+      );
+    },
+  );
+
+  test("refuses ambiguous selection without captured source identity", () => {
+    expect(() =>
+      applyGlossaryChange(duplicateSource, { original: { term: "API", definition: "Same" }, type: "delete" }),
+    ).toThrowError(expect.objectContaining({ code: "stale-term" }));
   });
 });

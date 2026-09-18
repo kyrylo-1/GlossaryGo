@@ -8,15 +8,15 @@ describe("Term canonical equivalence across parsing, mutation, and search", () =
   test("treats NFC and NFD spellings as canonically equivalent", () => {
     const duplicateSource = "terms:\n  - term: café\n    definition: NFC\n  - term: cafe\u0301\n    definition: NFD\n";
 
-    expect(() => parseGlossarySource(duplicateSource)).toThrowError(
-      expect.objectContaining({ code: "duplicate-term" }),
-    );
-    expect(() =>
-      applyGlossaryChange("terms:\n  - term: café\n    definition: NFC\n", {
-        term: { definition: "NFD", term: "cafe\u0301" },
-        type: "add",
-      }),
-    ).toThrowError(expect.objectContaining({ code: "duplicate-term" }));
+    expect(parseGlossarySource(duplicateSource)).toHaveLength(2);
+    expect(
+      parseGlossarySource(
+        applyGlossaryChange("terms:\n  - term: café\n    definition: NFC\n", {
+          term: { definition: "NFD", term: "cafe\u0301" },
+          type: "add",
+        }),
+      ),
+    ).toHaveLength(2);
     expect(searchTerms([{ definition: "NFC", term: "café" }], "cafe\u0301")).toEqual({
       terms: [{ definition: "NFC", term: "café" }],
       totalMatchCount: 1,
@@ -28,15 +28,15 @@ describe("Term case equivalence across parsing, mutation, and search", () => {
   test("treats Greek sigma case variants as equivalent", () => {
     const duplicateSource = "terms:\n  - term: ΟΣ\n    definition: Upper\n  - term: οσ\n    definition: Lower\n";
 
-    expect(() => parseGlossarySource(duplicateSource)).toThrowError(
-      expect.objectContaining({ code: "duplicate-term" }),
-    );
-    expect(() =>
-      applyGlossaryChange("terms:\n  - term: ΟΣ\n    definition: Upper\n", {
-        term: { definition: "Lower", term: "οσ" },
-        type: "add",
-      }),
-    ).toThrowError(expect.objectContaining({ code: "duplicate-term" }));
+    expect(parseGlossarySource(duplicateSource)).toHaveLength(2);
+    expect(
+      parseGlossarySource(
+        applyGlossaryChange("terms:\n  - term: ΟΣ\n    definition: Upper\n", {
+          term: { definition: "Lower", term: "οσ" },
+          type: "add",
+        }),
+      ),
+    ).toHaveLength(2);
     expect(searchTerms([{ definition: "Upper", term: "ΟΣ" }], "οσ")).toEqual({
       terms: [{ definition: "Upper", term: "ΟΣ" }],
       totalMatchCount: 1,

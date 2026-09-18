@@ -113,7 +113,7 @@ describe("runQuickAddTerm success feedback", () => {
 });
 
 describe("runQuickAddTerm save failures", () => {
-  test("reports a Unicode-equivalent duplicate without reporting success", async () => {
+  test("adds a Unicode-equivalent sibling independently", async () => {
     const glossaryFile = await writeGlossary("terms:\n  - term: Éclair\n    definition: Existing definition\n");
     const onFailure = vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue();
     const onSuccess = vi.fn<() => Promise<void>>().mockResolvedValue();
@@ -126,12 +126,9 @@ describe("runQuickAddTerm save failures", () => {
       saveChange: saveGlossaryChange,
     });
 
-    expect(onFailure).toHaveBeenCalledWith({
-      kind: "duplicate",
-      message: expect.stringContaining("duplicates another term"),
-    });
-    expect(onSuccess).not.toHaveBeenCalled();
-    await expect(loadGlossary(glossaryFile)).resolves.toEqual([{ definition: "Existing definition", term: "Éclair" }]);
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(onSuccess).toHaveBeenCalledOnce();
+    await expect(loadGlossary(glossaryFile)).resolves.toHaveLength(2);
   });
 
   test("reports a save failure without creating the invalid target", async () => {

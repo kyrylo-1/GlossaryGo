@@ -1,6 +1,8 @@
 import { describe, expect, test, vi, type Mock } from "vitest";
 
 import type { GlossaryChange } from "../glossary/apply-glossary-change";
+import { applyGlossaryChange } from "../glossary/apply-glossary-change";
+import { parseGlossarySource } from "../glossary/glossary";
 import { GlossaryError } from "../glossary/glossary";
 import type { Term } from "../utils/types";
 import { runDeleteTerm } from "./delete-term-logic";
@@ -185,4 +187,19 @@ describe("runDeleteTerm post-persistence handling", () => {
     expect(options.onDeleteFailure).not.toHaveBeenCalled();
     expect(options.deleting.current).toBe(true);
   });
+});
+
+test("retains captured identity through confirmation for identical siblings", async () => {
+  const source = "terms:\n  - term: API # first\n    definition: Same\n  - term: API # second\n    definition: Same\n";
+  const selected = parseGlossarySource(source)[1];
+  let result = source;
+  const options = createOptions();
+  options.confirmDelete.mockResolvedValue(true);
+  options.saveChange.mockImplementation((_path, change) => {
+    result = applyGlossaryChange(source, change);
+    return Promise.resolve();
+  });
+  await expect(runDeleteTerm({ ...options, original: selected })).resolves.toBe(true);
+  expect(result).toContain("# first");
+  expect(result).not.toContain("# second");
 });
