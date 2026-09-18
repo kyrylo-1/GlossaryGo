@@ -4,13 +4,17 @@ import type { ReactElement } from "react";
 
 import { resolveRevealGlossaryPath } from "./reveal-glossary-path";
 
+const revealGlossaryFile = async (glossaryFile: string): Promise<void> => {
+  await showInFinder(resolveRevealGlossaryPath(glossaryFile));
+};
+
 export const RevealGlossaryFileAction = ({ glossaryFile }: Readonly<{ glossaryFile: string }>): ReactElement => {
   return (
     <Action
       title="Reveal Glossary in Finder"
       icon={Icon.Finder}
       onAction={() => {
-        showInFinder(resolveRevealGlossaryPath(glossaryFile)).catch((error: unknown) =>
+        revealGlossaryFile(glossaryFile).catch((error: unknown) =>
           showFailureToast(error, { title: "Could Not Reveal Glossary" }),
         );
       }}
