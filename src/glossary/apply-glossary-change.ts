@@ -1,9 +1,10 @@
-import { isMap, isScalar, isSeq } from "yaml";
+import { isMap, isScalar, isSeq, type YAMLSeq } from "yaml";
 
 import { MAXIMUM_GLOSSARY_BYTES } from "../constants";
 import type { Term } from "../utils/types";
 import { GlossaryError } from "./glossary-error";
 import { areTermsEquivalent } from "./term-matching";
+import { compareTermNames } from "./term-name-order";
 import { parseValidatedGlossarySource } from "./validated-glossary-source";
 
 export type GlossaryChange =
@@ -19,6 +20,13 @@ const normalizeTerm = (term: Term): Term => {
   return normalizedTerm;
 };
 
+const sortTermsSequence = (sequence: YAMLSeq, terms: readonly Term[]): void => {
+  sequence.items = sequence.items
+    .map((node, index) => ({ name: terms[index].term, node }))
+    .sort((left, right) => compareTermNames(left.name, right.name))
+    .map(({ node }) => node);
+};
+
 export const applyGlossaryChange = (source: string, change: GlossaryChange): string => {
   const { document, terms } = parseValidatedGlossarySource(source);
   const sequence = document.get("terms", true);
@@ -27,7 +35,9 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   }
 
   if (change.type === "add") {
-    document.addIn(["terms"], document.createNode(normalizeTerm(change.term)));
+    const term = normalizeTerm(change.term);
+    document.addIn(["terms"], document.createNode(term));
+    sortTermsSequence(sequence, [...terms, term]);
   } else {
     const index = terms.findIndex((term) => areTermsEquivalent(term.term, change.original.term));
     if (

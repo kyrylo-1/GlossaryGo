@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 describe("saveGlossaryChange validation", () => {
-  test("adds a term after the existing entries and leaves no temporary file", async () => {
+  test("sorts added and existing terms and leaves no temporary file", async () => {
     const path = await writeGlossary("terms:\n  - term: API\n    definition: Application Programming Interface\n");
 
     await saveGlossaryChange(path, {
@@ -23,8 +23,8 @@ describe("saveGlossaryChange validation", () => {
     });
 
     await expect(loadGlossary(path)).resolves.toEqual([
-      { definition: "Application Programming Interface", term: "API" },
       { definition: "Architectural Decision Record", term: "ADR" },
+      { definition: "Application Programming Interface", term: "API" },
     ]);
     await expect(readdir(dirname(path))).resolves.toEqual(["glossary.yaml"]);
   });
@@ -246,8 +246,10 @@ describe("saveGlossaryChange replacement", () => {
     );
   });
 
-  test("keeps the original file and hides raw details when replacement fails", async () => {
-    const path = await writeGlossary("terms: []\n");
+  test("keeps unsorted source bytes and hides raw details when replacement fails", async () => {
+    const path = await writeGlossary(
+      "terms:\n  - term: Zulu\n    definition: Last\n  - term: Alpha\n    definition: First\n",
+    );
     const original = await readFile(path);
     vi.spyOn(glossarySaveFileSystem, "rename").mockRejectedValue(
       new Error("EACCES: hidden filesystem detail and Secret Term"),
