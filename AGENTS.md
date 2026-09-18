@@ -11,8 +11,6 @@ GlossaryGo: Raycast extension for searching private local YAML glossary.
 - `package.json`: commands, preferences. `glossary.schema.json`: format.
 
 Read `CONTEXT.md` before changing domain terminology. Read `README.md` before changing validation or search behavior.
-Read `TESTING.md` before features, behavior changes, regression fixes, or acceptance tests.
-Update affected testing scenarios in the same change. Report automated checks separately from live Raycast evidence.
 
 ## Commands
 
@@ -25,10 +23,7 @@ Use kebab-case filenames, camelCase functions/variables, PascalCase types/compon
 Follow ESLint: function expressions, explicit return types, type-only imports, `type` aliases.
 For TSX, use `vercel-react-best-practices` skill.
 
-Use descriptive Vitest `describe` / `test` names. Cover changed behavior, especially invalid YAML, duplicates,
-Unicode prefixes, reload failures. No numeric coverage threshold.
-Before submitting code, run tests, lint, formatting checks, build.
-For UI changes, verify search, reload, clipboard in Raycast using `TESTING.md`.
+Use descriptive Vitest `describe` / `test` names. No numeric coverage threshold.
 
 ## Commits and PRs
 
