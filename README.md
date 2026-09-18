@@ -41,8 +41,9 @@ when displayed and copied. Empty glossary is valid:
 terms: []
 ```
 
-Duplicates use search's Unicode-normalized, case-insensitive comparison. No extra fields, anchors, aliases, merge keys,
-custom tags, or multiple documents. Ordinary mappings, sequences, comments, quoted strings, literal/folded multiline
+Entries may share identical, case-equivalent, or canonically equivalent names. Even identical name-and-definition
+entries are allowed independently; loading and saving never merge them. The format stays limited to `term` and
+`definition`, with no stored identifiers. No extra fields, anchors, aliases, merge keys, custom tags, or multiple documents. Ordinary mappings, sequences, comments, quoted strings, literal/folded multiline
 strings are supported.
 
 ## Adding terms
@@ -52,7 +53,8 @@ Definitions require non-whitespace text; remaining content stays exact.
 
 Every successful add sorts the complete stored terms sequence, including previously unsorted entries, by name.
 File order uses locale-independent JavaScript ordinal string comparison: NFC-normalized lowercase names first,
-then NFC-normalized original names, then original names to break ties. Accents remain distinct; ordering is identical
+then NFC-normalized original names, then original names to break ties. Exact-name ties retain sequence order, with a
+new identical name after existing siblings. Accents remain distinct; ordering is identical
 across locales. Existing YAML entries move with their attached comments and scalar styles; decoded definition content
 stays exact. The same ordering applies to Add inside Search Term, standalone Add Term, and Quick Add Term.
 Edit keeps the selected file position; Delete keeps surviving entries in their current order. Opening, searching,
@@ -68,7 +70,7 @@ next opens or after **Reload Glossary** in an open search.
 ## Quick adding terms
 
 Open **Quick Add Term** from root search. Enter required inline **Term** and **Definition**; press Return.
-No form opens. Names are trimmed; definitions retain entered content. Add Term validation and duplicate rules apply.
+No form opens. Names are trimmed; definitions retain entered content. Add Term field validation applies; same-name additions create independent entries.
 **Term Added** appears only after successful save to effective file. Use **Add Term** for multiline definitions or
 successive entries.
 
@@ -90,17 +92,24 @@ Search matches term-name prefixes only, never definitions. Query is trimmed; mat
 and treats canonically equivalent Unicode as equal. `a` matches `API`; `e` does not match `éclair`.
 
 Matches sort case-insensitively, accent-sensitively, in locale-aware ascending order. Every match appears in Raycast's
-native scrollable list.
+native scrollable list. Same-name results remain separate. For identical or equivalent names, each row includes its
+Glossary File entry position and a short definition preview, without changing the stored name. Equivalent-name sorting
+ties retain Glossary File order. Unchanged reloads retain the selected sibling's identity.
 
 Empty/whitespace queries show copied terms first, then every remaining term in alphabetical order; the section subtitle
 is **Recent terms first** when current history is present. Successful **Copy Definition** or **Copy Term** records a term.
-Typing and selection do not. Reuse moves a term first without duplicates. History holds 20 names; evicts least recently
+Typing and selection do not. Reuse moves only that entry first. Same-name siblings can each be recent independently.
+History holds 20 entries; evicts least recently
 used when full. Without valid history, every term appears alphabetically. Typed prefixes always sort alphabetically,
 including never-copied terms.
 
 History stays in memory during Search Term session; resets on command unmount or effective file path change.
-Reload prunes missing names and shows current names/definitions. Missing file clears history; failed reload hides results
-until recovery. Rename removes old history unless new name is case- or Unicode-equivalent. Never persist history to
+An unchanged reload retains entry history. After file changes or add sorting, history follows an unambiguous equivalent
+name and exact definition. A singleton name may retain history through a definition change or equivalent rename.
+Missing entries, distinct renames, and ambiguous same-name siblings are pruned conservatively. Entries that previously
+shared an equivalent name and identical definition lose history after any source change, because their identity cannot
+be proved. Remaining entries still appear alphabetically. Missing file clears history; failed reload hides results
+until recovery. Never persist history to
 Glossary File, Raycast storage, logs, or network.
 
 Split-pane preview wraps definitions as literal prose, including Markdown-like characters; omits file metadata.
@@ -122,15 +131,16 @@ Successful add searches saved name and reloads.
 
 **Edit Term** pre-fills selected result's actual fields, independent of query. Both fields are editable.
 Success updates same file position, preserves field comments, searches normalized saved name, and reloads.
-Rename conflicting with another case- or Unicode-equivalent term fails. Case-only rename of selected term succeeds
-when no other entry conflicts.
+Rename to another entry’s identical, case-equivalent, or canonically equivalent name succeeds independently.
+Only the captured entry changes, including among identical name-and-definition siblings.
 
 **Delete Term** requires selected result. Confirmation names captured selection. Cancel writes nothing and does not
 reload. Confirm removes only captured entry, shows **Term Deleted** after save, reloads with query unchanged.
 Entry-owned comments leave with entry; document, sequence, surviving-entry comments remain.
 Deleting last match shows no-match view with **Add Term**. Deleting last entry leaves valid empty glossary in same file.
 
-Changed selection or file before edit/delete save causes safe conflict refusal. Conflicted edit retains input and offers
+Edit/Delete capture the selected entry and the source snapshot in memory. Any source change since selection, including
+comments, sequence shifts, reordering, or byte-order-mark changes, causes safe conflict refusal; reload before retrying. Conflicted edit retains input and offers
 user-triggered reload without query change. Conflicted delete reloads once; retry from current result.
 Load errors expose only file recovery until valid. Missing-file view shows effective path plus Add Term, reload,
 Reveal in Finder, Preferences for creation or replacement.
@@ -162,7 +172,7 @@ Explicit copy to clipboard is only way content leaves command.
 - **Custom file cannot be recreated:** Ensure existing parent folder is writable. Missing custom folders are not created.
 - **Load fails:** Require readable `.yaml`, valid UTF-8, at most 5 MiB. Select another file in preferences if needed.
 - **Validation fails:** Require one document, only `terms` root, only non-empty `term`/`definition` per entry.
-  Remove duplicates, anchors, aliases, merge keys, custom tags.
+  Remove anchors, aliases, merge keys, custom tags. Same-name entries are valid.
 - **No terms:** `terms: []` is valid. Otherwise fix validation error and **Reload Glossary**.
 - **No matches:** Use term-name prefix; shorten/correct query. Definitions and middle-of-name text are not searched.
 - **External edits missing:** Choose **Reload Glossary**. No automatic reload.
