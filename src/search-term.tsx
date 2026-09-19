@@ -26,7 +26,7 @@ import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
-import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
+import { prepareMarkdownForDisplay } from "./utils/prepare-markdown-for-display";
 import type { Term } from "./utils/types";
 
 const runAction = (action: () => Promise<unknown>, failureTitle: string): void => {
@@ -234,7 +234,7 @@ const FullDefinition = ({
   return (
     <Detail
       navigationTitle={term.term}
-      markdown={renderPlainTextAsMarkdown(term.definition)}
+      markdown={prepareMarkdownForDisplay(term.definition)}
       actions={
         <ActionPanel>
           <CopyTermActions onTermUsed={onTermUsed} term={term} />
@@ -292,7 +292,7 @@ const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ res
           id={getResultId(term, index)}
           title={term.term}
           subtitle={getResultSubtitle(term, result.terms, index)}
-          detail={<List.Item.Detail markdown={renderPlainTextAsMarkdown(term.definition)} />}
+          detail={<List.Item.Detail markdown={prepareMarkdownForDisplay(term.definition)} />}
           actions={<TermActions term={term} {...props} />}
         />
       ))}
