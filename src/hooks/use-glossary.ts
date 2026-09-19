@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch } fr
 
 import type { Term } from "../utils/types";
 import { GlossaryError, loadGlossary } from "../glossary/glossary";
+import { isGlossaryLoadCancelledError } from "../glossary/glossary-load-cancellation";
 import type { GlossaryTarget } from "../glossary/glossary-target";
 import { searchTerms, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState, type GlossaryAction } from "./glossary-reducer";
@@ -30,8 +31,12 @@ const getSafeErrorMessage = (error: unknown): string => {
 };
 
 const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryAction>): (() => Promise<void>) => {
+  const loadController = useRef<AbortController>();
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     const sequence = ++loadSequence.current;
     await Promise.resolve();
     if (sequence !== loadSequence.current) {
@@ -40,11 +45,14 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
     dispatch({ type: "loadStarted" });
 
     try {
-      const terms = await loadGlossary(glossaryFile);
+      const terms = await loadGlossary(glossaryFile, controller.signal);
       if (sequence === loadSequence.current) {
         dispatch({ terms, type: "loadSucceeded" });
       }
     } catch (error: unknown) {
+      if (isGlossaryLoadCancelledError(error)) {
+        return;
+      }
       if (sequence === loadSequence.current) {
         if (error instanceof GlossaryError && error.code === "missing") {
           dispatch({ type: "loadMissing" });
@@ -63,6 +71,7 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
     });
     return (): void => {
       isActive = false;
+      loadController.current?.abort();
       loadSequence.current += 1;
     };
   }, [reload]);
