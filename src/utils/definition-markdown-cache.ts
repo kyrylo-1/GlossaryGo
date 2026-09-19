@@ -1,4 +1,4 @@
-import { renderPlainTextAsMarkdown } from "./render-plain-text-as-markdown";
+import { prepareMarkdownForDisplay } from "./prepare-markdown-for-display";
 
 const MAX_CACHED_DEFINITIONS = 200;
 
@@ -9,7 +9,7 @@ export type DefinitionMarkdownCache = Readonly<{
 }>;
 
 export const createDefinitionMarkdownCache = (
-  formatDefinition: DefinitionFormatter = renderPlainTextAsMarkdown,
+  formatDefinition: DefinitionFormatter = prepareMarkdownForDisplay,
 ): DefinitionMarkdownCache => {
   const markdownByDefinition = new Map<string, string>();
 
