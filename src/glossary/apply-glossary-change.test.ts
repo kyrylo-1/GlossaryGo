@@ -305,6 +305,72 @@ describe("applyGlossaryChange additions", () => {
     ]);
   });
 
+  test("keeps a no-comma terminal bare flow marker inline while adding", () => {
+    const source =
+      "terms: [\n  { term: Alpha, definition: First },\n  { term: Zulu, definition: Last } #\n\n  # tail text\n]\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Middle", term: "Beta" },
+      type: "add",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First },\n\n    { definition: Middle, term: Beta },\n\n    { term: Zulu, definition: Last } #\n  ]\n\n  # tail text\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Middle", term: "Beta" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+  });
+
+  test("preserves an existing item comment and a distinct terminal marker while adding", () => {
+    const source =
+      "terms: [\n  { term: Alpha, definition: First },\n  { term: Zulu, definition: Last } # item text\n  , #\n\n  # tail text\n]\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Middle", term: "Beta" },
+      type: "add",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First },\n\n    { definition: Middle, term: Beta },\n\n    { term: Zulu, definition: Last } # item text\n    , #\n  ]\n\n  # tail text\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Middle", term: "Beta" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+  });
+
+  test("preserves distinct item and terminal comments when addition moves the owner from the end", () => {
+    const source = "terms: [\n  { term: Alpha, definition: First } # item text\n  , #\t\n\n  # tail text\n]\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Last", term: "Zulu" },
+      type: "add",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First } # item text\n    , #\t\n\n    { definition: Last, term: Zulu }\n  ]\n\n  # tail text\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+    expect(
+      applyGlossaryChange(next, {
+        original: { definition: "Last", term: "Zulu" },
+        term: { definition: "Updated last", term: "Zulu" },
+        type: "edit",
+      }),
+    ).toBe(expected.replace("definition: Last", "definition: Updated last"));
+    expect(
+      applyGlossaryChange(next, {
+        original: { definition: "Last", term: "Zulu" },
+        term: { definition: "Last", term: "Zulu" },
+        type: "edit",
+      }),
+    ).toBe(next);
+  });
+
   test("does not accumulate entry gaps across successive mutations", () => {
     const added = applyGlossaryChange("terms:\n  - term: Alpha\n    definition: First\n", {
       term: { definition: "Last", term: "Zulu" },
@@ -661,6 +727,45 @@ describe("applyGlossaryChange edits and deletions", () => {
         type: "edit",
       }),
     ).toBe(next);
+  });
+
+  test.each([
+    ["bare", "#", "#"],
+    ["one space", "# ", "#"],
+    ["several spaces", "#   ", "#   "],
+    ["a tab", "#\t", "#\t"],
+  ])("keeps a no-comma terminal flow marker with %s inline while editing", (_label, sourceMarker, expectedMarker) => {
+    const source = `terms: [\n  { term: Alpha, definition: First },\n  { term: Zulu, definition: Last } ${sourceMarker}\n\n  # tail text\n]\n`;
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Last", term: "Zulu" },
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+    const expected = `terms:\n  [\n    { term: Alpha, definition: First },\n\n    { term: Zulu, definition: Updated last } ${expectedMarker}\n  ]\n\n  # tail text\n`;
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Updated last", term: "Zulu" },
+    ]);
+  });
+
+  test("preserves a bare item comment and a distinct spaced terminal marker while editing", () => {
+    const source =
+      "terms: [\n  { term: Alpha, definition: First },\n  { term: Zulu, definition: Last } #\n  , #   \n\n  # tail empty\n\n\n  # tail text\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Last", term: "Zulu" },
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First },\n\n    { term: Zulu, definition: Updated last } #\n    , #   \n  ]\n\n  # tail empty\n\n\n  # tail text\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Updated last", term: "Zulu" },
+    ]);
   });
 
   test("preserves blank lines after a comment attached before an entry", () => {
@@ -1066,6 +1171,32 @@ describe("applyGlossaryChange edits and deletions", () => {
     });
     const expected =
       "terms:\n  [\n    { term: Zulu, definition: Last } #\t\n  ]\n\n  # tail empty\n\n\n  # tail text\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([{ definition: "Last", term: "Zulu" }]);
+  });
+
+  test("keeps a no-comma terminal tab marker inline during an unrelated delete", () => {
+    const source =
+      "terms: [\n  { term: Remove, definition: Removed },\n  { term: Zulu, definition: Last } #\t\n\n  # tail text\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected = "terms:\n  [\n    { term: Zulu, definition: Last } #\t\n  ]\n\n  # tail text\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([{ definition: "Last", term: "Zulu" }]);
+  });
+
+  test("preserves named item and terminal comments during an unrelated delete", () => {
+    const source =
+      "terms: [\n  { term: Remove, definition: Removed },\n  { term: Zulu, definition: Last } # item text\n  , # \n\n  # tail text\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected = "terms:\n  [\n    { term: Zulu, definition: Last } # item text\n    , #\n  ]\n\n  # tail text\n";
 
     expect(next).toBe(expected);
     expect(parseGlossarySource(next)).toEqual([{ definition: "Last", term: "Zulu" }]);

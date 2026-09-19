@@ -37,28 +37,70 @@ const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
 
 const isBlankOnly = (source: string): boolean => source.length > 0 && /^[\t \r\n]*$/.test(source);
 
-const normalizeTerminalInlineFlowComment = (source: string, sequence: YAMLSeq): void => {
+type TerminalFlowMarker = Readonly<{
+  owner: NonNullable<YAMLSeq["items"][number]>;
+  suffix: string;
+}>;
+
+const normalizeTerminalInlineFlowComment = (source: string, sequence: YAMLSeq): TerminalFlowMarker | undefined => {
   const lastEntry = sequence.items.at(-1);
+  const lastEntryValueEnd = lastEntry?.range?.[1];
   const lastEntryEnd = lastEntry?.range?.[2];
   const sequenceEnd = sequence.range?.[2];
-  if (!lastEntry || typeof lastEntryEnd !== "number" || typeof sequenceEnd !== "number") {
+  if (
+    !lastEntry ||
+    typeof lastEntryValueEnd !== "number" ||
+    typeof lastEntryEnd !== "number" ||
+    typeof sequenceEnd !== "number"
+  ) {
     return;
   }
   const trailingLines = source.slice(lastEntryEnd, sequenceEnd).split(/\r\n|\r|\n/);
   const inlineComment = trailingLines[0].match(/^[\t ]*,[\t ]*#([\t ]*)$/);
   if (inlineComment) {
-    lastEntry.comment = inlineComment[1].length > 0 ? inlineComment[1] : " ";
     sequence.comment = (sequence.comment ?? "")
       .split(/\r\n|\r|\n/)
       .slice(1)
       .join("\n");
+    if (typeof lastEntry.comment === "string") {
+      return { owner: lastEntry, suffix: inlineComment[1] };
+    }
+    lastEntry.comment = inlineComment[1].length > 0 ? inlineComment[1] : " ";
+    return;
+  }
+
+  const valueTrailingLines = source.slice(lastEntryValueEnd, sequenceEnd).split(/\r\n|\r|\n/);
+  const noCommaInlineComment = valueTrailingLines[0].match(/^[\t ]*#(.*)$/);
+  if (noCommaInlineComment && typeof lastEntry.comment === "string") {
+    const commentLines = lastEntry.comment.split(/\r\n|\r|\n/);
+    lastEntry.comment = noCommaInlineComment[1].length > 0 ? noCommaInlineComment[1] : " ";
+    sequence.comment = commentLines.slice(1).join("\n");
   }
 };
 
-const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): void => {
+const preserveStandaloneSequenceCommentGap = (source: string, sequence: YAMLSeq): void => {
+  const sequenceValueEnd = sequence.range?.[1];
+  const sequenceEnd = sequence.range?.[2];
+  if (typeof sequence.comment !== "string" || typeof sequenceValueEnd !== "number" || typeof sequenceEnd !== "number") {
+    return;
+  }
+  const trailingSource = source.slice(sequenceValueEnd, sequenceEnd);
+  const leadingLines = trailingSource.match(/^((?:[\t ]*(?:\r\n|\r|\n))+)[\t ]*#/);
+  if (!leadingLines) {
+    return;
+  }
+  const lineBreakCount = leadingLines[1].match(/\r\n|\r|\n/g)?.length ?? 0;
+  const blankLineCount = Math.max(0, lineBreakCount - 1);
+  if (blankLineCount > 0 && !sequence.comment.startsWith("\n")) {
+    sequence.comment = `${"\n".repeat(blankLineCount)}${sequence.comment}`;
+  }
+};
+
+const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): TerminalFlowMarker | undefined => {
   if (sequence.flow !== true) {
     return;
   }
+  let distinctFlowMarker: TerminalFlowMarker | undefined;
   for (let index = 1; index < sequence.items.length; index += 1) {
     const previous = sequence.items[index - 1];
     const entry = sequence.items[index];
@@ -73,10 +115,18 @@ const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): voi
         const commentBeforeLines = (entry.commentBefore ?? "").split(/\r\n|\r|\n/);
         entry.commentBefore =
           firstAttachedCommentIndex === -1 ? "" : commentBeforeLines.slice(firstAttachedCommentIndex).join("\n");
+      } else if (bareInlineComment && typeof previous.comment === "string") {
+        const commentLines = previous.comment.split(/\r\n|\r|\n/);
+        if (commentLines.length > 1) {
+          previous.comment = commentLines.slice(0, -1).join("\n");
+          distinctFlowMarker = { owner: previous, suffix: bareInlineComment[1] };
+        }
       }
     }
   }
-  normalizeTerminalInlineFlowComment(source, sequence);
+  const terminalFlowMarker = normalizeTerminalInlineFlowComment(source, sequence);
+  preserveStandaloneSequenceCommentGap(source, sequence);
+  return terminalFlowMarker ?? distinctFlowMarker;
 };
 
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
@@ -99,7 +149,12 @@ const EMPTY_ENTRY_GAP: EntryGap = {
   hasAttachedCommentMarker: false,
 };
 
-const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): EntryGap | undefined => {
+const measureEntryGap = (
+  source: string,
+  sequence: YAMLSeq,
+  index: number,
+  precedingOwnerMarker = false,
+): EntryGap | undefined => {
   const previous = sequence.items[index - 1];
   const entry = sequence.items[index];
   const previousEnd = previous?.range?.[2];
@@ -110,11 +165,12 @@ const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): Entr
 
   const interstitial = source.slice(previousEnd, entryStart);
   const interstitialLines = interstitial.split(/\r\n|\r|\n/).slice(0, -1);
-  const firstAttachedCommentIndex = interstitialLines.findIndex((line) => /^[\t ]*#/.test(line));
+  const entryOwnedLines = precedingOwnerMarker ? interstitialLines.slice(1) : interstitialLines;
+  const firstAttachedCommentIndex = entryOwnedLines.findIndex((line) => /^[\t ]*#/.test(line));
   const hasAttachedCommentMarker = firstAttachedCommentIndex !== -1;
   const totalBlankLines = countInterstitialBlankLines(interstitial);
   const externalBlankLines = hasAttachedCommentMarker
-    ? interstitialLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
+    ? entryOwnedLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
     : totalBlankLines;
   return {
     embeddedCommentBlankLines: totalBlankLines - externalBlankLines,
@@ -134,11 +190,16 @@ const insertGapLines = (source: string, insertions: readonly GapInsertion[]): st
   return parts.join("");
 };
 
-const captureEntryGaps = (source: string, sequence: YAMLSeq): Map<object, EntryGap> => {
+const captureEntryGaps = (
+  source: string,
+  sequence: YAMLSeq,
+  flowMarker: TerminalFlowMarker | undefined,
+): Map<object, EntryGap> => {
   const gaps = new Map<object, EntryGap>();
+  const markerOwnerIndex = flowMarker ? sequence.items.indexOf(flowMarker.owner) : -1;
   for (let index = 1; index < sequence.items.length; index += 1) {
     const entry = sequence.items[index];
-    const gap = measureEntryGap(source, sequence, index);
+    const gap = measureEntryGap(source, sequence, index, markerOwnerIndex === index - 1);
     if (entry && gap) {
       gaps.set(entry, gap);
     }
@@ -214,6 +275,59 @@ const restoreLargerEntryGaps = (source: string, requiredEntryGaps: readonly Entr
   return insertGapLines(source, insertions);
 };
 
+const restoreNonterminalFlowMarker = (source: string, ownerValueEnd: number, markerLine: string): string => {
+  const ownerLineEnd = source.indexOf("\n", ownerValueEnd);
+  const ownerLineSuffix = ownerLineEnd === -1 ? "" : source.slice(ownerValueEnd, ownerLineEnd);
+  const separatingComma = ownerLineSuffix.match(/^[\t ]*,(?=[\t ]*#)/);
+  if (ownerLineEnd === -1 || typeof separatingComma?.index !== "number") {
+    return source;
+  }
+  const commaOffset = ownerValueEnd + separatingComma.index + separatingComma[0].indexOf(",");
+  return `${source.slice(0, commaOffset)}${source.slice(commaOffset + 1, ownerLineEnd + 1)}${markerLine}${source.slice(ownerLineEnd + 1)}`;
+};
+
+const restoreFinalFlowMarker = (source: string, sequence: YAMLSeq, markerLine: string): string => {
+  const sequenceValueEnd = sequence.range?.[1];
+  const closingOffset = typeof sequenceValueEnd === "number" ? source.lastIndexOf("]", sequenceValueEnd - 1) : -1;
+  const closingLineStart = closingOffset === -1 ? -1 : source.lastIndexOf("\n", closingOffset - 1) + 1;
+  if (closingLineStart < 0 || !/^[\t ]*$/.test(source.slice(closingLineStart, closingOffset))) {
+    return source;
+  }
+  return `${source.slice(0, closingLineStart)}${markerLine}${source.slice(closingLineStart)}`;
+};
+
+const restoreTerminalFlowMarker = (
+  source: string,
+  marker: TerminalFlowMarker | undefined,
+  ownerIndex: number,
+): string => {
+  if (!marker || ownerIndex < 0) {
+    return source;
+  }
+  const { document } = parseValidatedGlossarySource(source);
+  const sequence = document.get("terms", true);
+  if (!isSeq(sequence) || sequence.flow !== true) {
+    return source;
+  }
+  const owner = sequence.items[ownerIndex];
+  const ownerStart = owner?.range?.[0];
+  const ownerValueEnd = owner?.range?.[1];
+  if (!owner || typeof ownerStart !== "number" || typeof ownerValueEnd !== "number") {
+    return source;
+  }
+  const ownerLineStart = source.lastIndexOf("\n", ownerStart - 1) + 1;
+  const ownerIndent = source.slice(ownerLineStart, ownerStart);
+  if (!/^[\t ]*$/.test(ownerIndent)) {
+    return source;
+  }
+  const normalizedSuffix = marker.suffix === " " ? "" : marker.suffix;
+  const markerLine = `${ownerIndent}, #${normalizedSuffix}\n`;
+  if (ownerIndex < sequence.items.length - 1) {
+    return restoreNonterminalFlowMarker(source, ownerValueEnd, markerLine);
+  }
+  return restoreFinalFlowMarker(source, sequence, markerLine);
+};
+
 const transferDeletedEntryExternalGap = (
   sequence: YAMLSeq,
   index: number,
@@ -280,8 +394,8 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
-  normalizeBareInlineFlowComments(source, sequence);
-  const originalEntryGaps = captureEntryGaps(source, sequence);
+  const terminalFlowMarker = normalizeBareInlineFlowComments(source, sequence);
+  const originalEntryGaps = captureEntryGaps(source, sequence, terminalFlowMarker);
 
   if (change.type === "add") {
     const term = normalizeTerm(change.term);
@@ -295,7 +409,13 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   }
 
   const requiredEntryGaps = separateTerms(sequence, originalEntryGaps);
-  const serializedSource = restoreLargerEntryGaps(document.toString(), requiredEntryGaps);
+  const terminalFlowMarkerOwnerIndex = terminalFlowMarker ? sequence.items.indexOf(terminalFlowMarker.owner) : -1;
+  const gapRestoredSource = restoreLargerEntryGaps(document.toString(), requiredEntryGaps);
+  const serializedSource = restoreTerminalFlowMarker(
+    gapRestoredSource,
+    terminalFlowMarker,
+    terminalFlowMarkerOwnerIndex,
+  );
   const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${serializedSource}`;
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
