@@ -98,6 +98,7 @@
     "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to npm.\\n\\nIf you did intend to publish it to npm, remove the \\`prepublishOnly\\` script and rerun \\`npm publish\\` again.\\nIf you wanted to publish it to the Raycast Store instead, use \\`npm run publish\\` instead.\\n\\n\" && exit 1",
     "publish": "npx @raycast/api@latest publish",
     "test": "vitest run",
+    "benchmark:prefix": "vitest run src/benchmarks/prefix-search-benchmark.report.test.ts --reporter=verbose",
     "format": "prettier --write .",
     "check:format": "prettier --check ."
   }
