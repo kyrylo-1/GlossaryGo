@@ -37,6 +37,24 @@ const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
 
 const isBlankOnly = (source: string): boolean => source.length > 0 && /^[\t \r\n]*$/.test(source);
 
+const normalizeTerminalInlineFlowComment = (source: string, sequence: YAMLSeq): void => {
+  const lastEntry = sequence.items.at(-1);
+  const lastEntryEnd = lastEntry?.range?.[2];
+  const sequenceEnd = sequence.range?.[2];
+  if (!lastEntry || typeof lastEntryEnd !== "number" || typeof sequenceEnd !== "number") {
+    return;
+  }
+  const trailingLines = source.slice(lastEntryEnd, sequenceEnd).split(/\r\n|\r|\n/);
+  const inlineComment = trailingLines[0].match(/^[\t ]*,[\t ]*#([\t ]*)$/);
+  if (inlineComment) {
+    lastEntry.comment = inlineComment[1].length > 0 ? inlineComment[1] : " ";
+    sequence.comment = (sequence.comment ?? "")
+      .split(/\r\n|\r|\n/)
+      .slice(1)
+      .join("\n");
+  }
+};
+
 const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): void => {
   if (sequence.flow !== true) {
     return;
@@ -58,6 +76,7 @@ const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): voi
       }
     }
   }
+  normalizeTerminalInlineFlowComment(source, sequence);
 };
 
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
@@ -94,21 +113,12 @@ const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): Entr
   const firstAttachedCommentIndex = interstitialLines.findIndex((line) => /^[\t ]*#/.test(line));
   const hasAttachedCommentMarker = firstAttachedCommentIndex !== -1;
   const totalBlankLines = countInterstitialBlankLines(interstitial);
-  if (sequence.flow === true) {
-    const externalBlankLines = hasAttachedCommentMarker
-      ? interstitialLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
-      : totalBlankLines;
-    return {
-      embeddedCommentBlankLines: totalBlankLines - externalBlankLines,
-      externalBlankLines,
-      hasAttachedCommentMarker,
-    };
-  }
-
-  const embeddedCommentBlankLines = countEmbeddedCommentBlankLines(entry.commentBefore ?? "");
+  const externalBlankLines = hasAttachedCommentMarker
+    ? interstitialLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
+    : totalBlankLines;
   return {
-    embeddedCommentBlankLines,
-    externalBlankLines: Math.max(0, totalBlankLines - embeddedCommentBlankLines),
+    embeddedCommentBlankLines: totalBlankLines - externalBlankLines,
+    externalBlankLines,
     hasAttachedCommentMarker,
   };
 };
