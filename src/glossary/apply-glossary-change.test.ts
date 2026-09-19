@@ -396,6 +396,27 @@ describe("applyGlossaryChange additions", () => {
     ]);
   });
 
+  test("does not duplicate a CRLF inline marker with one trailing space while adding and repeating", () => {
+    const source =
+      "terms: [\r\n  { term: Alpha, definition: First }, # \r\n\r\n  { term: Zulu, definition: Last }\r\n]\r\n";
+    const added = applyGlossaryChange(source, {
+      term: { definition: "Middle", term: "Beta" },
+      type: "add",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First }, #\n\n    { definition: Middle, term: Beta },\n\n    { term: Zulu, definition: Last }\n  ]\n";
+
+    expect(added).toBe(expected);
+    expect(added.match(/#(?:\n|$)/g)).toHaveLength(1);
+    expect(
+      applyGlossaryChange(added, {
+        original: { definition: "Last", term: "Zulu" },
+        term: { definition: "Updated last", term: "Zulu" },
+        type: "edit",
+      }),
+    ).toBe(expected.replace("definition: Last", "definition: Updated last"));
+  });
+
   test("does not accumulate entry gaps across successive mutations", () => {
     const added = applyGlossaryChange("terms:\n  - term: Alpha\n    definition: First\n", {
       term: { definition: "Last", term: "Zulu" },
@@ -810,6 +831,28 @@ describe("applyGlossaryChange edits and deletions", () => {
       { definition: "Second", term: "Beta" },
       { definition: "Updated last", term: "Zulu" },
     ]);
+  });
+
+  test("does not duplicate a CRLF inline marker with several trailing spaces while editing and repeating", () => {
+    const source =
+      "terms: [\r\n  { term: Alpha, definition: First }, #   \r\n\r\n  { term: Zulu, definition: Last }\r\n]\r\n";
+    const edited = applyGlossaryChange(source, {
+      original: { definition: "Last", term: "Zulu" },
+      term: { definition: "Updated once", term: "Zulu" },
+      type: "edit",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First }, #   \n\n    { term: Zulu, definition: Updated once }\n  ]\n";
+
+    expect(edited).toBe(expected);
+    expect(edited.match(/# {3}/g)).toHaveLength(1);
+    expect(
+      applyGlossaryChange(edited, {
+        original: { definition: "Updated once", term: "Zulu" },
+        term: { definition: "Updated twice", term: "Zulu" },
+        type: "edit",
+      }),
+    ).toBe(expected.replace("Updated once", "Updated twice"));
   });
 
   test.each([
@@ -1306,6 +1349,27 @@ describe("applyGlossaryChange edits and deletions", () => {
       { definition: "First", term: "Alpha" },
       { definition: "Last", term: "Zulu" },
     ]);
+  });
+
+  test("does not duplicate a CRLF inline tab marker when deleting its following entry and repeating", () => {
+    const source =
+      "terms: [\r\n  { term: Alpha, definition: First }, #\t\r\n\r\n  { term: Remove, definition: Removed },\r\n  { term: Zulu, definition: Last }\r\n]\r\n";
+    const deleted = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected =
+      "terms:\n  [\n    { term: Alpha, definition: First }, #\t\n\n    { term: Zulu, definition: Last }\n  ]\n";
+
+    expect(deleted).toBe(expected);
+    expect(deleted.match(/#\t/g)).toHaveLength(1);
+    expect(
+      applyGlossaryChange(deleted, {
+        original: { definition: "Last", term: "Zulu" },
+        term: { definition: "Updated last", term: "Zulu" },
+        type: "edit",
+      }),
+    ).toBe(expected.replace("definition: Last", "definition: Updated last"));
   });
 
   test.each([

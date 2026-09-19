@@ -133,8 +133,14 @@ const normalizeFlowBoundaryMarker = (source: string, previous: FlowEntry, entry:
     return;
   }
   const previousLineEnd = source.indexOf("\n", previousValueEnd);
-  const previousLineSuffix = source.slice(previousValueEnd, previousLineEnd === -1 ? source.length : previousLineEnd);
+  const previousLineSuffix = source
+    .slice(previousValueEnd, previousLineEnd === -1 ? source.length : previousLineEnd)
+    .replace(/\r$/, "");
   if (/^[\t ]*,[\t ]*#[\t ]*$/.test(previousLineSuffix)) {
+    const hasStandaloneComment = interstitialLines.slice(1, -1).some((line) => /^[\t ]*#/.test(line));
+    if (!hasStandaloneComment && isBlankOnly(entry.commentBefore ?? "")) {
+      entry.commentBefore = "";
+    }
     return;
   }
   const commentLines = previous.comment.split(/\r\n|\r|\n/);
@@ -494,8 +500,14 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   }
 
   const requiredEntryGaps = separateTerms(sequence, originalEntryGaps);
+  const ownerIndexes = new Map<FlowEntry, number>();
+  for (const [index, entry] of sequence.items.entries()) {
+    if (entry) {
+      ownerIndexes.set(entry, index);
+    }
+  }
   const flowMarkerPlacements = flowSourceMetadata.markers
-    .map(({ owner, suffix }) => ({ ownerIndex: sequence.items.indexOf(owner), suffix }))
+    .map(({ owner, suffix }) => ({ ownerIndex: ownerIndexes.get(owner) ?? -1, suffix }))
     .filter(({ ownerIndex }) => ownerIndex >= 0);
   const gapRestoredSource = restoreLargerEntryGaps(document.toString(), requiredEntryGaps);
   const markerRestoredSource = restoreFlowMarkers(gapRestoredSource, flowMarkerPlacements);
