@@ -75,18 +75,27 @@ export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget
   const reload = useGlossaryReload(glossaryFile, dispatch);
   const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
   const recordTerm = useCallback((term: Term) => dispatch({ term, type: "termUsed" }), []);
-  const result = useMemo(
+  const hasTypedQuery = model.query.trim().length > 0;
+  const typedResult = useMemo(
     () =>
-      model.state.status === "ready"
+      model.state.status === "ready" && hasTypedQuery
+        ? searchTerms(model.state.terms, model.query)
+        : EMPTY_SEARCH_RESULT,
+    [hasTypedQuery, model.query, model.state],
+  );
+  const blankQueryResult = useMemo(
+    () =>
+      model.state.status === "ready" && !hasTypedQuery
         ? searchTerms(model.state.terms, model.query, model.recentTerms)
         : EMPTY_SEARCH_RESULT,
-    [model.query, model.recentTerms, model.state],
+    [hasTypedQuery, model.query, model.recentTerms, model.state],
   );
+  const result = hasTypedQuery ? typedResult : blankQueryResult;
 
   return {
     createParent,
     glossaryFile,
-    isRecent: model.query.trim().length === 0 && model.recentTerms.length > 0,
+    isRecent: !hasTypedQuery && model.recentTerms.length > 0,
     query: model.query,
     recordTerm,
     reload,
