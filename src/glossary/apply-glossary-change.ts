@@ -35,6 +35,11 @@ const countInterstitialBlankLines = (source: string): number => {
 const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
   countInterstitialBlankLines(commentBefore) + (/(?:\r\n|\r|\n)[\t ]*$/.test(commentBefore) ? 1 : 0);
 
+const countLeadingLineBreaks = (source: string): number => {
+  const leadingLineBreaks = source.match(/^(?:(?:\r\n|\r|\n)[\t ]*)+/)?.[0] ?? "";
+  return leadingLineBreaks.match(/\r\n|\r|\n/g)?.length ?? 0;
+};
+
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
   const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
   return typeof firstLineBreak?.index === "number"
@@ -46,6 +51,29 @@ type GapInsertion = Readonly<{ count: number; offset: number }>;
 type EntryGap = Readonly<{ embeddedCommentBlankLines: number; externalBlankLines: number }>;
 
 const EMPTY_ENTRY_GAP: EntryGap = { embeddedCommentBlankLines: 0, externalBlankLines: 0 };
+
+const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): EntryGap | undefined => {
+  const previous = sequence.items[index - 1];
+  const entry = sequence.items[index];
+  const previousEnd = previous?.range?.[2];
+  const entryStart = entry?.range?.[0];
+  if (!previous || !entry || typeof previousEnd !== "number" || typeof entryStart !== "number") {
+    return;
+  }
+
+  const commentBefore = entry.commentBefore ?? "";
+  const allCommentBlankLines = countEmbeddedCommentBlankLines(commentBefore);
+  const leadingFlowExternalBlankLines =
+    sequence.flow === true && typeof previous.comment === "string" ? countLeadingLineBreaks(commentBefore) : 0;
+  const embeddedCommentBlankLines = Math.max(0, allCommentBlankLines - leadingFlowExternalBlankLines);
+  return {
+    embeddedCommentBlankLines,
+    externalBlankLines: Math.max(
+      0,
+      countInterstitialBlankLines(source.slice(previousEnd, entryStart)) - embeddedCommentBlankLines,
+    ),
+  };
+};
 
 const insertGapLines = (source: string, insertions: readonly GapInsertion[]): string => {
   const parts: string[] = [];
@@ -61,17 +89,10 @@ const insertGapLines = (source: string, insertions: readonly GapInsertion[]): st
 const captureEntryGaps = (source: string, sequence: YAMLSeq): Map<object, EntryGap> => {
   const gaps = new Map<object, EntryGap>();
   for (let index = 1; index < sequence.items.length; index += 1) {
-    const previous = sequence.items[index - 1];
     const entry = sequence.items[index];
-    const previousEnd = previous?.range?.[2];
-    const entryStart = entry?.range?.[0];
-    if (previous && entry && typeof previousEnd === "number" && typeof entryStart === "number") {
-      const interstitial = source.slice(previousEnd, entryStart);
-      const embeddedCommentBlankLines = countEmbeddedCommentBlankLines(entry.commentBefore ?? "");
-      gaps.set(entry, {
-        embeddedCommentBlankLines,
-        externalBlankLines: Math.max(0, countInterstitialBlankLines(interstitial) - embeddedCommentBlankLines),
-      });
+    const gap = measureEntryGap(source, sequence, index);
+    if (entry && gap) {
+      gaps.set(entry, gap);
     }
   }
   return gaps;
@@ -124,11 +145,7 @@ const restoreLargerEntryGaps = (source: string, requiredEntryGaps: readonly Entr
     const entryStart = entry?.range?.[0];
     if (typeof previousEnd === "number" && typeof entryStart === "number") {
       const interstitial = source.slice(previousEnd, entryStart);
-      const embeddedCommentBlankLines = countEmbeddedCommentBlankLines(entry?.commentBefore ?? "");
-      const actualExternalBlankLines = Math.max(
-        0,
-        countInterstitialBlankLines(interstitial) - embeddedCommentBlankLines,
-      );
+      const actualExternalBlankLines = measureEntryGap(source, sequence, index)?.externalBlankLines ?? 0;
       const missingGapCount = requiredEntryGaps[index - 1].externalBlankLines - actualExternalBlankLines;
       if (missingGapCount > 0) {
         insertions.push({ count: missingGapCount, offset: getGapInsertionOffset(interstitial, previousEnd) });
