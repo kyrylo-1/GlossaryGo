@@ -25,7 +25,10 @@ vi.mock("@raycast/utils", async (importOriginal) => ({
 }));
 vi.mock("./glossary/glossary", async (importOriginal) => ({
   ...(await importOriginal<typeof GlossaryModule>()),
-  loadGlossary: mocks.load,
+  loadGlossarySource: async (path: string): Promise<string> => {
+    const loadedTerms = await mocks.load(path);
+    return `terms: ${JSON.stringify(loadedTerms)}\n`;
+  },
 }));
 vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => ({ createParent: false, path: mocks.path }),
