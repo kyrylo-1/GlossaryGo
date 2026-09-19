@@ -12,7 +12,7 @@ import {
   Toast,
   useNavigation,
 } from "@raycast/api";
-import { useCallback, useRef, useState, type ReactElement } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
@@ -26,7 +26,7 @@ import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
 import { useGlossary, type CommandState } from "./hooks/use-glossary";
 import { copyWithFeedback } from "./utils/copy-with-feedback";
-import { prepareMarkdownForDisplay } from "./utils/prepare-markdown-for-display";
+import { createDefinitionMarkdownCache } from "./utils/definition-markdown-cache";
 import type { Term } from "./utils/types";
 
 const runAction = (action: () => Promise<unknown>, failureTitle: string): void => {
@@ -167,6 +167,7 @@ const DeleteTermAction = ({ glossaryFile, onReload, term }: DeleteTermActionProp
 
 type SearchActionsProps = AddTermActionProps &
   Readonly<{
+    formatDefinition: (definition: string) => string;
     isRecent: boolean;
     onTermUsed: (term: Term) => void;
     onEditConflictReload: () => Promise<void>;
@@ -227,14 +228,16 @@ const CopyTermActions = ({ onTermUsed, term }: CopyTermActionsProps): ReactEleme
 };
 
 const FullDefinition = ({
+  formatDefinition,
   glossaryFile,
   onTermUsed,
   term,
-}: CopyTermActionsProps & Readonly<{ glossaryFile: string }>): ReactElement => {
+}: CopyTermActionsProps &
+  Readonly<{ formatDefinition: (definition: string) => string; glossaryFile: string }>): ReactElement => {
   return (
     <Detail
       navigationTitle={term.term}
-      markdown={prepareMarkdownForDisplay(term.definition)}
+      markdown={formatDefinition(term.definition)}
       actions={
         <ActionPanel>
           <CopyTermActions onTermUsed={onTermUsed} term={term} />
@@ -253,7 +256,14 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         title="View Full Definition"
         shortcut={{ key: "v", modifiers: ["cmd", "shift"] }}
         icon={Icon.Document}
-        target={<FullDefinition glossaryFile={props.glossaryFile} onTermUsed={props.onTermUsed} term={term} />}
+        target={
+          <FullDefinition
+            formatDefinition={props.formatDefinition}
+            glossaryFile={props.glossaryFile}
+            onTermUsed={props.onTermUsed}
+            term={term}
+          />
+        }
       />
       <ActionPanel.Section>
         <AddTermAction {...props} />
@@ -271,10 +281,38 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
   );
 };
 
-const getResultSubtitle = (term: Term, terms: readonly Term[], index: number): string => {
+const fallbackTermCollator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
+
+const getEquivalentCounts = (terms: readonly Term[]): readonly number[] => {
+  if (terms.every((term) => getEntryIdentity(term))) {
+    return terms.map((term) => getEntryIdentity(term)?.equivalentCount ?? 1);
+  }
+
+  const equivalentCounts = new Array<number>(terms.length).fill(1);
+  const sortedIndexes = terms
+    .map((_, index) => index)
+    .sort((left, right) =>
+      fallbackTermCollator.compare(terms[left].term.normalize("NFC"), terms[right].term.normalize("NFC")),
+    );
+  for (let start = 0; start < sortedIndexes.length;) {
+    let end = start + 1;
+    while (
+      end < sortedIndexes.length &&
+      areTermsEquivalent(terms[sortedIndexes[start]].term, terms[sortedIndexes[end]].term)
+    ) {
+      end += 1;
+    }
+    for (let index = start; index < end; index += 1) {
+      equivalentCounts[sortedIndexes[index]] = end - start;
+    }
+    start = end;
+  }
+  return equivalentCounts;
+};
+
+const getResultSubtitle = (term: Term, equivalentCount: number, index: number): string => {
   const identity = getEntryIdentity(term);
-  const count = identity?.equivalentCount ?? terms.filter((entry) => areTermsEquivalent(entry.term, term.term)).length;
-  if (count < 2) {
+  if (equivalentCount < 2) {
     return "";
   }
   const preview = term.definition.replaceAll(/\s+/gu, " ").trim().slice(0, 100);
@@ -283,18 +321,39 @@ const getResultSubtitle = (term: Term, terms: readonly Term[], index: number): s
 
 const getResultId = (term: Term, index: number): string => getEntryIdentity(term)?.id ?? `${index}`;
 
+type ResultItemProps = SearchActionsProps &
+  Readonly<{
+    id: string;
+    subtitle: string;
+    term: Term;
+  }>;
+
+const ResultItem = memo(({ id, subtitle, term, ...props }: ResultItemProps): ReactElement => {
+  return (
+    <List.Item
+      id={id}
+      title={term.term}
+      subtitle={subtitle}
+      detail={<List.Item.Detail markdown={props.formatDefinition(term.definition)} />}
+      actions={<TermActions term={term} {...props} />}
+    />
+  );
+});
+
 const ResultSection = ({ result, ...props }: SearchActionsProps & Readonly<{ result: SearchResult }>): ReactElement => {
+  const resultItems = useMemo(() => {
+    const equivalentCounts = getEquivalentCounts(result.terms);
+    return result.terms.map((term, index) => ({
+      id: getResultId(term, index),
+      subtitle: getResultSubtitle(term, equivalentCounts[index], index),
+      term,
+    }));
+  }, [result.terms]);
+
   return (
     <List.Section title="Terms" subtitle={props.isRecent ? "Recent terms first" : ""}>
-      {result.terms.map((term, index) => (
-        <List.Item
-          key={getResultId(term, index)}
-          id={getResultId(term, index)}
-          title={term.term}
-          subtitle={getResultSubtitle(term, result.terms, index)}
-          detail={<List.Item.Detail markdown={prepareMarkdownForDisplay(term.definition)} />}
-          actions={<TermActions term={term} {...props} />}
-        />
+      {resultItems.map(({ id, subtitle, term }) => (
+        <ResultItem key={id} id={id} subtitle={subtitle} term={term} {...props} />
       ))}
     </List.Section>
   );
@@ -381,6 +440,7 @@ const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): Re
   const { createParent, glossaryFile, isRecent, query, recordTerm, reload, result, setQuery, state } =
     useGlossary(target);
   const { pop } = useNavigation();
+  const [definitionMarkdownCache] = useState(createDefinitionMarkdownCache);
   const { onSelectionChange, selectedItemId } = useResultSelection(state.status, result.terms);
   const onSaved = useCallback(
     async (term: Term): Promise<void> => {
@@ -408,6 +468,7 @@ const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): Re
     >
       <CommandContent
         createParent={createParent}
+        formatDefinition={definitionMarkdownCache.getMarkdown}
         glossaryFile={glossaryFile}
         initialTerm={query}
         isRecent={isRecent}
