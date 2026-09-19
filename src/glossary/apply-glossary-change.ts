@@ -27,7 +27,7 @@ const sortTermsSequence = (sequence: YAMLSeq, terms: readonly Term[]): void => {
     .map(({ node }) => node);
 };
 
-const countLeadingBlankLines = (source: string): number => {
+const countInterstitialBlankLines = (source: string): number => {
   const lines = source.split(/\r\n|\r|\n/);
   return lines.slice(0, -1).filter((line) => /^[\t ]*$/.test(line)).length;
 };
@@ -61,7 +61,7 @@ const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, n
     const entryStart = entry?.range?.[0];
     if (previous && entry && typeof previousEnd === "number" && typeof entryStart === "number") {
       const interstitial = source.slice(previousEnd, entryStart);
-      gapCounts.set(entry, countLeadingBlankLines(interstitial));
+      gapCounts.set(entry, countInterstitialBlankLines(interstitial));
     }
   }
   return gapCounts;
@@ -69,7 +69,9 @@ const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, n
 
 const separateTerms = (sequence: YAMLSeq, originalGapCounts: ReadonlyMap<object, number>): readonly number[] => {
   const firstEntry = sequence.items[0];
-  const displacedFirstGapCount = firstEntry ? (originalGapCounts.get(firstEntry) ?? 0) : 0;
+  const hasEmbeddedCommentGap = countInterstitialBlankLines(firstEntry?.commentBefore ?? "") > 0;
+  const displacedFirstGapCount =
+    firstEntry?.spaceBefore === true && !hasEmbeddedCommentGap ? (originalGapCounts.get(firstEntry) ?? 0) : 0;
   if (firstEntry && originalGapCounts.has(firstEntry)) {
     firstEntry.spaceBefore = false;
   }
@@ -104,7 +106,7 @@ const restoreLargerEntryGaps = (source: string, requiredGapCounts: readonly numb
     const entryStart = entry?.range?.[0];
     if (typeof previousEnd === "number" && typeof entryStart === "number") {
       const interstitial = source.slice(previousEnd, entryStart);
-      const missingGapCount = requiredGapCounts[index - 1] - countLeadingBlankLines(interstitial);
+      const missingGapCount = requiredGapCounts[index - 1] - countInterstitialBlankLines(interstitial);
       if (missingGapCount > 0) {
         insertions.push({ count: missingGapCount, offset: getGapInsertionOffset(interstitial, previousEnd) });
       }
