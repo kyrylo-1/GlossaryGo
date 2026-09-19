@@ -202,37 +202,83 @@ describe("Search Term recovery actions", () => {
   });
 });
 
+// eslint-disable-next-line max-lines-per-function -- Shares an intentionally long Definition fixture across reader tests.
 describe("definition reading from Search Term", () => {
-  const definition = `# Literal heading\n**literal emphasis** [literal link](url) $math$\n\n${Array.from(
-    { length: 150 },
-    (_, index) => `Long prose line ${index + 1} with enough words to wrap in a reading view.`,
-  ).join("\n")}\nLast line`;
+  const definition = `# Markdown heading
+
+**bold** and _italic_, with [an ordinary link](https://example.test/docs) and \`inline code\`.
+
+- First item
+- Second item
+
+> A blockquote
+
+\`\`\`
++---------+
+| diagram |
++---------+
+\`\`\`
+
+![remote image](https://tracker.test/pixel)
+![[obsidian-embed]]
+<img src="https://tracker.test/pixel">
+<iframe src="https://tracker.test/embed"></iframe>
+
+\`![code image](https://example.test/unchanged) <img src="unchanged">\`
+
+${Array.from({ length: 150 }, (_, index) => `Long prose line ${index + 1} with enough words to wrap in a reading view.`).join("\n")}
+Last line`;
 
   beforeEach(() => {
     mocks.load.mockResolvedValue([
       { definition: "Wrong definition", term: "Zulu" },
-      { definition, term: "Résumé" },
+      { definition, term: "Literal [Term]" },
     ]);
   });
 
-  test("keeps the split-pane preview and all literal multiline prose without file metadata", async () => {
+  test("uses identical safe native Markdown in both reading views while preserving literal action values", async () => {
     render(<Command />);
-    await screen.findByRole("article", { name: "Résumé" });
+    const selected = await screen.findByRole("article", { name: "Literal [Term]" });
     expect(screen.getByRole("main").dataset.showingDetail).toBe("true");
     expect(screen.queryAllByText("Glossary File")).toHaveLength(0);
     const preview = screen.getAllByTestId("preview")[0].textContent;
-    expect(preview).toContain("&#35; Literal heading  \n&#42;&#42;literal emphasis&#42;&#42;");
-    expect(preview).toContain("&#91;literal link&#93;&#40;url&#41; &#36;math&#36;  \n&#160;");
-    expect(preview).toContain("Long prose line 150 with enough words to wrap in a reading view&#46;  \nLast line");
+    expect(preview).toContain("# Markdown heading\n\n**bold** and _italic_");
+    expect(preview).toContain("[an ordinary link](https://example.test/docs)");
+    expect(preview).toContain("```\n+---------+\n| diagram |\n+---------+\n```");
+    expect(preview).toContain("&#33;[remote image](https://tracker.test/pixel)");
+    expect(preview).toContain("![[obsidian-embed]]");
+    expect(preview).toContain("&#60;img src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;pixel&#34;&#62;");
+    expect(preview).toContain(
+      "&#60;iframe src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;embed&#34;&#62;&#60;&#47;iframe&#62;",
+    );
+    expect(preview).toContain('`![code image](https://example.test/unchanged) <img src="unchanged">`');
+    expect(preview).toContain("Long prose line 150 with enough words to wrap in a reading view.\nLast line");
+
+    search("Literal");
+    expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId);
+    fireEvent.click(within(selected).getByRole("button", { name: "View Full Definition" }));
+    const reader = screen.getByRole("heading", { level: 1, name: "Literal [Term]" }).closest("section");
+    if (!reader) {
+      throw new Error("Missing full definition reader.");
+    }
+    expect(within(reader).getByText(/Markdown heading/).textContent).toBe(preview);
+    fireEvent.click(within(reader).getByRole("button", { name: "Copy Definition" }));
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith(definition));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    const query = screen.getByRole("textbox", { name: "Search terms" });
+    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Literal");
+    fireEvent.click(within(selected).getByRole("button", { name: "Edit Term" }));
+    expect(fieldValue("term")).toBe("Literal [Term]");
+    expect(fieldValue("definition")).toBe(definition);
   });
 
   test("opens the selected full definition with exact copy values and Reveal, retaining the query", async () => {
     render(<Command />);
-    await screen.findByRole("article", { name: "Résumé" });
-    search("ré");
-    const selected = screen.getByRole("article", { name: "Résumé" });
+    await screen.findByRole("article", { name: "Literal [Term]" });
+    search("Literal");
+    const selected = screen.getByRole("article", { name: "Literal [Term]" });
     fireEvent.click(within(selected).getByRole("button", { name: "View Full Definition" }));
-    const reader = screen.getByRole("heading", { level: 1, name: "Résumé" }).closest("section");
+    const reader = screen.getByRole("heading", { level: 1, name: "Literal [Term]" }).closest("section");
     if (!reader) {
       throw new Error("Missing full definition reader.");
     }
@@ -242,13 +288,13 @@ describe("definition reading from Search Term", () => {
     fireEvent.click(within(reader).getByRole("button", { name: "Copy Definition" }));
     await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith(definition));
     fireEvent.click(within(reader).getByRole("button", { name: "Copy Term" }));
-    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith("Résumé"));
+    await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith("Literal [Term]"));
     fireEvent.click(within(reader).getByRole("button", { name: "Reveal Glossary in Finder" }));
     await waitFor(() => expect(raycastApiMocks.showInFinder).toHaveBeenCalledWith("/tmp"));
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    expect(screen.queryByRole("heading", { level: 1, name: "Résumé" })).toBeNull();
+    expect(screen.queryByRole("heading", { level: 1, name: "Literal [Term]" })).toBeNull();
     const query = screen.getByRole("textbox", { name: "Search terms" });
-    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("ré");
+    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Literal");
     expect(within(selected).getByRole("button", { name: "Reload Glossary" })).toBeTruthy();
   });
 });
@@ -346,17 +392,13 @@ describe("Search Term post-save refresh", () => {
 });
 
 describe("Search Term result details", () => {
-  test("keeps literal term content and existing actions without exposing the glossary path", async () => {
+  test("keeps literal term content and native Markdown definitions without exposing the glossary path", async () => {
     const definition = "Literal # heading\nA *definition* with `code`.\nRésumé.";
     mocks.load.mockResolvedValue([{ definition, term: "Résumé" }]);
     render(<Command />);
     const result = within(await screen.findByRole("article", { name: "Résumé" }));
 
-    expect(
-      result.getByText("Literal &#35; heading  \nA &#42;definition&#42; with &#96;code&#96;&#46;  \nRésumé&#46;", {
-        normalizer: (text) => text,
-      }),
-    ).toBeTruthy();
+    expect(result.getByTestId("preview").textContent).toBe(definition);
     expect(result.queryByText("Glossary File")).toBeNull();
     expect(result.queryByText("/tmp/first.yaml")).toBeNull();
     expect(result.getAllByRole("button").map((button) => button.textContent)).toEqual([
