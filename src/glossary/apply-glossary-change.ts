@@ -32,6 +32,9 @@ const countInterstitialBlankLines = (source: string): number => {
   return lines.slice(0, -1).filter((line) => /^[\t ]*$/.test(line)).length;
 };
 
+const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
+  countInterstitialBlankLines(commentBefore) + (/(?:\r\n|\r|\n)[\t ]*$/.test(commentBefore) ? 1 : 0);
+
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
   const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
   return typeof firstLineBreak?.index === "number"
@@ -40,6 +43,9 @@ const getGapInsertionOffset = (interstitial: string, previousEnd: number): numbe
 };
 
 type GapInsertion = Readonly<{ count: number; offset: number }>;
+type EntryGap = Readonly<{ embeddedCommentBlankLines: number; externalBlankLines: number }>;
+
+const EMPTY_ENTRY_GAP: EntryGap = { embeddedCommentBlankLines: 0, externalBlankLines: 0 };
 
 const insertGapLines = (source: string, insertions: readonly GapInsertion[]): string => {
   const parts: string[] = [];
@@ -52,8 +58,8 @@ const insertGapLines = (source: string, insertions: readonly GapInsertion[]): st
   return parts.join("");
 };
 
-const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, number> => {
-  const gapCounts = new Map<object, number>();
+const captureEntryGaps = (source: string, sequence: YAMLSeq): Map<object, EntryGap> => {
+  const gaps = new Map<object, EntryGap>();
   for (let index = 1; index < sequence.items.length; index += 1) {
     const previous = sequence.items[index - 1];
     const entry = sequence.items[index];
@@ -61,39 +67,47 @@ const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, n
     const entryStart = entry?.range?.[0];
     if (previous && entry && typeof previousEnd === "number" && typeof entryStart === "number") {
       const interstitial = source.slice(previousEnd, entryStart);
-      gapCounts.set(entry, countInterstitialBlankLines(interstitial));
+      const embeddedCommentBlankLines = countEmbeddedCommentBlankLines(entry.commentBefore ?? "");
+      gaps.set(entry, {
+        embeddedCommentBlankLines,
+        externalBlankLines: Math.max(0, countInterstitialBlankLines(interstitial) - embeddedCommentBlankLines),
+      });
     }
   }
-  return gapCounts;
+  return gaps;
 };
 
-const separateTerms = (sequence: YAMLSeq, originalGapCounts: ReadonlyMap<object, number>): readonly number[] => {
+const separateTerms = (sequence: YAMLSeq, originalEntryGaps: ReadonlyMap<object, EntryGap>): readonly EntryGap[] => {
   const firstEntry = sequence.items[0];
-  const commentBefore = firstEntry?.commentBefore ?? "";
-  const embeddedCommentGapCount =
-    countInterstitialBlankLines(commentBefore) + (/(?:\r\n|\r|\n)[\t ]*$/.test(commentBefore) ? 1 : 0);
-  const displacedFirstGapCount =
-    firstEntry?.spaceBefore === true
-      ? Math.max(0, (originalGapCounts.get(firstEntry) ?? 0) - embeddedCommentGapCount)
-      : 0;
-  if (firstEntry && originalGapCounts.has(firstEntry)) {
+  const displacedFirstExternalGap = firstEntry ? (originalEntryGaps.get(firstEntry)?.externalBlankLines ?? 0) : 0;
+  if (firstEntry && originalEntryGaps.has(firstEntry)) {
     firstEntry.spaceBefore = false;
   }
-  const requiredGapCounts: number[] = [];
+  const requiredEntryGaps: EntryGap[] = [];
   for (const [index, entry] of sequence.items.slice(1).entries()) {
     if (entry) {
-      const originalGapCount = originalGapCounts.get(entry) ?? 0;
-      if (originalGapCount === 0) {
-        entry.spaceBefore = true;
-      }
-      requiredGapCounts.push(Math.max(1, originalGapCount, index === 0 ? displacedFirstGapCount : 0));
+      const originalGap = originalEntryGaps.get(entry) ?? {
+        ...EMPTY_ENTRY_GAP,
+        embeddedCommentBlankLines: countEmbeddedCommentBlankLines(entry.commentBefore ?? ""),
+      };
+      const preservedExternalGap = Math.max(
+        originalGap.externalBlankLines,
+        index === 0 ? displacedFirstExternalGap : 0,
+      );
+      const requiredExternalGap =
+        preservedExternalGap === 0 && originalGap.embeddedCommentBlankLines === 0 ? 1 : preservedExternalGap;
+      entry.spaceBefore = requiredExternalGap > 0;
+      requiredEntryGaps.push({
+        embeddedCommentBlankLines: originalGap.embeddedCommentBlankLines,
+        externalBlankLines: requiredExternalGap,
+      });
     }
   }
-  return requiredGapCounts;
+  return requiredEntryGaps;
 };
 
-const restoreLargerEntryGaps = (source: string, requiredGapCounts: readonly number[]): string => {
-  if (requiredGapCounts.every((count) => count <= 1)) {
+const restoreLargerEntryGaps = (source: string, requiredEntryGaps: readonly EntryGap[]): string => {
+  if (requiredEntryGaps.every(({ externalBlankLines }) => externalBlankLines <= 1)) {
     return source;
   }
   const { document } = parseValidatedGlossarySource(source);
@@ -110,7 +124,12 @@ const restoreLargerEntryGaps = (source: string, requiredGapCounts: readonly numb
     const entryStart = entry?.range?.[0];
     if (typeof previousEnd === "number" && typeof entryStart === "number") {
       const interstitial = source.slice(previousEnd, entryStart);
-      const missingGapCount = requiredGapCounts[index - 1] - countInterstitialBlankLines(interstitial);
+      const embeddedCommentBlankLines = countEmbeddedCommentBlankLines(entry?.commentBefore ?? "");
+      const actualExternalBlankLines = Math.max(
+        0,
+        countInterstitialBlankLines(interstitial) - embeddedCommentBlankLines,
+      );
+      const missingGapCount = requiredEntryGaps[index - 1].externalBlankLines - actualExternalBlankLines;
       if (missingGapCount > 0) {
         insertions.push({ count: missingGapCount, offset: getGapInsertionOffset(interstitial, previousEnd) });
       }
@@ -124,7 +143,7 @@ const applyExistingEntryChange = (
   terms: readonly Term[],
   sequence: YAMLSeq,
   change: Exclude<GlossaryChange, Readonly<{ term: Term; type: "add" }>>,
-  originalGapCounts: Map<object, number>,
+  originalEntryGaps: Map<object, EntryGap>,
 ): boolean => {
   const index = resolveSelectedIndex(source, terms, change.original);
   if (
@@ -141,10 +160,12 @@ const applyExistingEntryChange = (
     const removedEntry = sequence.items[index];
     const followingEntry = sequence.items[index + 1];
     if (index > 0 && removedEntry && followingEntry) {
-      originalGapCounts.set(
-        followingEntry,
-        Math.max(originalGapCounts.get(removedEntry) ?? 0, originalGapCounts.get(followingEntry) ?? 0),
-      );
+      const removedGap = originalEntryGaps.get(removedEntry) ?? EMPTY_ENTRY_GAP;
+      const followingGap = originalEntryGaps.get(followingEntry) ?? EMPTY_ENTRY_GAP;
+      originalEntryGaps.set(followingEntry, {
+        embeddedCommentBlankLines: followingGap.embeddedCommentBlankLines,
+        externalBlankLines: Math.max(removedGap.externalBlankLines, followingGap.externalBlankLines),
+      });
     }
     sequence.delete(index);
     return true;
@@ -174,21 +195,21 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
-  const originalGapCounts = captureEntryGapCounts(source, sequence);
+  const originalEntryGaps = captureEntryGaps(source, sequence);
 
   if (change.type === "add") {
     const term = normalizeTerm(change.term);
     document.addIn(["terms"], document.createNode(term));
     sortTermsSequence(sequence, [...terms, term]);
   } else {
-    const changed = applyExistingEntryChange(source, terms, sequence, change, originalGapCounts);
+    const changed = applyExistingEntryChange(source, terms, sequence, change, originalEntryGaps);
     if (!changed) {
       return source;
     }
   }
 
-  const requiredGapCounts = separateTerms(sequence, originalGapCounts);
-  const serializedSource = restoreLargerEntryGaps(document.toString(), requiredGapCounts);
+  const requiredEntryGaps = separateTerms(sequence, originalEntryGaps);
+  const serializedSource = restoreLargerEntryGaps(document.toString(), requiredEntryGaps);
   const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${serializedSource}`;
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");

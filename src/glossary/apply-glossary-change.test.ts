@@ -124,6 +124,32 @@ describe("applyGlossaryChange additions", () => {
     expect(repeated).toBe(expected.replace("definition: Middle", "definition: Updated middle"));
   });
 
+  test("transfers a promoted entry's external gap across the next entry's attached comment", () => {
+    const source =
+      "terms:\n  - term: Zulu\n    definition: Last\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n\n  # Beta entry\n\n\n  - term: 'Beta'\n    definition: \"Second\"\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Fourth", term: "Delta" },
+      type: "add",
+    });
+    const expected =
+      "terms:\n  - term: 'Alpha'\n    definition: \"First\"\n\n\n  # Beta entry\n\n\n  - term: 'Beta'\n    definition: \"Second\"\n\n  - definition: Fourth\n    term: Delta\n\n  - term: Zulu\n    definition: Last\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Second", term: "Beta" },
+      { definition: "Fourth", term: "Delta" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[2],
+      term: { definition: "Updated fourth", term: "Delta" },
+      type: "edit",
+    });
+    expect(repeated).toBe(expected.replace("definition: Fourth", "definition: Updated fourth"));
+  });
+
   test("does not accumulate entry gaps across successive mutations", () => {
     const added = applyGlossaryChange("terms:\n  - term: Alpha\n    definition: First\n", {
       term: { definition: "Last", term: "Zulu" },
@@ -478,6 +504,72 @@ describe("applyGlossaryChange edits and deletions", () => {
     });
 
     expect(next).toBe("terms:\n  - term: Alpha\n    definition: First\n\n\n  - term: Zulu\n    definition: Last\n");
+  });
+
+  test("transfers one external gap when deleting a middle block entry", () => {
+    const source =
+      "terms:\n  - term: Alpha\n    definition: First\n\n  - term: Remove\n    definition: Removed\n  - term: 'Zulu'\n    definition: \"Last\"\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected = "terms:\n  - term: Alpha\n    definition: First\n\n  - term: 'Zulu'\n    definition: \"Last\"\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+  });
+
+  test.each([
+    ["one", "\n\n"],
+    ["several", "\n\n\n\n"],
+  ])("transfers %s external gap when deleting a middle flow entry", (_label, gap) => {
+    const source = `terms: [\n  { term: Alpha, definition: First },${gap}  { term: Remove, definition: Removed },\n  { term: Zulu, definition: Last }\n]\n`;
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected = `terms:\n  [\n    { term: Alpha, definition: First },${gap}    { term: Zulu, definition: Last }\n  ]\n`;
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+    expect(repeated).toBe(expected.replace("definition: Last", "definition: Updated last"));
+  });
+
+  test("transfers only external gaps when deleting a commented middle entry", () => {
+    const source =
+      "terms:\n  - term: Alpha\n    definition: First\n\n\n  # remove part one\n\n\n  # remove part two\n\n\n  - term: 'Remove'\n    definition: \"Removed\"\n\n  # Zulu entry\n\n\n  - term: 'Zulu'\n    definition: \"Last\"\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected =
+      "terms:\n  - term: Alpha\n    definition: First\n\n\n  # Zulu entry\n\n\n  - term: 'Zulu'\n    definition: \"Last\"\n";
+
+    expect(next).toBe(expected);
+    expect(next).not.toContain("remove part");
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+    expect(repeated).toBe(expected.replace('definition: "Last"', 'definition: "Updated last"'));
   });
 
   test("preserves external and multi-paragraph comment gaps when deleting the first entry", () => {
