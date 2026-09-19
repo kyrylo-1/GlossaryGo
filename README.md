@@ -46,6 +46,10 @@ entries are allowed independently; loading and saving never merge them. The form
 `definition`, with no stored identifiers. No extra fields, anchors, aliases, merge keys, custom tags, or multiple documents. Ordinary mappings, sequences, comments, quoted strings, literal/folded multiline
 strings are supported.
 
+Successful Add, Edit, and Delete mutations separate adjacent top-level entries with at least one empty line. Existing
+larger entry gaps and blank lines inside multiline definitions stay intact. Opening, searching, copying, and reloading
+never reformat the Glossary File.
+
 ## Adding terms
 
 Open **Add Term**. Enter **Term** and multiline **Definition**; choose **Save Term**. Saved names are trimmed.

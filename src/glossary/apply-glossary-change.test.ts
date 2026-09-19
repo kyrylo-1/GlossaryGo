@@ -70,6 +70,51 @@ describe("applyGlossaryChange additions", () => {
     ]);
   });
 
+  test("separates adjacent entries with an empty line after adding", () => {
+    const source = "terms:\n  - term: Zulu\n    definition: Last\n  - term: Alpha\n    definition: First\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Middle", term: "Beta" },
+      type: "add",
+    });
+
+    expect(next).toBe(
+      "terms:\n  - term: Alpha\n    definition: First\n\n  - definition: Middle\n    term: Beta\n\n  - term: Zulu\n    definition: Last\n",
+    );
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Middle", term: "Beta" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+  });
+
+  test("preserves a larger entry gap when addition sorting moves it to the first entry", () => {
+    const source = "terms:\n  - term: Zulu\n    definition: Last\n\n\n  - term: Alpha\n    definition: First\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Middle", term: "Beta" },
+      type: "add",
+    });
+
+    expect(next).toBe(
+      "terms:\n  - term: Alpha\n    definition: First\n\n\n  - definition: Middle\n    term: Beta\n\n  - term: Zulu\n    definition: Last\n",
+    );
+  });
+
+  test("does not accumulate entry gaps across successive mutations", () => {
+    const added = applyGlossaryChange("terms:\n  - term: Alpha\n    definition: First\n", {
+      term: { definition: "Last", term: "Zulu" },
+      type: "add",
+    });
+    const edited = applyGlossaryChange(added, {
+      original: { definition: "Last", term: "Zulu" },
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+
+    expect(edited).toBe(
+      "terms:\n  - term: Alpha\n    definition: First\n\n  - definition: Updated last\n    term: Zulu\n",
+    );
+  });
+
   test("produces identical saved bytes from different entry orders", () => {
     const firstSource = "terms:\n  - term: Zulu\n    definition: Last\n  - term: Alpha\n    definition: First\n";
     const secondSource = "terms:\n  - term: Alpha\n    definition: First\n  - term: Zulu\n    definition: Last\n";
@@ -194,6 +239,21 @@ describe("applyGlossaryChange additions", () => {
 // This group covers edit and delete mutations against stable parsed entries.
 // eslint-disable-next-line max-lines-per-function
 describe("applyGlossaryChange edits and deletions", () => {
+  test("separates adjacent entries with an empty line after editing", () => {
+    const source = "terms:\n  - term: API\n    definition: Old\n  - term: HTTP\n    definition: Protocol\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Old", term: "API" },
+      term: { definition: "Updated", term: "API" },
+      type: "edit",
+    });
+
+    expect(next).toBe("terms:\n  - term: API\n    definition: Updated\n\n  - term: HTTP\n    definition: Protocol\n");
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "Updated", term: "API" },
+      { definition: "Protocol", term: "HTTP" },
+    ]);
+  });
+
   test("renames the selected term without treating it as a duplicate of itself", () => {
     const original = { definition: "Old definition", term: "API" };
     const source = "terms:\n  - term: API\n    definition: Old definition\n";
@@ -232,6 +292,22 @@ describe("applyGlossaryChange edits and deletions", () => {
     expect(next).toContain("# Root");
     expect(next).toContain("# Term comment");
     expect(next).toContain("# Definition comment");
+  });
+
+  test("preserves larger entry spacing, comments, and blank lines inside multiline definitions", () => {
+    const source =
+      "# Root note\nterms:\n  - term: API\n    definition: |-\n      first line\n\n      third line\n\n\n  # HTTP entry\n  - term: HTTP\n    definition: Protocol\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "first line\n\nthird line", term: "API" },
+      term: { definition: "first line\n\nthird line", term: "Application API" },
+      type: "edit",
+    });
+
+    expect(next).toBe(source.replace("term: API", "term: Application API"));
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "first line\n\nthird line", term: "Application API" },
+      { definition: "Protocol", term: "HTTP" },
+    ]);
   });
 
   test("allows renaming an entry to another entry's equivalent name", () => {
@@ -284,6 +360,32 @@ describe("applyGlossaryChange edits and deletions", () => {
       { definition: "Last", term: "Zulu" },
       { definition: "First", term: "Alpha" },
     ]);
+  });
+
+  test("separates adjacent surviving entries with an empty line after deleting", () => {
+    const source =
+      "terms:\n  - term: Alpha\n    definition: First\n  - term: Remove\n    definition: Removed\n  - term: Zulu\n    definition: Last\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+
+    expect(next).toBe("terms:\n  - term: Alpha\n    definition: First\n\n  - term: Zulu\n    definition: Last\n");
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+  });
+
+  test("preserves a larger entry gap when deleting the entry after it", () => {
+    const source =
+      "terms:\n  - term: Alpha\n    definition: First\n\n\n  - term: Remove\n    definition: Removed\n  - term: Zulu\n    definition: Last\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+
+    expect(next).toBe("terms:\n  - term: Alpha\n    definition: First\n\n\n  - term: Zulu\n    definition: Last\n");
   });
 
   test("deleting the last term retains an empty glossary and glossary comments", () => {

@@ -27,48 +27,133 @@ const sortTermsSequence = (sequence: YAMLSeq, terms: readonly Term[]): void => {
     .map(({ node }) => node);
 };
 
+const countLeadingBlankLines = (source: string): number => {
+  const leadingWhitespace = source.match(/^(?:[\t ]*(?:\r\n|\r|\n))*/)?.[0] ?? "";
+  return leadingWhitespace.match(/\r\n|\r|\n/g)?.length ?? 0;
+};
+
+const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, number> => {
+  const gapCounts = new Map<object, number>();
+  for (let index = 1; index < sequence.items.length; index += 1) {
+    const previous = sequence.items[index - 1];
+    const entry = sequence.items[index];
+    const previousEnd = previous?.range?.[2];
+    const entryStart = entry?.range?.[0];
+    if (previous && entry && typeof previousEnd === "number" && typeof entryStart === "number") {
+      const interstitial = source.slice(previousEnd, entryStart);
+      gapCounts.set(entry, countLeadingBlankLines(interstitial));
+    }
+  }
+  return gapCounts;
+};
+
+const separateTerms = (sequence: YAMLSeq, originalGapCounts: ReadonlyMap<object, number>): readonly number[] => {
+  const firstEntry = sequence.items[0];
+  const displacedFirstGapCount = firstEntry ? (originalGapCounts.get(firstEntry) ?? 0) : 0;
+  if (firstEntry && originalGapCounts.has(firstEntry)) {
+    firstEntry.spaceBefore = false;
+  }
+  const requiredGapCounts: number[] = [];
+  for (const [index, entry] of sequence.items.slice(1).entries()) {
+    if (entry) {
+      entry.spaceBefore = true;
+      requiredGapCounts.push(Math.max(1, originalGapCounts.get(entry) ?? 0, index === 0 ? displacedFirstGapCount : 0));
+    }
+  }
+  return requiredGapCounts;
+};
+
+const restoreLargerEntryGaps = (source: string, requiredGapCounts: readonly number[]): string => {
+  if (requiredGapCounts.every((count) => count <= 1)) {
+    return source;
+  }
+  const { document } = parseValidatedGlossarySource(source);
+  const sequence = document.get("terms", true);
+  if (!isSeq(sequence)) {
+    throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
+  }
+
+  let restored = source;
+  for (let index = sequence.items.length - 1; index >= 1; index -= 1) {
+    const previous = sequence.items[index - 1];
+    const entry = sequence.items[index];
+    const previousEnd = previous?.range?.[2];
+    const entryStart = entry?.range?.[0];
+    if (typeof previousEnd === "number" && typeof entryStart === "number") {
+      const interstitial = source.slice(previousEnd, entryStart);
+      const missingGapCount = requiredGapCounts[index - 1] - countLeadingBlankLines(interstitial);
+      if (missingGapCount > 0) {
+        restored = `${restored.slice(0, previousEnd)}${"\n".repeat(missingGapCount)}${restored.slice(previousEnd)}`;
+      }
+    }
+  }
+  return restored;
+};
+
+const applyExistingEntryChange = (
+  source: string,
+  terms: readonly Term[],
+  sequence: YAMLSeq,
+  change: Exclude<GlossaryChange, Readonly<{ term: Term; type: "add" }>>,
+  originalGapCounts: Map<object, number>,
+): void => {
+  const index = resolveSelectedIndex(source, terms, change.original);
+  if (
+    index === -1 ||
+    terms[index].term !== change.original.term ||
+    terms[index].definition !== change.original.definition
+  ) {
+    throw new GlossaryError(
+      "stale-term",
+      "The selected term changed or was removed. Reload the glossary and try again.",
+    );
+  }
+  if (change.type === "delete") {
+    const removedEntry = sequence.items[index];
+    const followingEntry = sequence.items[index + 1];
+    if (index > 0 && removedEntry && followingEntry) {
+      originalGapCounts.set(
+        followingEntry,
+        Math.max(originalGapCounts.get(removedEntry) ?? 0, originalGapCounts.get(followingEntry) ?? 0),
+      );
+    }
+    sequence.delete(index);
+    return;
+  }
+
+  const entry = sequence.items[index];
+  const normalizedTerm = normalizeTerm(change.term);
+  if (!isMap(entry)) {
+    throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
+  }
+  const termScalar = entry.get("term", true);
+  const definitionScalar = entry.get("definition", true);
+  if (!isScalar(termScalar) || !isScalar(definitionScalar)) {
+    throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
+  }
+  termScalar.value = normalizedTerm.term;
+  definitionScalar.value = normalizedTerm.definition;
+};
+
 export const applyGlossaryChange = (source: string, change: GlossaryChange): string => {
   const { document, terms } = parseValidatedGlossarySource(source);
   const sequence = document.get("terms", true);
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
+  const originalGapCounts = captureEntryGapCounts(source, sequence);
 
   if (change.type === "add") {
     const term = normalizeTerm(change.term);
     document.addIn(["terms"], document.createNode(term));
     sortTermsSequence(sequence, [...terms, term]);
   } else {
-    const index = resolveSelectedIndex(source, terms, change.original);
-    if (
-      index === -1 ||
-      terms[index].term !== change.original.term ||
-      terms[index].definition !== change.original.definition
-    ) {
-      throw new GlossaryError(
-        "stale-term",
-        "The selected term changed or was removed. Reload the glossary and try again.",
-      );
-    }
-    if (change.type === "delete") {
-      sequence.delete(index);
-    } else {
-      const entry = sequence.items[index];
-      const normalizedTerm = normalizeTerm(change.term);
-      if (!isMap(entry)) {
-        throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
-      }
-      const termScalar = entry.get("term", true);
-      const definitionScalar = entry.get("definition", true);
-      if (!isScalar(termScalar) || !isScalar(definitionScalar)) {
-        throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
-      }
-      termScalar.value = normalizedTerm.term;
-      definitionScalar.value = normalizedTerm.definition;
-    }
+    applyExistingEntryChange(source, terms, sequence, change, originalGapCounts);
   }
 
-  const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${document.toString()}`;
+  const requiredGapCounts = separateTerms(sequence, originalGapCounts);
+  const serializedSource = restoreLargerEntryGaps(document.toString(), requiredGapCounts);
+  const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${serializedSource}`;
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
