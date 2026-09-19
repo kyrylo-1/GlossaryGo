@@ -80,6 +80,7 @@ describe("saveGlossaryChange link safety", () => {
 describe("saveGlossaryChange invalid sources", () => {
   test.each([
     ["invalid YAML", Buffer.from("terms: [}\n"), "invalid-yaml"],
+    ["multiple YAML documents", Buffer.from("terms: []\n---\nterms: []\n"), "multiple-documents"],
     ["invalid UTF-8", Buffer.from([0x74, 0x65, 0x72, 0x6d, 0x73, 0x3a, 0x20, 0xff]), "invalid-encoding"],
     ["an oversized file", Buffer.alloc(5 * 1024 * 1024 + 1, 0x20), "too-large"],
   ])("rejects %s without changing the source bytes", async (_label, source, code) => {
@@ -108,6 +109,14 @@ describe("saveGlossaryChange invalid sources", () => {
 });
 
 describe("saveGlossaryChange first glossary creation", () => {
+  test("initializes an existing zero-byte glossary when adding the first term", async () => {
+    const path = await writeGlossary("");
+
+    await saveGlossaryChange(path, { term: { definition: "Interface", term: "API" }, type: "add" });
+
+    await expect(loadGlossary(path)).resolves.toEqual([{ definition: "Interface", term: "API" }]);
+  });
+
   test("creates a missing glossary for the first added term with private permissions", async () => {
     const path = await createTemporaryPath("missing.yaml");
 

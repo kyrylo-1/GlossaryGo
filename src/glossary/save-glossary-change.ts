@@ -65,7 +65,8 @@ const saveOnce = async (path: string, change: GlossaryChange): Promise<void> => 
     }
     throw createUnreadableError();
   }
-  const candidate = applyGlossaryChange(original.source, change);
+  const source = original.bytes.byteLength === 0 && change.type === "add" ? "terms: []\n" : original.source;
+  const candidate = applyGlossaryChange(source, change);
   if (candidate === original.source) {
     return;
   }
