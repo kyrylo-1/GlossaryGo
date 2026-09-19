@@ -99,15 +99,15 @@ describe("applyGlossaryChange additions", () => {
     );
   });
 
-  test("preserves external and embedded comment gaps when addition sorting moves an entry first", () => {
+  test("preserves external and multi-paragraph comment gaps when addition sorting moves an entry first", () => {
     const source =
-      "terms:\n  - term: Zulu\n    definition: Last\n\n\n  # Alpha entry\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n";
+      "terms:\n  - term: Zulu\n    definition: Last\n\n\n  # alpha part one\n\n\n  # alpha part two\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n";
     const next = applyGlossaryChange(source, {
       term: { definition: "Middle", term: "Beta" },
       type: "add",
     });
     const expected =
-      "terms:\n  # Alpha entry\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n\n\n  - definition: Middle\n    term: Beta\n\n  - term: Zulu\n    definition: Last\n";
+      "terms:\n  # alpha part one\n\n\n  # alpha part two\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n\n\n  - definition: Middle\n    term: Beta\n\n  - term: Zulu\n    definition: Last\n";
 
     expect(next).toBe(expected);
     expect(parseGlossarySource(next)).toEqual([
@@ -480,15 +480,15 @@ describe("applyGlossaryChange edits and deletions", () => {
     expect(next).toBe("terms:\n  - term: Alpha\n    definition: First\n\n\n  - term: Zulu\n    definition: Last\n");
   });
 
-  test("preserves external and embedded comment gaps when deleting the first entry", () => {
+  test("preserves external and multi-paragraph comment gaps when deleting the first entry", () => {
     const source =
-      "terms:\n  - term: Remove\n    definition: Removed\n\n\n  # Alpha entry\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n  - term: Zulu\n    definition: Last\n";
+      "terms:\n  - term: Remove\n    definition: Removed\n\n\n  # alpha part one\n\n\n  # alpha part two\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n  - term: Zulu\n    definition: Last\n";
     const next = applyGlossaryChange(source, {
       original: { definition: "Removed", term: "Remove" },
       type: "delete",
     });
     const expected =
-      "terms:\n  # Alpha entry\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n\n\n  - term: Zulu\n    definition: Last\n";
+      "terms:\n  # alpha part one\n\n\n  # alpha part two\n\n\n  - term: 'Alpha'\n    definition: \"First\"\n\n\n  - term: Zulu\n    definition: Last\n";
 
     expect(next).toBe(expected);
     expect(parseGlossarySource(next)).toEqual([
