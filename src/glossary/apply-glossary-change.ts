@@ -40,6 +40,8 @@ const countLeadingLineBreaks = (source: string): number => {
   return leadingLineBreaks.match(/\r\n|\r|\n/g)?.length ?? 0;
 };
 
+const isBlankOnly = (source: string): boolean => source.length > 0 && /^[\t \r\n]*$/.test(source);
+
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
   const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
   return typeof firstLineBreak?.index === "number"
@@ -65,7 +67,10 @@ const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): Entr
   const allCommentBlankLines = countEmbeddedCommentBlankLines(commentBefore);
   const leadingFlowExternalBlankLines =
     sequence.flow === true && typeof previous.comment === "string" ? countLeadingLineBreaks(commentBefore) : 0;
-  const embeddedCommentBlankLines = Math.max(0, allCommentBlankLines - leadingFlowExternalBlankLines);
+  const embeddedCommentBlankLines =
+    leadingFlowExternalBlankLines > 0 && isBlankOnly(commentBefore)
+      ? 0
+      : Math.max(0, allCommentBlankLines - leadingFlowExternalBlankLines);
   return {
     embeddedCommentBlankLines,
     externalBlankLines: Math.max(
@@ -103,6 +108,9 @@ const separateTerms = (sequence: YAMLSeq, originalEntryGaps: ReadonlyMap<object,
   const displacedFirstExternalGap = firstEntry ? (originalEntryGaps.get(firstEntry)?.externalBlankLines ?? 0) : 0;
   if (firstEntry && originalEntryGaps.has(firstEntry)) {
     firstEntry.spaceBefore = false;
+    if (sequence.flow === true && isBlankOnly(firstEntry.commentBefore ?? "")) {
+      firstEntry.commentBefore = "";
+    }
   }
   const requiredEntryGaps: EntryGap[] = [];
   for (const [index, entry] of sequence.items.slice(1).entries()) {
