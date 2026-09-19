@@ -226,6 +226,31 @@ describe("applyGlossaryChange additions", () => {
     ).toBe(next);
   });
 
+  test("keeps a bare inline flow comment with its owner when addition sorting promotes the following entry", () => {
+    const source =
+      "terms: [\n  { term: Zulu, definition: Last }, #\n\n\n  { term: 'Alpha', definition: \"First\" }\n]\n";
+    const next = applyGlossaryChange(source, {
+      term: { definition: "Middle", term: "Beta" },
+      type: "add",
+    });
+    const expected =
+      "terms:\n  [\n    { term: 'Alpha', definition: \"First\" },\n\n\n    { definition: Middle, term: Beta },\n\n    { term: Zulu, definition: Last } #\n  ]\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Middle", term: "Beta" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated middle", term: "Beta" },
+      type: "edit",
+    });
+    expect(repeated).toBe(expected.replace("definition: Middle", "definition: Updated middle"));
+  });
+
   test("does not accumulate entry gaps across successive mutations", () => {
     const added = applyGlossaryChange("terms:\n  - term: Alpha\n    definition: First\n", {
       term: { definition: "Last", term: "Zulu" },
@@ -493,6 +518,31 @@ describe("applyGlossaryChange edits and deletions", () => {
     expect(repeated).toBe(expected.replace('definition: "Second"', 'definition: "Updated second"'));
   });
 
+  test("keeps a bare inline flow comment inline while editing its owner", () => {
+    const source =
+      "terms: [\n  { term: 'Alpha', definition: \"First\" }, #\n\n  { term: 'Beta', definition: \"Second\" }\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "First", term: "Alpha" },
+      term: { definition: "Updated first", term: "Alpha" },
+      type: "edit",
+    });
+    const expected =
+      "terms:\n  [\n    { term: 'Alpha', definition: \"Updated first\" }, #\n\n    { term: 'Beta', definition: \"Second\" }\n  ]\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "Updated first", term: "Alpha" },
+      { definition: "Second", term: "Beta" },
+    ]);
+    expect(
+      applyGlossaryChange(next, {
+        original: parseGlossarySource(next)[0],
+        term: parseGlossarySource(next)[0],
+        type: "edit",
+      }),
+    ).toBe(next);
+  });
+
   test("preserves blank lines after a comment attached before an entry", () => {
     const source =
       "terms:\n  - term: API\n    definition: Interface\n  # HTTP entry\n\n\n  - term: 'HTTP'\n    definition: \"Protocol\"\n";
@@ -723,6 +773,31 @@ describe("applyGlossaryChange edits and deletions", () => {
     ).toBe(next);
   });
 
+  test("removes a bare inline flow comment with its owner while transferring gaps after deleting first", () => {
+    const source =
+      "terms: [\n  { term: Remove, definition: Removed }, #\n\n\n  { term: 'Alpha', definition: \"First\" },\n  { term: 'Zulu', definition: \"Last\" }\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected =
+      "terms:\n  [\n    { term: 'Alpha', definition: \"First\" },\n\n\n    { term: 'Zulu', definition: \"Last\" }\n  ]\n";
+
+    expect(next).toBe(expected);
+    expect(next).not.toContain("#");
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+    expect(repeated).toBe(expected.replace('definition: "Last"', 'definition: "Updated last"'));
+  });
+
   test("transfers every blank-only flow gap when deleting a middle entry", () => {
     const source =
       "terms: [\n  { term: 'Alpha', definition: \"First\" }, # trailing\n\n\n\n\n  { term: Remove, definition: Removed },\n  { term: 'Zulu', definition: \"Last\" }\n]\n";
@@ -756,6 +831,30 @@ describe("applyGlossaryChange edits and deletions", () => {
     });
     const expected =
       "terms:\n  [\n    { term: 'Alpha', definition: \"First\" }, # trailing\n\n\n\n    { term: 'Zulu', definition: \"Last\" }\n  ]\n";
+
+    expect(next).toBe(expected);
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "First", term: "Alpha" },
+      { definition: "Last", term: "Zulu" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated last", term: "Zulu" },
+      type: "edit",
+    });
+    expect(repeated).toBe(expected.replace('definition: "Last"', 'definition: "Updated last"'));
+  });
+
+  test("preserves a surviving bare inline flow comment while transferring gaps on middle delete", () => {
+    const source =
+      "terms: [\n  { term: 'Alpha', definition: \"First\" }, #\n\n\n\n  { term: Remove, definition: Removed },\n  { term: 'Zulu', definition: \"Last\" }\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Removed", term: "Remove" },
+      type: "delete",
+    });
+    const expected =
+      "terms:\n  [\n    { term: 'Alpha', definition: \"First\" }, #\n\n\n\n    { term: 'Zulu', definition: \"Last\" }\n  ]\n";
 
     expect(next).toBe(expected);
     expect(parseGlossarySource(next)).toEqual([

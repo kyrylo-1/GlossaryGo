@@ -37,6 +37,29 @@ const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
 
 const isBlankOnly = (source: string): boolean => source.length > 0 && /^[\t \r\n]*$/.test(source);
 
+const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): void => {
+  if (sequence.flow !== true) {
+    return;
+  }
+  for (let index = 1; index < sequence.items.length; index += 1) {
+    const previous = sequence.items[index - 1];
+    const entry = sequence.items[index];
+    const previousEnd = previous?.range?.[2];
+    const entryStart = entry?.range?.[0];
+    if (previous && entry && typeof previousEnd === "number" && typeof entryStart === "number") {
+      const interstitialLines = source.slice(previousEnd, entryStart).split(/\r\n|\r|\n/);
+      const bareInlineComment = interstitialLines[0].match(/^[\t ]*,[\t ]*#([\t ]*)$/);
+      if (bareInlineComment) {
+        previous.comment = bareInlineComment[1].length > 0 ? bareInlineComment[1] : " ";
+        const firstAttachedCommentIndex = interstitialLines.slice(0, -1).findIndex((line) => /^[\t ]*#/.test(line));
+        const commentBeforeLines = (entry.commentBefore ?? "").split(/\r\n|\r|\n/);
+        entry.commentBefore =
+          firstAttachedCommentIndex === -1 ? "" : commentBeforeLines.slice(firstAttachedCommentIndex).join("\n");
+      }
+    }
+  }
+};
+
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
   const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
   return typeof firstLineBreak?.index === "number"
@@ -161,6 +184,7 @@ const restoreLargerEntryGaps = (source: string, requiredEntryGaps: readonly Entr
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
+  normalizeBareInlineFlowComments(source, sequence);
 
   const insertions: GapInsertion[] = [];
   for (let index = 1; index < sequence.items.length; index += 1) {
@@ -246,6 +270,7 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
+  normalizeBareInlineFlowComments(source, sequence);
   const originalEntryGaps = captureEntryGaps(source, sequence);
 
   if (change.type === "add") {
