@@ -32,6 +32,11 @@ const countInterstitialBlankLines = (source: string): number => {
   return lines.slice(0, -1).filter((line) => /^[\t ]*$/.test(line)).length;
 };
 
+const countEmbeddedCommentBlankLines = (commentBefore: string): number => {
+  const trailingLineBreaks = commentBefore.match(/(?:(?:\r\n|\r|\n)[\t ]*)+$/)?.[0] ?? "";
+  return trailingLineBreaks.match(/\r\n|\r|\n/g)?.length ?? 0;
+};
+
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
   const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
   return typeof firstLineBreak?.index === "number"
@@ -69,9 +74,11 @@ const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, n
 
 const separateTerms = (sequence: YAMLSeq, originalGapCounts: ReadonlyMap<object, number>): readonly number[] => {
   const firstEntry = sequence.items[0];
-  const hasEmbeddedCommentGap = countInterstitialBlankLines(firstEntry?.commentBefore ?? "") > 0;
+  const embeddedCommentGapCount = countEmbeddedCommentBlankLines(firstEntry?.commentBefore ?? "");
   const displacedFirstGapCount =
-    firstEntry?.spaceBefore === true && !hasEmbeddedCommentGap ? (originalGapCounts.get(firstEntry) ?? 0) : 0;
+    firstEntry?.spaceBefore === true
+      ? Math.max(0, (originalGapCounts.get(firstEntry) ?? 0) - embeddedCommentGapCount)
+      : 0;
   if (firstEntry && originalGapCounts.has(firstEntry)) {
     firstEntry.spaceBefore = false;
   }
