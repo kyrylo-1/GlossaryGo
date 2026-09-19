@@ -1,16 +1,18 @@
 const searchCollator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
 
-const normalize = (value: string): string => {
+export const normalizeTermName = (value: string): string => {
   return value.normalize("NFC");
 };
 
-export const areTermsEquivalent = (left: string, right: string): boolean => {
-  return searchCollator.compare(normalize(left), normalize(right)) === 0;
+export const areNormalizedTermsEquivalent = (left: string, right: string): boolean => {
+  return searchCollator.compare(left, right) === 0;
 };
 
-export const termStartsWith = (term: string, query: string): boolean => {
-  const normalizedTerm = normalize(term);
-  const normalizedQuery = normalize(query);
+export const areTermsEquivalent = (left: string, right: string): boolean => {
+  return areNormalizedTermsEquivalent(normalizeTermName(left), normalizeTermName(right));
+};
+
+export const normalizedTermStartsWith = (normalizedTerm: string, normalizedQuery: string): boolean => {
   if (normalizedQuery.length === 0) {
     return true;
   }
@@ -24,4 +26,8 @@ export const termStartsWith = (term: string, query: string): boolean => {
   }
 
   return false;
+};
+
+export const termStartsWith = (term: string, query: string): boolean => {
+  return normalizedTermStartsWith(normalizeTermName(term), normalizeTermName(query));
 };
