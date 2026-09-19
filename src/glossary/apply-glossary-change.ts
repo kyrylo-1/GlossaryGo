@@ -28,8 +28,28 @@ const sortTermsSequence = (sequence: YAMLSeq, terms: readonly Term[]): void => {
 };
 
 const countLeadingBlankLines = (source: string): number => {
-  const leadingWhitespace = source.match(/^(?:[\t ]*(?:\r\n|\r|\n))*/)?.[0] ?? "";
-  return leadingWhitespace.match(/\r\n|\r|\n/g)?.length ?? 0;
+  const lines = source.split(/\r\n|\r|\n/);
+  return lines.slice(0, -1).filter((line) => /^[\t ]*$/.test(line)).length;
+};
+
+const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
+  const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
+  return typeof firstLineBreak?.index === "number"
+    ? previousEnd + firstLineBreak.index + firstLineBreak[0].length
+    : previousEnd;
+};
+
+type GapInsertion = Readonly<{ count: number; offset: number }>;
+
+const insertGapLines = (source: string, insertions: readonly GapInsertion[]): string => {
+  const parts: string[] = [];
+  let sourceOffset = 0;
+  for (const insertion of insertions) {
+    parts.push(source.slice(sourceOffset, insertion.offset), "\n".repeat(insertion.count));
+    sourceOffset = insertion.offset;
+  }
+  parts.push(source.slice(sourceOffset));
+  return parts.join("");
 };
 
 const captureEntryGapCounts = (source: string, sequence: YAMLSeq): Map<object, number> => {
@@ -56,8 +76,11 @@ const separateTerms = (sequence: YAMLSeq, originalGapCounts: ReadonlyMap<object,
   const requiredGapCounts: number[] = [];
   for (const [index, entry] of sequence.items.slice(1).entries()) {
     if (entry) {
-      entry.spaceBefore = true;
-      requiredGapCounts.push(Math.max(1, originalGapCounts.get(entry) ?? 0, index === 0 ? displacedFirstGapCount : 0));
+      const originalGapCount = originalGapCounts.get(entry) ?? 0;
+      if (originalGapCount === 0) {
+        entry.spaceBefore = true;
+      }
+      requiredGapCounts.push(Math.max(1, originalGapCount, index === 0 ? displacedFirstGapCount : 0));
     }
   }
   return requiredGapCounts;
@@ -73,8 +96,8 @@ const restoreLargerEntryGaps = (source: string, requiredGapCounts: readonly numb
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
 
-  let restored = source;
-  for (let index = sequence.items.length - 1; index >= 1; index -= 1) {
+  const insertions: GapInsertion[] = [];
+  for (let index = 1; index < sequence.items.length; index += 1) {
     const previous = sequence.items[index - 1];
     const entry = sequence.items[index];
     const previousEnd = previous?.range?.[2];
@@ -83,11 +106,11 @@ const restoreLargerEntryGaps = (source: string, requiredGapCounts: readonly numb
       const interstitial = source.slice(previousEnd, entryStart);
       const missingGapCount = requiredGapCounts[index - 1] - countLeadingBlankLines(interstitial);
       if (missingGapCount > 0) {
-        restored = `${restored.slice(0, previousEnd)}${"\n".repeat(missingGapCount)}${restored.slice(previousEnd)}`;
+        insertions.push({ count: missingGapCount, offset: getGapInsertionOffset(interstitial, previousEnd) });
       }
     }
   }
-  return restored;
+  return insertGapLines(source, insertions);
 };
 
 const applyExistingEntryChange = (
@@ -96,7 +119,7 @@ const applyExistingEntryChange = (
   sequence: YAMLSeq,
   change: Exclude<GlossaryChange, Readonly<{ term: Term; type: "add" }>>,
   originalGapCounts: Map<object, number>,
-): void => {
+): boolean => {
   const index = resolveSelectedIndex(source, terms, change.original);
   if (
     index === -1 ||
@@ -118,11 +141,14 @@ const applyExistingEntryChange = (
       );
     }
     sequence.delete(index);
-    return;
+    return true;
   }
 
   const entry = sequence.items[index];
   const normalizedTerm = normalizeTerm(change.term);
+  if (normalizedTerm.term === terms[index].term && normalizedTerm.definition === terms[index].definition) {
+    return false;
+  }
   if (!isMap(entry)) {
     throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
   }
@@ -133,6 +159,7 @@ const applyExistingEntryChange = (
   }
   termScalar.value = normalizedTerm.term;
   definitionScalar.value = normalizedTerm.definition;
+  return true;
 };
 
 export const applyGlossaryChange = (source: string, change: GlossaryChange): string => {
@@ -148,7 +175,10 @@ export const applyGlossaryChange = (source: string, change: GlossaryChange): str
     document.addIn(["terms"], document.createNode(term));
     sortTermsSequence(sequence, [...terms, term]);
   } else {
-    applyExistingEntryChange(source, terms, sequence, change, originalGapCounts);
+    const changed = applyExistingEntryChange(source, terms, sequence, change, originalGapCounts);
+    if (!changed) {
+      return source;
+    }
   }
 
   const requiredGapCounts = separateTerms(sequence, originalGapCounts);

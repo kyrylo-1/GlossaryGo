@@ -239,6 +239,13 @@ describe("applyGlossaryChange additions", () => {
 // This group covers edit and delete mutations against stable parsed entries.
 // eslint-disable-next-line max-lines-per-function
 describe("applyGlossaryChange edits and deletions", () => {
+  test.each(["", "\uFEFF"])("returns a loaded unchanged edit with source prefix %j byte-for-byte", (prefix) => {
+    const source = `${prefix}terms:\n  - term: API\n    definition: Interface\n  - term: HTTP\n    definition: Protocol\n`;
+    const original = parseGlossarySource(source)[0];
+
+    expect(applyGlossaryChange(source, { original, term: { ...original }, type: "edit" })).toBe(source);
+  });
+
   test("separates adjacent entries with an empty line after editing", () => {
     const source = "terms:\n  - term: API\n    definition: Old\n  - term: HTTP\n    definition: Protocol\n";
     const next = applyGlossaryChange(source, {
@@ -252,6 +259,13 @@ describe("applyGlossaryChange edits and deletions", () => {
       { definition: "Updated", term: "API" },
       { definition: "Protocol", term: "HTTP" },
     ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated protocol", term: "HTTP" },
+      type: "edit",
+    });
+    expect(repeated).toBe(next.replace("definition: Protocol", "definition: Updated protocol"));
   });
 
   test("renames the selected term without treating it as a duplicate of itself", () => {
@@ -310,6 +324,46 @@ describe("applyGlossaryChange edits and deletions", () => {
     ]);
   });
 
+  test("preserves larger entry spacing in a flow sequence", () => {
+    const source = "terms: [\n  { term: API, definition: Interface },\n\n\n  { term: HTTP, definition: Protocol }\n]\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Interface", term: "API" },
+      term: { definition: "Updated", term: "API" },
+      type: "edit",
+    });
+
+    expect(next).toBe(
+      "terms:\n  [\n    { term: API, definition: Updated },\n\n\n    { term: HTTP, definition: Protocol }\n  ]\n",
+    );
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "Updated", term: "API" },
+      { definition: "Protocol", term: "HTTP" },
+    ]);
+  });
+
+  test("preserves blank lines after a comment attached before an entry", () => {
+    const source =
+      "terms:\n  - term: API\n    definition: Interface\n  # HTTP entry\n\n\n  - term: 'HTTP'\n    definition: \"Protocol\"\n";
+    const next = applyGlossaryChange(source, {
+      original: { definition: "Interface", term: "API" },
+      term: { definition: "Updated", term: "API" },
+      type: "edit",
+    });
+
+    expect(next).toBe(source.replace("definition: Interface", "definition: Updated"));
+    expect(parseGlossarySource(next)).toEqual([
+      { definition: "Updated", term: "API" },
+      { definition: "Protocol", term: "HTTP" },
+    ]);
+
+    const repeated = applyGlossaryChange(next, {
+      original: parseGlossarySource(next)[1],
+      term: { definition: "Updated protocol", term: "HTTP" },
+      type: "edit",
+    });
+    expect(repeated).toBe(next.replace('definition: "Protocol"', 'definition: "Updated protocol"'));
+  });
+
   test("allows renaming an entry to another entry's equivalent name", () => {
     const source = "terms:\n  - term: API\n    definition: Interface\n  - term: HTTP\n    definition: Protocol\n";
     const next = applyGlossaryChange(source, {
@@ -342,6 +396,19 @@ describe("applyGlossaryChange edits and deletions", () => {
         applyGlossaryChange("terms: []\n", {
           original: { definition: "Interface", term: "API" },
           term: { definition: "Updated", term: "API" },
+          type: "edit",
+        }),
+      "stale-term",
+    );
+  });
+
+  // eslint-disable-next-line vitest/expect-expect
+  test("validates a stale selection before recognizing an unchanged submitted edit", () => {
+    expectGlossaryError(
+      () =>
+        applyGlossaryChange("terms:\n  - term: API\n    definition: Current\n", {
+          original: { definition: "Stale", term: "API" },
+          term: { definition: "Stale", term: "API" },
           type: "edit",
         }),
       "stale-term",
@@ -464,6 +531,38 @@ describe("applyGlossaryChange serialized size", () => {
       "too-large",
     );
   });
+
+  // eslint-disable-next-line vitest/expect-expect
+  test("rejects an edit when inserted entry separators alone exceed the UTF-8 byte limit", () => {
+    const fixedSource = "# \nterms:\n  - term: Alpha\n    definition: First\n  - term: Zulu\n    definition: Last\n";
+    const comment = "x".repeat(MAXIMUM_GLOSSARY_BYTES - Buffer.byteLength(fixedSource, "utf8"));
+    const source = `# ${comment}\nterms:\n  - term: Alpha\n    definition: First\n  - term: Zulu\n    definition: Last\n`;
+
+    expectGlossaryError(
+      () =>
+        applyGlossaryChange(source, {
+          original: { definition: "First", term: "Alpha" },
+          term: { definition: "Other", term: "Alpha" },
+          type: "edit",
+        }),
+      "too-large",
+    );
+  });
+});
+
+test("preserves every larger gap in a many-entry glossary", () => {
+  const source = `terms:\n${Array.from(
+    { length: 400 },
+    (_, index) => `  - term: Term ${String(index).padStart(3, "0")}\n    definition: Definition ${index}\n\n\n`,
+  ).join("")}`;
+  const next = applyGlossaryChange(source, {
+    original: { definition: "Definition 0", term: "Term 000" },
+    term: { definition: "Updated definition", term: "Term 000" },
+    type: "edit",
+  });
+
+  expect(next.match(/\n\n\n {2}- term:/g)).toHaveLength(399);
+  expect(parseGlossarySource(next)).toHaveLength(400);
 });
 
 const duplicateSource =
