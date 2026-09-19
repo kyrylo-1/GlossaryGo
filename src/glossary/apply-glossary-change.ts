@@ -49,7 +49,7 @@ const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): voi
     if (previous && entry && typeof previousEnd === "number" && typeof entryStart === "number") {
       const interstitialLines = source.slice(previousEnd, entryStart).split(/\r\n|\r|\n/);
       const bareInlineComment = interstitialLines[0].match(/^[\t ]*,[\t ]*#([\t ]*)$/);
-      if (bareInlineComment) {
+      if (bareInlineComment && typeof previous.comment !== "string") {
         previous.comment = bareInlineComment[1].length > 0 ? bareInlineComment[1] : " ";
         const firstAttachedCommentIndex = interstitialLines.slice(0, -1).findIndex((line) => /^[\t ]*#/.test(line));
         const commentBeforeLines = (entry.commentBefore ?? "").split(/\r\n|\r|\n/);
@@ -94,7 +94,7 @@ const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): Entr
   const firstAttachedCommentIndex = interstitialLines.findIndex((line) => /^[\t ]*#/.test(line));
   const hasAttachedCommentMarker = firstAttachedCommentIndex !== -1;
   const totalBlankLines = countInterstitialBlankLines(interstitial);
-  if (sequence.flow === true && typeof previous.comment === "string") {
+  if (sequence.flow === true) {
     const externalBlankLines = hasAttachedCommentMarker
       ? interstitialLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
       : totalBlankLines;
