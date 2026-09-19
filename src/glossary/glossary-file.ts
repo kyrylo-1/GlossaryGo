@@ -12,8 +12,13 @@ import {
   GlossaryError,
 } from "./glossary-error";
 import { hasFileSystemCode } from "./has-file-system-code";
+import { isGlossaryLoadCancelledError, throwIfGlossaryLoadCancelled } from "./glossary-load-cancellation";
 
 const readChunkBytes = 64 * 1024;
+
+export const glossaryReadFileSystem = {
+  open: async (path: string): Promise<FileHandle> => open(path, "r"),
+};
 
 export type GlossaryFileMetadata = Readonly<{
   changedNanoseconds: bigint;
@@ -31,7 +36,8 @@ export type GlossaryFileSnapshot = Readonly<{
   source: string;
 }>;
 
-const readGlossaryBytes = async (handle: FileHandle, size: bigint): Promise<Buffer> => {
+const readGlossaryBytes = async (handle: FileHandle, size: bigint, signal?: AbortSignal): Promise<Buffer> => {
+  throwIfGlossaryLoadCancelled(signal);
   if (size > BigInt(MAXIMUM_GLOSSARY_BYTES)) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }
@@ -39,9 +45,11 @@ const readGlossaryBytes = async (handle: FileHandle, size: bigint): Promise<Buff
   const chunks: Buffer[] = [];
   let totalBytes = 0;
   while (totalBytes <= MAXIMUM_GLOSSARY_BYTES) {
+    throwIfGlossaryLoadCancelled(signal);
     const bytesRemaining = MAXIMUM_GLOSSARY_BYTES + 1 - totalBytes;
     const chunk = Buffer.allocUnsafe(Math.min(readChunkBytes, bytesRemaining));
     const { bytesRead } = await handle.read(chunk, 0, chunk.byteLength, null);
+    throwIfGlossaryLoadCancelled(signal);
     if (bytesRead === 0) {
       break;
     }
@@ -146,18 +154,18 @@ export const readGlossarySnapshot = async (path: string): Promise<GlossaryFileSn
   }
 };
 
-const readGlossaryBytesFromPath = async (path: string): Promise<Buffer> => {
+const readGlossaryBytesFromPath = async (path: string, signal?: AbortSignal): Promise<Buffer> => {
   let handle: FileHandle | undefined;
   try {
-    handle = await open(path, "r");
+    handle = await glossaryReadFileSystem.open(path);
     const fileStats = await handle.stat();
     if (!fileStats.isFile()) {
       throw createUnreadableError();
     }
 
-    return await readGlossaryBytes(handle, BigInt(fileStats.size));
+    return await readGlossaryBytes(handle, BigInt(fileStats.size), signal);
   } catch (error: unknown) {
-    if (error instanceof GlossaryError) {
+    if (error instanceof GlossaryError || isGlossaryLoadCancelledError(error)) {
       throw error;
     }
     if (hasFileSystemCode(error, "ENOENT")) {
@@ -169,8 +177,8 @@ const readGlossaryBytesFromPath = async (path: string): Promise<Buffer> => {
   }
 };
 
-export const readGlossarySource = async (path: string): Promise<string> => {
-  return decodeGlossaryBytes(await readGlossaryBytesFromPath(path));
+export const readGlossarySource = async (path: string, signal?: AbortSignal): Promise<string> => {
+  return decodeGlossaryBytes(await readGlossaryBytesFromPath(path, signal));
 };
 
 export const glossarySaveFileSystem = {
