@@ -112,10 +112,14 @@ be proved. Remaining entries still appear alphabetically. Missing file clears hi
 until recovery. Never persist history to
 Glossary File, Raycast storage, logs, or network.
 
-Split-pane preview wraps definitions as literal prose, including Markdown-like characters; omits file metadata.
-**View Full Definition** opens full-width scrollable reader titled with term. Reader offers **Copy Definition**,
-**Copy Term**, **Reveal Glossary in Finder**. Successful copies in either view update Recent Terms.
-Go back to same query.
+Split-pane preview and **View Full Definition** use the same display-only CommonMark presentation for definitions,
+including headings, emphasis, lists, blockquotes, inline code, and fenced code. Fenced ASCII diagrams retain their
+spacing and line breaks. Active CommonMark image syntax and raw HTML tags are shown inert outside code so the renderer
+cannot fetch resources; `![[...]]` remains literal inert text because it is not a CommonMark image. Ordinary Markdown
+links remain links and require user activation. Term names stay literal. **View Full
+Definition** opens a full-width scrollable reader titled with term. Reader offers **Copy Definition**, **Copy Term**,
+**Reveal Glossary in Finder**. Copy Definition and Edit retain the exact original definition, including whitespace.
+Successful copies in either view update Recent Terms. Go back to same query.
 
 Selected-result action order: **Copy Definition**, **Copy Term**, **View Full Definition**, **Add Term**, **Edit Term**,
 **Delete Term**, **Reload Glossary**, **Reveal Glossary in Finder**. Copy does not close command.
