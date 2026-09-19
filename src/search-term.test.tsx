@@ -11,8 +11,10 @@ import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import type * as GlossaryModule from "./glossary/glossary";
 import Command from "./search-term";
 import { raycastApiMocks } from "./test/raycast-api-stub";
+import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 import type { Term } from "./utils/types";
 import type * as RaycastUtils from "@raycast/utils";
+import type * as MarkdownRenderer from "./utils/render-plain-text-as-markdown";
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn<(path: string) => Promise<readonly Term[]>>(),
@@ -31,6 +33,13 @@ vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => ({ createParent: false, path: mocks.path }),
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.save }));
+vi.mock("./utils/render-plain-text-as-markdown", async (importOriginal) => {
+  const original = await importOriginal<typeof MarkdownRenderer>();
+  return {
+    ...original,
+    renderPlainTextAsMarkdown: vi.fn<typeof original.renderPlainTextAsMarkdown>(original.renderPlainTextAsMarkdown),
+  };
+});
 const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].map((term) => ({
   definition: `${term} definition`,
   term,
@@ -333,6 +342,28 @@ describe("Search Term complete result list", () => {
     const last = within(screen.getByRole("article", { name: "A07" }));
     fireEvent.click(last.getByRole("button", { name: "Copy Definition" }));
     await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith("A07 original definition"));
+  });
+
+  test("formats a large result list once when its parent rerenders", async () => {
+    mocks.load.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => ({
+        definition: `Synthetic definition ${index + 1}`,
+        term: `Term ${String(index + 1).padStart(3, "0")}`,
+      })),
+    );
+    const view = render(<Command />);
+    await screen.findByRole("article", { name: "Term 001" });
+    expect(screen.getAllByTestId("result")).toHaveLength(200);
+    expect(renderPlainTextAsMarkdown).toHaveBeenCalledTimes(200);
+
+    const selected = screen.getByRole("article", { name: "Term 200" });
+    fireEvent.click(selected);
+    await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId));
+    view.rerender(<Command />);
+
+    expect(renderPlainTextAsMarkdown).toHaveBeenCalledTimes(200);
+    expect(screen.getAllByTestId("result")).toHaveLength(200);
+    expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId);
   });
 });
 
