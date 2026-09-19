@@ -20,20 +20,24 @@ describe("prepareMarkdownForDisplay", () => {
   src="https://tracker.test/multiline-pixel"
   alt="tracking pixel">`;
 
-    expect(prepareMarkdownForDisplay(markdown)).toBe(`# Heading
+    const expected = [
+      "# Heading",
+      "",
+      "**bold** and _italic_ [ordinary link](https://example.test/docs)",
+      "",
+      "- list item",
+      "> blockquote",
+      "",
+      "&#33;[image](https://tracker.test/pixel)",
+      "![[obsidian-embed]]",
+      "&#60;img src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;pixel&#34;&#62;",
+      "&#60;iframe src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;embed&#34;&#62;&#60;&#47;iframe&#62;  ",
+      "&#60;img  ",
+      "&#32;&#32;src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;multiline&#45;pixel&#34;  ",
+      "&#32;&#32;alt&#61;&#34;tracking pixel&#34;&#62;",
+    ].join("\n");
 
-**bold** and _italic_ [ordinary link](https://example.test/docs)
-
-- list item
-> blockquote
-
-&#33;[image](https://tracker.test/pixel)
-![[obsidian-embed]]
-&#60;img src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;pixel&#34;&#62;
-&#60;iframe src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;embed&#34;&#62;&#60;&#47;iframe&#62;  
-&#60;img  
-&#32;&#32;src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;multiline&#45;pixel&#34;  
-&#32;&#32;alt&#61;&#34;tracking pixel&#34;&#62;`);
+    expect(prepareMarkdownForDisplay(markdown)).toBe(expected);
   });
 
   test("preserves image-like and HTML-like code exactly, including fenced diagram spacing", () => {
