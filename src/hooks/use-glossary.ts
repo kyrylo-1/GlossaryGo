@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch } from "react";
 
 import type { Term } from "../utils/types";
-import { GlossaryError, loadGlossary } from "../glossary/glossary";
+import { GlossaryError } from "../glossary/glossary";
 import type { GlossaryTarget } from "../glossary/glossary-target";
+import { createGlossarySourceCache, type GlossarySourceCache } from "../glossary/glossary-source-cache";
 import { searchTerms, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState, type GlossaryAction } from "./glossary-reducer";
 
@@ -29,7 +30,11 @@ const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
 };
 
-const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryAction>): (() => Promise<void>) => {
+const useGlossaryReload = (
+  glossaryFile: string,
+  dispatch: Dispatch<GlossaryAction>,
+  sourceCache: GlossarySourceCache,
+): (() => Promise<void>) => {
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -40,7 +45,7 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
     dispatch({ type: "loadStarted" });
 
     try {
-      const terms = await loadGlossary(glossaryFile);
+      const terms = await sourceCache.load(glossaryFile);
       if (sequence === loadSequence.current) {
         dispatch({ terms, type: "loadSucceeded" });
       }
@@ -53,7 +58,7 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
         }
       }
     }
-  }, [dispatch, glossaryFile]);
+  }, [dispatch, glossaryFile, sourceCache]);
   useEffect(() => {
     let isActive = true;
     queueMicrotask(() => {
@@ -64,15 +69,17 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
     return (): void => {
       isActive = false;
       loadSequence.current += 1;
+      sourceCache.clear();
     };
-  }, [reload]);
+  }, [reload, sourceCache]);
 
   return reload;
 };
 
 export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget): GlossaryController => {
   const [model, dispatch] = useReducer(glossaryReducer, { query: "", recentTerms: [], state: { status: "loading" } });
-  const reload = useGlossaryReload(glossaryFile, dispatch);
+  const [sourceCache] = useState<GlossarySourceCache>(createGlossarySourceCache);
+  const reload = useGlossaryReload(glossaryFile, dispatch, sourceCache);
   const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
   const recordTerm = useCallback((term: Term) => dispatch({ term, type: "termUsed" }), []);
   const result = useMemo(

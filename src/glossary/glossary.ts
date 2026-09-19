@@ -11,11 +11,14 @@ export const parseGlossarySource = (source: string): readonly Term[] => {
 export { GlossaryError } from "./glossary-error";
 export type { GlossaryErrorCode } from "./glossary-error";
 
-export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
+export const loadGlossarySource = async (path: string): Promise<string> => {
   if (!path.endsWith(GLOSSARY_FILE_EXTENSION)) {
     throw new GlossaryError("invalid-extension", `Choose a file with the ${GLOSSARY_FILE_EXTENSION} extension.`);
   }
 
-  const source = await readGlossarySource(path);
-  return parseGlossarySource(source);
+  return readGlossarySource(path);
+};
+
+export const loadGlossary = async (path: string): Promise<readonly Term[]> => {
+  return parseGlossarySource(await loadGlossarySource(path));
 };
