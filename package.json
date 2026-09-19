@@ -67,6 +67,7 @@
   "dependencies": {
     "@raycast/api": "^2.4.1",
     "@raycast/utils": "^2.3.0",
+    "micromark": "4.0.2",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
