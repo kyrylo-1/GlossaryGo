@@ -35,11 +35,6 @@ const countInterstitialBlankLines = (source: string): number => {
 const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
   countInterstitialBlankLines(commentBefore) + (/(?:\r\n|\r|\n)[\t ]*$/.test(commentBefore) ? 1 : 0);
 
-const countLeadingLineBreaks = (source: string): number => {
-  const leadingLineBreaks = source.match(/^(?:(?:\r\n|\r|\n)[\t ]*)+/)?.[0] ?? "";
-  return leadingLineBreaks.match(/\r\n|\r|\n/g)?.length ?? 0;
-};
-
 const isBlankOnly = (source: string): boolean => source.length > 0 && /^[\t \r\n]*$/.test(source);
 
 const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
@@ -50,9 +45,17 @@ const getGapInsertionOffset = (interstitial: string, previousEnd: number): numbe
 };
 
 type GapInsertion = Readonly<{ count: number; offset: number }>;
-type EntryGap = Readonly<{ embeddedCommentBlankLines: number; externalBlankLines: number }>;
+type EntryGap = Readonly<{
+  embeddedCommentBlankLines: number;
+  externalBlankLines: number;
+  hasAttachedCommentMarker: boolean;
+}>;
 
-const EMPTY_ENTRY_GAP: EntryGap = { embeddedCommentBlankLines: 0, externalBlankLines: 0 };
+const EMPTY_ENTRY_GAP: EntryGap = {
+  embeddedCommentBlankLines: 0,
+  externalBlankLines: 0,
+  hasAttachedCommentMarker: false,
+};
 
 const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): EntryGap | undefined => {
   const previous = sequence.items[index - 1];
@@ -63,20 +66,27 @@ const measureEntryGap = (source: string, sequence: YAMLSeq, index: number): Entr
     return;
   }
 
-  const commentBefore = entry.commentBefore ?? "";
-  const allCommentBlankLines = countEmbeddedCommentBlankLines(commentBefore);
-  const leadingFlowExternalBlankLines =
-    sequence.flow === true && typeof previous.comment === "string" ? countLeadingLineBreaks(commentBefore) : 0;
-  const embeddedCommentBlankLines =
-    leadingFlowExternalBlankLines > 0 && isBlankOnly(commentBefore)
-      ? 0
-      : Math.max(0, allCommentBlankLines - leadingFlowExternalBlankLines);
+  const interstitial = source.slice(previousEnd, entryStart);
+  const interstitialLines = interstitial.split(/\r\n|\r|\n/).slice(0, -1);
+  const firstAttachedCommentIndex = interstitialLines.findIndex((line) => /^[\t ]*#/.test(line));
+  const hasAttachedCommentMarker = firstAttachedCommentIndex !== -1;
+  const totalBlankLines = countInterstitialBlankLines(interstitial);
+  if (sequence.flow === true && typeof previous.comment === "string") {
+    const externalBlankLines = hasAttachedCommentMarker
+      ? interstitialLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
+      : totalBlankLines;
+    return {
+      embeddedCommentBlankLines: totalBlankLines - externalBlankLines,
+      externalBlankLines,
+      hasAttachedCommentMarker,
+    };
+  }
+
+  const embeddedCommentBlankLines = countEmbeddedCommentBlankLines(entry.commentBefore ?? "");
   return {
     embeddedCommentBlankLines,
-    externalBlankLines: Math.max(
-      0,
-      countInterstitialBlankLines(source.slice(previousEnd, entryStart)) - embeddedCommentBlankLines,
-    ),
+    externalBlankLines: Math.max(0, totalBlankLines - embeddedCommentBlankLines),
+    hasAttachedCommentMarker,
   };
 };
 
@@ -105,10 +115,15 @@ const captureEntryGaps = (source: string, sequence: YAMLSeq): Map<object, EntryG
 
 const separateTerms = (sequence: YAMLSeq, originalEntryGaps: ReadonlyMap<object, EntryGap>): readonly EntryGap[] => {
   const firstEntry = sequence.items[0];
-  const displacedFirstExternalGap = firstEntry ? (originalEntryGaps.get(firstEntry)?.externalBlankLines ?? 0) : 0;
-  if (firstEntry && originalEntryGaps.has(firstEntry)) {
+  const firstEntryGap = firstEntry && originalEntryGaps.get(firstEntry);
+  const displacedFirstExternalGap = firstEntryGap?.externalBlankLines ?? 0;
+  if (firstEntry && firstEntryGap) {
     firstEntry.spaceBefore = false;
-    if (sequence.flow === true && isBlankOnly(firstEntry.commentBefore ?? "")) {
+    if (
+      sequence.flow === true &&
+      !firstEntryGap.hasAttachedCommentMarker &&
+      isBlankOnly(firstEntry.commentBefore ?? "")
+    ) {
       firstEntry.commentBefore = "";
     }
   }
@@ -118,6 +133,7 @@ const separateTerms = (sequence: YAMLSeq, originalEntryGaps: ReadonlyMap<object,
       const originalGap = originalEntryGaps.get(entry) ?? {
         ...EMPTY_ENTRY_GAP,
         embeddedCommentBlankLines: countEmbeddedCommentBlankLines(entry.commentBefore ?? ""),
+        hasAttachedCommentMarker: typeof entry.commentBefore === "string",
       };
       const preservedExternalGap = Math.max(
         originalGap.externalBlankLines,
@@ -129,6 +145,7 @@ const separateTerms = (sequence: YAMLSeq, originalEntryGaps: ReadonlyMap<object,
       requiredEntryGaps.push({
         embeddedCommentBlankLines: originalGap.embeddedCommentBlankLines,
         externalBlankLines: requiredExternalGap,
+        hasAttachedCommentMarker: originalGap.hasAttachedCommentMarker,
       });
     }
   }
@@ -163,6 +180,24 @@ const restoreLargerEntryGaps = (source: string, requiredEntryGaps: readonly Entr
   return insertGapLines(source, insertions);
 };
 
+const transferDeletedEntryExternalGap = (
+  sequence: YAMLSeq,
+  index: number,
+  originalEntryGaps: Map<object, EntryGap>,
+): void => {
+  const removedEntry = sequence.items[index];
+  const followingEntry = sequence.items[index + 1];
+  if (index > 0 && removedEntry && followingEntry) {
+    const removedGap = originalEntryGaps.get(removedEntry) ?? EMPTY_ENTRY_GAP;
+    const followingGap = originalEntryGaps.get(followingEntry) ?? EMPTY_ENTRY_GAP;
+    originalEntryGaps.set(followingEntry, {
+      embeddedCommentBlankLines: followingGap.embeddedCommentBlankLines,
+      externalBlankLines: Math.max(removedGap.externalBlankLines, followingGap.externalBlankLines),
+      hasAttachedCommentMarker: followingGap.hasAttachedCommentMarker,
+    });
+  }
+};
+
 const applyExistingEntryChange = (
   source: string,
   terms: readonly Term[],
@@ -182,16 +217,7 @@ const applyExistingEntryChange = (
     );
   }
   if (change.type === "delete") {
-    const removedEntry = sequence.items[index];
-    const followingEntry = sequence.items[index + 1];
-    if (index > 0 && removedEntry && followingEntry) {
-      const removedGap = originalEntryGaps.get(removedEntry) ?? EMPTY_ENTRY_GAP;
-      const followingGap = originalEntryGaps.get(followingEntry) ?? EMPTY_ENTRY_GAP;
-      originalEntryGaps.set(followingEntry, {
-        embeddedCommentBlankLines: followingGap.embeddedCommentBlankLines,
-        externalBlankLines: Math.max(removedGap.externalBlankLines, followingGap.externalBlankLines),
-      });
-    }
+    transferDeletedEntryExternalGap(sequence, index, originalEntryGaps);
     sequence.delete(index);
     return true;
   }
