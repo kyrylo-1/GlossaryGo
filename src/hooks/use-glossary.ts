@@ -79,15 +79,24 @@ export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget
     () => (model.state.status === "ready" ? prepareTermsForSearch(model.state.terms) : null),
     [model.state],
   );
-  const result = useMemo(
-    () => (preparedTerms ? searchPreparedTerms(preparedTerms, model.query, model.recentTerms) : EMPTY_SEARCH_RESULT),
-    [model.query, model.recentTerms, preparedTerms],
+  const hasTypedQuery = model.query.trim().length > 0;
+  const typedResult = useMemo(
+    () => (preparedTerms && hasTypedQuery ? searchPreparedTerms(preparedTerms, model.query) : EMPTY_SEARCH_RESULT),
+    [hasTypedQuery, model.query, preparedTerms],
   );
+  const blankQueryResult = useMemo(
+    () =>
+      preparedTerms && !hasTypedQuery
+        ? searchPreparedTerms(preparedTerms, model.query, model.recentTerms)
+        : EMPTY_SEARCH_RESULT,
+    [hasTypedQuery, model.query, model.recentTerms, preparedTerms],
+  );
+  const result = hasTypedQuery ? typedResult : blankQueryResult;
 
   return {
     createParent,
     glossaryFile,
-    isRecent: model.query.trim().length === 0 && model.recentTerms.length > 0,
+    isRecent: !hasTypedQuery && model.recentTerms.length > 0,
     query: model.query,
     recordTerm,
     reload,
