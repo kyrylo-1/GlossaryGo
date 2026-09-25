@@ -18,7 +18,7 @@ const showRecovery = async (title: string, message: string): Promise<void> => {
     await openExtensionPreferences();
   } catch {
     await confirmAlert({
-      message: "Open Raycast Settings, select Extensions > GlossaryGo, and choose a Glossary File manually.",
+      message: "Open Raycast Settings, select Extensions > GlossaryGo, and choose a Glossary Location manually.",
       primaryAction: { title: "OK" },
       title: "Could Not Open Preferences",
     });
@@ -34,7 +34,7 @@ export default async function Command(): Promise<void> {
   } catch {
     await showRecovery(
       "Could Not Reveal Glossary",
-      "Check the Glossary File path and folder permissions, or choose another file in Preferences.",
+      "Check the Glossary Location path and folder permissions, or choose another folder in Preferences.",
     );
     return;
   }
@@ -44,7 +44,7 @@ export default async function Command(): Promise<void> {
   } catch {
     await showRecovery(
       "Could Not Reveal Glossary",
-      "Check that the location is accessible in Finder and try again, or choose another file in Preferences.",
+      "Check that the location is accessible in Finder and try again, or choose another folder in Preferences.",
     );
     return;
   }
@@ -52,7 +52,7 @@ export default async function Command(): Promise<void> {
   if (revealPath !== glossaryFile) {
     await showRecovery(
       "Glossary File Is Missing",
-      "Revealed the nearest folder. Use Add Term after creating any missing custom folders, or choose a file in Preferences.",
+      "Revealed the nearest folder. Use Add Term to create the missing glossary, or choose a Glossary Location in Preferences.",
     );
   }
 }
