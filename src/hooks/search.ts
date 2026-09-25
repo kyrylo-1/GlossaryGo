@@ -1,4 +1,5 @@
-import { termStartsWith } from "../glossary/term-matching";
+import { getNormalizedTermName } from "../glossary/entry-identity";
+import { normalizeTermName, normalizedTermStartsWith } from "../glossary/term-matching";
 import type { Term } from "../utils/types";
 
 import { resolveRecentTerms } from "./recent-terms";
@@ -10,13 +11,15 @@ export type SearchResult = Readonly<{
 
 type IndexedTerm = Readonly<{
   key: string;
+  normalizedTerm: string;
   term: Term;
 }>;
 
 export type PreparedTermsForSearch = Readonly<{
   alphabetical: readonly Term[];
   asciiPrefixIndex: readonly IndexedTerm[] | null;
-  nonAsciiTerms: readonly Term[];
+  nonAsciiTerms: readonly IndexedTerm[];
+  normalizedTerms: readonly IndexedTerm[];
   terms: readonly Term[];
 }>;
 
@@ -27,7 +30,6 @@ export const PREPARED_PREFIX_SEARCH_THRESHOLD = 500;
 const lowerBound = (entries: readonly IndexedTerm[], key: string): number => {
   let start = 0;
   let end = entries.length;
-
   while (start < end) {
     const middle = Math.floor((start + end) / 2);
     if (entries[middle].key < key) {
@@ -36,7 +38,6 @@ const lowerBound = (entries: readonly IndexedTerm[], key: string): number => {
       end = middle;
     }
   }
-
   return start;
 };
 
@@ -49,31 +50,33 @@ const buildSearchResult = (
   const recent = query.length === 0 ? resolveRecentTerms(history, terms) : [];
   const recentEntries = new Set(recent);
   const matches = [...recent, ...alphabetical.filter((entry) => !recentEntries.has(entry))];
-
-  return Object.freeze({
-    terms: Object.freeze(matches),
-    totalMatchCount: matches.length,
-  });
+  return Object.freeze({ terms: Object.freeze(matches), totalMatchCount: matches.length });
 };
 
 export const prepareTermsForSearch = (terms: readonly Term[]): PreparedTermsForSearch => {
   const alphabetical = terms.toSorted((left, right) => termCollator.compare(left.term, right.term));
+  const normalizedTerms = terms.map((term) => ({
+    key: "",
+    normalizedTerm: getNormalizedTermName(term),
+    term,
+  }));
   if (terms.length <= PREPARED_PREFIX_SEARCH_THRESHOLD) {
     return Object.freeze({
       alphabetical: Object.freeze(alphabetical),
       asciiPrefixIndex: null,
-      nonAsciiTerms: [],
+      nonAsciiTerms: Object.freeze(normalizedTerms),
+      normalizedTerms: Object.freeze(normalizedTerms),
       terms,
     });
   }
 
   const asciiPrefixIndex: IndexedTerm[] = [];
-  const nonAsciiTerms: Term[] = [];
-  for (const term of terms) {
-    if (ASCII_ONLY.test(term.term)) {
-      asciiPrefixIndex.push({ key: term.term.toLowerCase(), term });
+  const nonAsciiTerms: IndexedTerm[] = [];
+  for (const entry of normalizedTerms) {
+    if (ASCII_ONLY.test(entry.normalizedTerm)) {
+      asciiPrefixIndex.push({ ...entry, key: entry.normalizedTerm.toLowerCase() });
     } else {
-      nonAsciiTerms.push(term);
+      nonAsciiTerms.push(entry);
     }
   }
   asciiPrefixIndex.sort((left, right) => {
@@ -82,21 +85,23 @@ export const prepareTermsForSearch = (terms: readonly Term[]): PreparedTermsForS
     }
     return left.key < right.key ? -1 : 1;
   });
-
   return Object.freeze({
     alphabetical: Object.freeze(alphabetical),
     asciiPrefixIndex: Object.freeze(asciiPrefixIndex),
     nonAsciiTerms: Object.freeze(nonAsciiTerms),
+    normalizedTerms: Object.freeze(normalizedTerms),
     terms,
   });
 };
 
-const findPreparedPrefixMatches = (prepared: PreparedTermsForSearch, query: string): readonly Term[] => {
-  if (!prepared.asciiPrefixIndex || !ASCII_ONLY.test(query)) {
-    return prepared.terms.filter(({ term }) => termStartsWith(term, query));
+const findPreparedPrefixMatches = (prepared: PreparedTermsForSearch, normalizedQuery: string): readonly Term[] => {
+  if (!prepared.asciiPrefixIndex || !ASCII_ONLY.test(normalizedQuery)) {
+    return prepared.normalizedTerms
+      .filter(({ normalizedTerm }) => normalizedTermStartsWith(normalizedTerm, normalizedQuery))
+      .map(({ term }) => term);
   }
 
-  const lowercaseQuery = query.toLowerCase();
+  const lowercaseQuery = normalizedQuery.toLowerCase();
   const matches: Term[] = [];
   for (
     let index = lowerBound(prepared.asciiPrefixIndex, lowercaseQuery);
@@ -107,11 +112,16 @@ const findPreparedPrefixMatches = (prepared: PreparedTermsForSearch, query: stri
     if (!candidate.key.startsWith(lowercaseQuery)) {
       break;
     }
-    if (termStartsWith(candidate.term.term, query)) {
+    if (normalizedTermStartsWith(candidate.normalizedTerm, normalizedQuery)) {
       matches.push(candidate.term);
     }
   }
-  return [...matches, ...prepared.nonAsciiTerms.filter(({ term }) => termStartsWith(term, query))];
+  return [
+    ...matches,
+    ...prepared.nonAsciiTerms
+      .filter(({ normalizedTerm }) => normalizedTermStartsWith(normalizedTerm, normalizedQuery))
+      .map(({ term }) => term),
+  ];
 };
 
 export const searchPreparedTerms = (
@@ -119,22 +129,20 @@ export const searchPreparedTerms = (
   query: string,
   history: readonly Term[] = [],
 ): SearchResult => {
-  const normalizedQuery = query.trim();
+  const normalizedQuery = normalizeTermName(query.trim());
   if (normalizedQuery.length === 0) {
     return buildSearchResult(prepared.terms, prepared.alphabetical, normalizedQuery, history);
   }
   const alphabetical = findPreparedPrefixMatches(prepared, normalizedQuery).toSorted((left, right) =>
     termCollator.compare(left.term, right.term),
   );
-
   return buildSearchResult(prepared.terms, alphabetical, normalizedQuery, history);
 };
 
 export const searchTerms = (terms: readonly Term[], query: string, history: readonly Term[] = []): SearchResult => {
-  const normalizedQuery = query.trim();
+  const normalizedQuery = normalizeTermName(query.trim());
   const alphabetical = terms
-    .filter(({ term }) => termStartsWith(term, normalizedQuery))
+    .filter((entry) => normalizedTermStartsWith(getNormalizedTermName(entry), normalizedQuery))
     .sort((left, right) => termCollator.compare(left.term, right.term));
-
   return buildSearchResult(terms, alphabetical, normalizedQuery, history);
 };
