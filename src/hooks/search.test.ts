@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { Term } from "../utils/types";
-import { searchTerms } from "./search";
+import { prepareTermsForSearch, searchPreparedTerms, searchTerms } from "./search";
 
 const term = (name: string, definition = `${name} definition`): Term => {
   return { definition, term: name };
@@ -119,4 +119,37 @@ test("keeps every sibling visible when an identical entry is recent", () => {
   expect(result.totalMatchCount).toBe(3);
   expect(result.terms[0]).toBe(second);
   expect(result.terms.filter((entry) => entry.term === "API")).toHaveLength(2);
+});
+
+describe("prepared search parity", () => {
+  const asciiTerms = (count: number): readonly Term[] => {
+    return Array.from({ length: count }, (_, index) => {
+      const padded = index.toString().padStart(3, "0");
+      let name = `Zulu-${padded}`;
+      if (index % 3 === 0) {
+        name = `Architecture-${padded}`;
+      } else if (index % 3 === 1) {
+        name = `API-${padded}`;
+      }
+      return term(name, `Synthetic definition ${padded}`);
+    });
+  };
+
+  test.each([499, 500, 501])("keeps prefix results identical at %i loaded ASCII terms", (count) => {
+    const terms = asciiTerms(count);
+    const prepared = prepareTermsForSearch(terms);
+
+    for (const query of [" ", "a", "api-", "architecture-4", "no-match"]) {
+      expect(searchPreparedTerms(prepared, query)).toEqual(searchTerms(terms, query));
+    }
+  });
+
+  test("keeps ICU Unicode matching and ordering when a large glossary contains a non-ASCII name", () => {
+    const terms = [...asciiTerms(499), term("éclair", "NFC"), term("e\u0301clair", "NFD")];
+    const prepared = prepareTermsForSearch(terms);
+
+    for (const query of ["e", "é", "e\u0301c", "ÉC"]) {
+      expect(searchPreparedTerms(prepared, query)).toEqual(searchTerms(terms, query));
+    }
+  });
 });
