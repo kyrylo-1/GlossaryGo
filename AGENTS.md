@@ -32,11 +32,14 @@ PRs explain problem, resulting behavior, validation; link issues and include scr
 
 ## Privacy and agent rules
 
-Keep glossary content local and in memory. Only permitted persistence: explicit Add Term, Edit Term, or Delete Term
-through glossary save service to effective Glossary File. Target `glossary.yaml` inside the user-selected Glossary
-Location when configured; preserve a legacy user-selected `.yaml` file preference; otherwise target `glossary.yaml`
-under Raycast's `environment.supportPath`. Never persist content elsewhere, log it, or transmit it. Use synthetic test
-data.
+Keep glossary content local and in memory for every command except Ask Glossary. Only after an explicit question and
+in-session disclosure confirmation, Ask Glossary may send the question and complete decoded term/definition context
+within its limit to Raycast AI with static grounding instructions. Refuse over-limit context in full; exclude paths,
+YAML source, comments, and metadata. Persist, log, and cache none of the question, answer, or context.
+Only permitted glossary persistence: explicit Add Term, Edit Term, or Delete Term through the glossary save service to
+the effective Glossary File: `glossary.yaml` inside the user-selected Glossary Location, preserving a legacy
+user-selected `.yaml` file preference, otherwise `glossary.yaml` under Raycast's `environment.supportPath`.
+Use synthetic test data.
 
 Preserve unrelated worktree changes. DSG hook blocks file deletion: provide deletion commands instead.
 When committing, delegate creation to separate Luna agent with low reasoning.

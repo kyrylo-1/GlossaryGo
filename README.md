@@ -170,17 +170,55 @@ file, recheck selected file, then replace after write completes. Same-path saves
 Checks reduce overwrites but do not provide atomic compare-and-swap against external editors/processes or guarantee
 crash durability on every filesystem. Avoid external edits during saves.
 
+## Asking the glossary
+
+**Ask Glossary** requires Raycast AI access. Both its **Question** form and **Send to Raycast AI?** confirmation explain:
+
+> If processing proceeds, your question and every term and definition in the Glossary are sent to Raycast AI. Glossaries
+> over the 32 KiB context limit are refused and not sent.
+
+Opening the command and typing send nothing. The first non-empty submission in each command session asks for
+confirmation. Choose **Send to Raycast AI** to continue or **Cancel** to return without sending. Confirmation applies
+only to that open command session.
+
+After confirmation, question validation, and an AI-access check, Ask Glossary resolves and loads the current effective
+Glossary File for each submission, including retries. Opening, typing, cancelling disclosure, and unavailable AI access
+do not resolve or load the file. Ask Glossary sends the trimmed
+question with the complete decoded term-and-definition context, plus static grounding instructions, in one Raycast AI
+request. It does not send file paths, YAML source, comments, preferences, or file metadata. The trimmed question is
+limited to 2,000 JavaScript characters. The serialized context is limited to 32 KiB measured as UTF-8 bytes; when the complete
+context exceeds that limit, Ask Glossary refuses the request rather than truncating, selecting, or summarizing terms.
+An empty Glossary is reported locally without an AI request.
+
+Answers are grounded in the supplied Glossary: they should name exact supporting terms or say when the Glossary
+lacks sufficient information. After a failure, **Edit Question** restores exactly what you submitted so you can correct
+an overlong question or retry after a file, access, or AI failure. Submitting again makes a new attempt without repeating
+disclosure in the same open session. **Ask Another Question** explicitly starts a blank question form, including after
+a failure. Questions, answers, and disclosure acknowledgement remain in command memory only and are not persisted.
+
+Search Term, Add Term, Quick Add Term, Edit Term, Delete Term, Copy, Reload Glossary, and Reveal Glossary in Finder
+retain their existing local-only behavior. Explicit copy actions place the selected value on the clipboard, and Reveal
+opens the effective file or its nearest existing folder in Finder; Ask Glossary's AI request is the explicit exception
+that transmits the question and bounded decoded Glossary context to Raycast AI.
+
 ## Testing
 
 See [Testing GlossaryGo](TESTING.md) for Raycast setup, automated checks, manual acceptance plan.
 
 ## Privacy
 
-Only effective Glossary File is read. Existing content, form input, inline arguments stay on device, in memory while
-command is open. Explicit valid first Add may create file; later changes use restricted sibling temporary copy.
-Normal failures remove files created by failed operation. Crash or cleanup failure may leave incomplete first file or
-temporary copy for manual recovery. No other content persistence, logging, network transmission, or telemetry.
-Explicit copy to clipboard is only way content leaves command.
+Commands read only the effective Glossary File. Existing content, form input, and inline arguments stay on device and
+in memory while the command is open, except when a user explicitly submits a question to Ask Glossary after its
+disclosure confirmation. That single Raycast AI request contains the question and complete decoded term-and-definition
+context within the 32 KiB UTF-8 limit, plus static grounding instructions. Oversized context is refused in full. Ask
+Glossary does not persist questions, answers, or acknowledgement; it does not write the Glossary File, cache/history,
+logs, or telemetry.
+
+Search, Add, Edit, Delete, Copy, Reload, and Reveal do not send Glossary content over a network. Explicit valid first
+Add may create the effective file; later changes use a restricted sibling temporary copy. Normal failures remove files
+created by the failed operation. A crash or cleanup failure may leave an incomplete first file or temporary copy for
+manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
+in Finder.
 
 ## Troubleshooting
 

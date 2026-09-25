@@ -23,6 +23,12 @@
       "mode": "view"
     },
     {
+      "name": "ask-glossary",
+      "title": "Ask Glossary",
+      "description": "Ask questions grounded in your local glossary using Raycast AI",
+      "mode": "view"
+    },
+    {
       "name": "add-term",
       "title": "Add Term",
       "description": "Add a term and definition to your local glossary",
