@@ -1,8 +1,12 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { searchTerms } from "../hooks/search";
 import { applyGlossaryChange } from "./apply-glossary-change";
 import { parseGlossarySource } from "./glossary";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("Term canonical equivalence across parsing, mutation, and search", () => {
   test("treats NFC and NFD spellings as canonically equivalent", () => {
@@ -21,6 +25,29 @@ describe("Term canonical equivalence across parsing, mutation, and search", () =
       terms: [{ definition: "NFC", term: "café" }],
       totalMatchCount: 1,
     });
+  });
+
+  test("normalizes each mixed-Unicode name once while retaining independent sibling search results", () => {
+    const normalize = String.prototype.normalize;
+    const normalizeSpy = vi.spyOn(String.prototype, "normalize").mockImplementation(function (form?: string): string {
+      return normalize.call(this, form);
+    });
+    const source =
+      "terms:\n  - term: café\n    definition: NFC\n  - term: cafe\u0301\n    definition: NFD\n  - term: résumé\n    definition: Accent\n";
+
+    const terms = parseGlossarySource(source);
+    const result = searchTerms(terms, "cafe\u0301");
+
+    expect(terms).toEqual([
+      { definition: "NFC", term: "café" },
+      { definition: "NFD", term: "cafe\u0301" },
+      { definition: "Accent", term: "résumé" },
+    ]);
+    expect(result.terms).toEqual([
+      { definition: "NFC", term: "café" },
+      { definition: "NFD", term: "cafe\u0301" },
+    ]);
+    expect(normalizeSpy).toHaveBeenCalledTimes(terms.length + 1);
   });
 });
 

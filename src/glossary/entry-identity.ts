@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 
-import { areTermsEquivalent } from "./term-matching";
+import { areNormalizedTermsEquivalent, normalizeTermName } from "./term-matching";
 import type { Term } from "../utils/types";
 
 type EntryIdentity = Readonly<{
   id: string;
   index: number;
+  normalizedTerm: string;
   source: string;
   equivalentCount: number;
   identicalCount: number;
@@ -18,11 +19,14 @@ export const captureEntryIdentities = (source: string, terms: readonly Term[]): 
   const fingerprint = createHash("sha256").update(source).digest("hex");
   const collator = new Intl.Collator("und", { sensitivity: "accent", usage: "search" });
   const ordered = terms
-    .map((entry, index) => ({ entry, index }))
-    .sort((left, right) => collator.compare(left.entry.term.normalize("NFC"), right.entry.term.normalize("NFC")));
+    .map((entry, index) => ({ entry, index, normalizedTerm: normalizeTermName(entry.term) }))
+    .sort((left, right) => collator.compare(left.normalizedTerm, right.normalizedTerm));
   for (let start = 0; start < ordered.length;) {
     let end = start + 1;
-    while (end < ordered.length && areTermsEquivalent(ordered[start].entry.term, ordered[end].entry.term)) {
+    while (
+      end < ordered.length &&
+      areNormalizedTermsEquivalent(ordered[start].normalizedTerm, ordered[end].normalizedTerm)
+    ) {
       end += 1;
     }
     const group = ordered.slice(start, end);
@@ -30,7 +34,7 @@ export const captureEntryIdentities = (source: string, terms: readonly Term[]): 
     for (const { entry } of group) {
       definitionCounts.set(entry.definition, (definitionCounts.get(entry.definition) ?? 0) + 1);
     }
-    for (const { entry, index } of group) {
+    for (const { entry, index, normalizedTerm } of group) {
       identities.set(
         entry,
         Object.freeze({
@@ -38,6 +42,7 @@ export const captureEntryIdentities = (source: string, terms: readonly Term[]): 
           id: `${fingerprint}:${index}`,
           identicalCount: definitionCounts.get(entry.definition) ?? 0,
           index,
+          normalizedTerm,
           source,
         }),
       );
@@ -47,6 +52,10 @@ export const captureEntryIdentities = (source: string, terms: readonly Term[]): 
 };
 
 export const getEntryIdentity = (entry: Term): EntryIdentity | undefined => identities.get(entry);
+
+export const getNormalizedTermName = (entry: Term): string => {
+  return identities.get(entry)?.normalizedTerm ?? normalizeTermName(entry.term);
+};
 
 export const resolveSelectedIndex = (source: string, terms: readonly Term[], original: Term): number => {
   const identity = identities.get(original);
