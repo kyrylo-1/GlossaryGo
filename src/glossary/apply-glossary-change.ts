@@ -27,48 +27,492 @@ const sortTermsSequence = (sequence: YAMLSeq, terms: readonly Term[]): void => {
     .map(({ node }) => node);
 };
 
+const countInterstitialBlankLines = (source: string): number => {
+  const lines = source.split(/\r\n|\r|\n/);
+  return lines.slice(0, -1).filter((line) => /^[\t ]*$/.test(line)).length;
+};
+
+const countEmbeddedCommentBlankLines = (commentBefore: string): number =>
+  countInterstitialBlankLines(commentBefore) + (/(?:\r\n|\r|\n)[\t ]*$/.test(commentBefore) ? 1 : 0);
+
+const isBlankOnly = (source: string): boolean => source.length > 0 && /^[\t \r\n]*$/.test(source);
+
+type FlowEntry = NonNullable<YAMLSeq["items"][number]>;
+type FlowMarker = Readonly<{
+  owner: FlowEntry;
+  suffix: string;
+}>;
+type FlowSourceMetadata = Readonly<{
+  markers: readonly FlowMarker[];
+  zeroGapStandaloneTail: boolean;
+}>;
+
+const normalizeTerminalInlineFlowComment = (source: string, sequence: YAMLSeq): FlowMarker | undefined => {
+  const lastEntry = sequence.items.at(-1);
+  const lastEntryValueEnd = lastEntry?.range?.[1];
+  const lastEntryEnd = lastEntry?.range?.[2];
+  const sequenceEnd = sequence.range?.[2];
+  if (
+    !lastEntry ||
+    typeof lastEntryValueEnd !== "number" ||
+    typeof lastEntryEnd !== "number" ||
+    typeof sequenceEnd !== "number"
+  ) {
+    return;
+  }
+  const trailingLines = source.slice(lastEntryEnd, sequenceEnd).split(/\r\n|\r|\n/);
+  const inlineComment = trailingLines[0].match(/^[\t ]*,[\t ]*#([\t ]*)$/);
+  if (inlineComment) {
+    sequence.comment = (sequence.comment ?? "")
+      .split(/\r\n|\r|\n/)
+      .slice(1)
+      .join("\n");
+    if (typeof lastEntry.comment === "string") {
+      return { owner: lastEntry, suffix: inlineComment[1] };
+    }
+    lastEntry.comment = inlineComment[1].length > 0 ? inlineComment[1] : " ";
+    return;
+  }
+
+  const valueTrailingLines = source.slice(lastEntryValueEnd, sequenceEnd).split(/\r\n|\r|\n/);
+  const noCommaInlineComment = valueTrailingLines[0].match(/^[\t ]*#(.*)$/);
+  if (noCommaInlineComment && typeof lastEntry.comment === "string") {
+    const commentLines = lastEntry.comment.split(/\r\n|\r|\n/);
+    lastEntry.comment = noCommaInlineComment[1].length > 0 ? noCommaInlineComment[1] : " ";
+    const trailingItemComment = commentLines.slice(1).join("\n");
+    if (trailingItemComment.length > 0) {
+      sequence.comment =
+        typeof sequence.comment === "string" ? `${trailingItemComment}\n${sequence.comment}` : trailingItemComment;
+    }
+  }
+};
+
+const preserveStandaloneSequenceCommentGap = (source: string, sequence: YAMLSeq): boolean => {
+  const sequenceValueEnd = sequence.range?.[1];
+  const sequenceEnd = sequence.range?.[2];
+  if (typeof sequenceEnd === "number" && /^[\t ]*#/.test(source.slice(sequenceEnd))) {
+    return true;
+  }
+  if (typeof sequence.comment !== "string" || typeof sequenceValueEnd !== "number" || typeof sequenceEnd !== "number") {
+    return false;
+  }
+  const trailingSource = source.slice(sequenceValueEnd, sequenceEnd);
+  const leadingLines = trailingSource.match(/^((?:[\t ]*(?:\r\n|\r|\n))+)[\t ]*#/);
+  if (!leadingLines) {
+    return false;
+  }
+  const lineBreakCount = leadingLines[1].match(/\r\n|\r|\n/g)?.length ?? 0;
+  const blankLineCount = Math.max(0, lineBreakCount - 1);
+  if (blankLineCount > 0 && !sequence.comment.startsWith("\n")) {
+    sequence.comment = `${"\n".repeat(blankLineCount)}${sequence.comment}`;
+  }
+  return blankLineCount === 0;
+};
+
+const normalizeFlowBoundaryMarker = (source: string, previous: FlowEntry, entry: FlowEntry): FlowMarker | undefined => {
+  const previousValueEnd = previous.range?.[1];
+  const previousEnd = previous.range?.[2];
+  const entryStart = entry.range?.[0];
+  if (typeof previousEnd !== "number" || typeof entryStart !== "number") {
+    return;
+  }
+  const interstitialLines = source.slice(previousEnd, entryStart).split(/\r\n|\r|\n/);
+  const marker = interstitialLines[0].match(/^[\t ]*,[\t ]*#([\t ]*)$/);
+  if (!marker) {
+    return;
+  }
+  if (typeof previous.comment !== "string") {
+    previous.comment = marker[1].length > 0 ? marker[1] : " ";
+    const firstAttachedCommentIndex = interstitialLines.slice(0, -1).findIndex((line) => /^[\t ]*#/.test(line));
+    const commentBeforeLines = (entry.commentBefore ?? "").split(/\r\n|\r|\n/);
+    entry.commentBefore =
+      firstAttachedCommentIndex === -1 ? "" : commentBeforeLines.slice(firstAttachedCommentIndex).join("\n");
+    return;
+  }
+  if (typeof previousValueEnd !== "number") {
+    return;
+  }
+  const previousLineEnd = source.indexOf("\n", previousValueEnd);
+  const previousLineSuffix = source
+    .slice(previousValueEnd, previousLineEnd === -1 ? source.length : previousLineEnd)
+    .replace(/\r$/, "");
+  if (/^[\t ]*,[\t ]*#[\t ]*$/.test(previousLineSuffix)) {
+    const hasStandaloneComment = interstitialLines.slice(1, -1).some((line) => /^[\t ]*#/.test(line));
+    if (!hasStandaloneComment && isBlankOnly(entry.commentBefore ?? "")) {
+      entry.commentBefore = "";
+    }
+    return;
+  }
+  const commentLines = previous.comment.split(/\r\n|\r|\n/);
+  if (commentLines.length > 1) {
+    previous.comment = commentLines.slice(0, -1).join("\n");
+  } else if (isBlankOnly(entry.commentBefore ?? "")) {
+    entry.commentBefore = "";
+  }
+  return { owner: previous, suffix: marker[1] };
+};
+
+const normalizeBareInlineFlowComments = (source: string, sequence: YAMLSeq): FlowSourceMetadata => {
+  if (sequence.flow !== true) {
+    return { markers: [], zeroGapStandaloneTail: false };
+  }
+  const markers: FlowMarker[] = [];
+  for (let index = 1; index < sequence.items.length; index += 1) {
+    const previous = sequence.items[index - 1];
+    const entry = sequence.items[index];
+    const marker = previous && entry ? normalizeFlowBoundaryMarker(source, previous, entry) : null;
+    if (marker) {
+      markers.push(marker);
+    }
+  }
+  const terminalFlowMarker = normalizeTerminalInlineFlowComment(source, sequence);
+  if (terminalFlowMarker) {
+    markers.push(terminalFlowMarker);
+  }
+  return {
+    markers,
+    zeroGapStandaloneTail: preserveStandaloneSequenceCommentGap(source, sequence),
+  };
+};
+
+const getGapInsertionOffset = (interstitial: string, previousEnd: number): number => {
+  const firstLineBreak = interstitial.match(/\r\n|\r|\n/);
+  return typeof firstLineBreak?.index === "number"
+    ? previousEnd + firstLineBreak.index + firstLineBreak[0].length
+    : previousEnd;
+};
+
+type GapInsertion = Readonly<{ count: number; offset: number }>;
+type EntryGap = Readonly<{
+  embeddedCommentBlankLines: number;
+  externalBlankLines: number;
+  hasAttachedCommentMarker: boolean;
+}>;
+
+const EMPTY_ENTRY_GAP: EntryGap = {
+  embeddedCommentBlankLines: 0,
+  externalBlankLines: 0,
+  hasAttachedCommentMarker: false,
+};
+
+const measureEntryGap = (
+  source: string,
+  sequence: YAMLSeq,
+  index: number,
+  precedingOwnerMarker = false,
+): EntryGap | undefined => {
+  const previous = sequence.items[index - 1];
+  const entry = sequence.items[index];
+  const previousEnd = previous?.range?.[2];
+  const entryStart = entry?.range?.[0];
+  if (!previous || !entry || typeof previousEnd !== "number" || typeof entryStart !== "number") {
+    return;
+  }
+
+  const interstitial = source.slice(previousEnd, entryStart);
+  const interstitialLines = interstitial.split(/\r\n|\r|\n/).slice(0, -1);
+  const entryOwnedLines = precedingOwnerMarker ? interstitialLines.slice(1) : interstitialLines;
+  const firstAttachedCommentIndex = entryOwnedLines.findIndex((line) => /^[\t ]*#/.test(line));
+  const hasAttachedCommentMarker = firstAttachedCommentIndex !== -1;
+  const totalBlankLines = countInterstitialBlankLines(interstitial);
+  const externalBlankLines = hasAttachedCommentMarker
+    ? entryOwnedLines.slice(0, firstAttachedCommentIndex).filter((line) => /^[\t ]*$/.test(line)).length
+    : totalBlankLines;
+  return {
+    embeddedCommentBlankLines: totalBlankLines - externalBlankLines,
+    externalBlankLines,
+    hasAttachedCommentMarker,
+  };
+};
+
+const insertGapLines = (source: string, insertions: readonly GapInsertion[]): string => {
+  const parts: string[] = [];
+  let sourceOffset = 0;
+  for (const insertion of insertions) {
+    parts.push(source.slice(sourceOffset, insertion.offset), "\n".repeat(insertion.count));
+    sourceOffset = insertion.offset;
+  }
+  parts.push(source.slice(sourceOffset));
+  return parts.join("");
+};
+
+const captureEntryGaps = (
+  source: string,
+  sequence: YAMLSeq,
+  flowMarkers: readonly FlowMarker[],
+): Map<object, EntryGap> => {
+  const gaps = new Map<object, EntryGap>();
+  const markerOwners = new Set(flowMarkers.map(({ owner }) => owner));
+  for (let index = 1; index < sequence.items.length; index += 1) {
+    const entry = sequence.items[index];
+    const previous = sequence.items[index - 1];
+    const gap = measureEntryGap(source, sequence, index, Boolean(previous && markerOwners.has(previous)));
+    if (entry && gap) {
+      gaps.set(entry, gap);
+    }
+  }
+  return gaps;
+};
+
+const separateTerms = (sequence: YAMLSeq, originalEntryGaps: ReadonlyMap<object, EntryGap>): readonly EntryGap[] => {
+  const firstEntry = sequence.items[0];
+  const firstEntryGap = firstEntry && originalEntryGaps.get(firstEntry);
+  const displacedFirstExternalGap = firstEntryGap?.externalBlankLines ?? 0;
+  if (firstEntry && firstEntryGap) {
+    firstEntry.spaceBefore = false;
+    if (
+      sequence.flow === true &&
+      !firstEntryGap.hasAttachedCommentMarker &&
+      isBlankOnly(firstEntry.commentBefore ?? "")
+    ) {
+      firstEntry.commentBefore = "";
+    }
+  }
+  const requiredEntryGaps: EntryGap[] = [];
+  for (const [index, entry] of sequence.items.slice(1).entries()) {
+    if (entry) {
+      const originalGap = originalEntryGaps.get(entry) ?? {
+        ...EMPTY_ENTRY_GAP,
+        embeddedCommentBlankLines: countEmbeddedCommentBlankLines(entry.commentBefore ?? ""),
+        hasAttachedCommentMarker: typeof entry.commentBefore === "string",
+      };
+      const preservedExternalGap = Math.max(
+        originalGap.externalBlankLines,
+        index === 0 ? displacedFirstExternalGap : 0,
+      );
+      const requiredExternalGap =
+        preservedExternalGap === 0 && originalGap.embeddedCommentBlankLines === 0 ? 1 : preservedExternalGap;
+      entry.spaceBefore = requiredExternalGap > 0;
+      requiredEntryGaps.push({
+        embeddedCommentBlankLines: originalGap.embeddedCommentBlankLines,
+        externalBlankLines: requiredExternalGap,
+        hasAttachedCommentMarker: originalGap.hasAttachedCommentMarker,
+      });
+    }
+  }
+  return requiredEntryGaps;
+};
+
+const restoreLargerEntryGaps = (source: string, requiredEntryGaps: readonly EntryGap[]): string => {
+  if (requiredEntryGaps.every(({ externalBlankLines }) => externalBlankLines <= 1)) {
+    return source;
+  }
+  const { document } = parseValidatedGlossarySource(source);
+  const sequence = document.get("terms", true);
+  if (!isSeq(sequence)) {
+    throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
+  }
+  normalizeBareInlineFlowComments(source, sequence);
+
+  const insertions: GapInsertion[] = [];
+  for (let index = 1; index < sequence.items.length; index += 1) {
+    const previous = sequence.items[index - 1];
+    const entry = sequence.items[index];
+    const previousEnd = previous?.range?.[2];
+    const entryStart = entry?.range?.[0];
+    if (typeof previousEnd === "number" && typeof entryStart === "number") {
+      const interstitial = source.slice(previousEnd, entryStart);
+      const actualExternalBlankLines = measureEntryGap(source, sequence, index)?.externalBlankLines ?? 0;
+      const missingGapCount = requiredEntryGaps[index - 1].externalBlankLines - actualExternalBlankLines;
+      if (missingGapCount > 0) {
+        insertions.push({ count: missingGapCount, offset: getGapInsertionOffset(interstitial, previousEnd) });
+      }
+    }
+  }
+  return insertGapLines(source, insertions);
+};
+
+type FlowMarkerPlacement = Readonly<{ ownerIndex: number; suffix: string }>;
+type SourceEdit = Readonly<{ end: number; start: number; text: string }>;
+
+const applySourceEdits = (source: string, edits: readonly SourceEdit[]): string => {
+  const parts: string[] = [];
+  let sourceOffset = 0;
+  for (const edit of [...edits].sort((left, right) => left.start - right.start)) {
+    parts.push(source.slice(sourceOffset, edit.start), edit.text);
+    sourceOffset = edit.end;
+  }
+  parts.push(source.slice(sourceOffset));
+  return parts.join("");
+};
+
+const getNonterminalMarkerEdits = (
+  source: string,
+  ownerValueEnd: number,
+  markerLine: string,
+): readonly SourceEdit[] => {
+  const ownerLineEnd = source.indexOf("\n", ownerValueEnd);
+  const ownerLineSuffix = ownerLineEnd === -1 ? "" : source.slice(ownerValueEnd, ownerLineEnd);
+  const separatingComma = ownerLineSuffix.match(/^[\t ]*,(?=[\t ]*#)/);
+  if (ownerLineEnd === -1 || typeof separatingComma?.index !== "number") {
+    return [];
+  }
+  const commaOffset = ownerValueEnd + separatingComma.index + separatingComma[0].indexOf(",");
+  return [
+    { end: commaOffset + 1, start: commaOffset, text: "" },
+    { end: ownerLineEnd + 1, start: ownerLineEnd + 1, text: markerLine },
+  ];
+};
+
+const getFinalMarkerEdit = (source: string, sequence: YAMLSeq, markerLine: string): readonly SourceEdit[] => {
+  const sequenceValueEnd = sequence.range?.[1];
+  const closingOffset = typeof sequenceValueEnd === "number" ? source.lastIndexOf("]", sequenceValueEnd - 1) : -1;
+  const closingLineStart = closingOffset === -1 ? -1 : source.lastIndexOf("\n", closingOffset - 1) + 1;
+  return closingLineStart >= 0 && /^[\t ]*$/.test(source.slice(closingLineStart, closingOffset))
+    ? [{ end: closingLineStart, start: closingLineStart, text: markerLine }]
+    : [];
+};
+
+const getFlowMarkerEdits = (
+  source: string,
+  sequence: YAMLSeq,
+  placement: FlowMarkerPlacement,
+): readonly SourceEdit[] => {
+  const owner = sequence.items[placement.ownerIndex];
+  const ownerStart = owner?.range?.[0];
+  const ownerValueEnd = owner?.range?.[1];
+  if (!owner || typeof ownerStart !== "number" || typeof ownerValueEnd !== "number") {
+    return [];
+  }
+  const ownerLineStart = source.lastIndexOf("\n", ownerStart - 1) + 1;
+  const ownerIndent = source.slice(ownerLineStart, ownerStart);
+  if (!/^[\t ]*$/.test(ownerIndent)) {
+    return [];
+  }
+  const normalizedSuffix = placement.suffix === " " ? "" : placement.suffix;
+  const markerLine = `${ownerIndent}, #${normalizedSuffix}\n`;
+  return placement.ownerIndex < sequence.items.length - 1
+    ? getNonterminalMarkerEdits(source, ownerValueEnd, markerLine)
+    : getFinalMarkerEdit(source, sequence, markerLine);
+};
+
+const collectFlowMarkerEdits = (
+  source: string,
+  sequence: YAMLSeq,
+  placements: readonly FlowMarkerPlacement[],
+): readonly SourceEdit[] => placements.flatMap((placement) => getFlowMarkerEdits(source, sequence, placement));
+
+const restoreFlowMarkers = (source: string, placements: readonly FlowMarkerPlacement[]): string => {
+  if (placements.length === 0) {
+    return source;
+  }
+  const { document } = parseValidatedGlossarySource(source);
+  const sequence = document.get("terms", true);
+  if (!isSeq(sequence) || sequence.flow !== true) {
+    return source;
+  }
+  return applySourceEdits(source, collectFlowMarkerEdits(source, sequence, placements));
+};
+
+const restoreZeroGapStandaloneTail = (source: string, shouldRestore: boolean): string => {
+  if (!shouldRestore) {
+    return source;
+  }
+  const { document } = parseValidatedGlossarySource(source);
+  const sequence = document.get("terms", true);
+  const sequenceValueEnd = isSeq(sequence) ? sequence.range?.[1] : null;
+  const closingOffset = typeof sequenceValueEnd === "number" ? source.lastIndexOf("]", sequenceValueEnd - 1) : -1;
+  const trailingLines = closingOffset === -1 ? null : source.slice(closingOffset + 1).match(/^\n\n(?=[\t ]*#)/);
+  if (!trailingLines) {
+    return source;
+  }
+  return `${source.slice(0, closingOffset + 1)}${source.slice(closingOffset + 2)}`;
+};
+
+const transferDeletedEntryExternalGap = (
+  sequence: YAMLSeq,
+  index: number,
+  originalEntryGaps: Map<object, EntryGap>,
+): void => {
+  const removedEntry = sequence.items[index];
+  const followingEntry = sequence.items[index + 1];
+  if (index > 0 && removedEntry && followingEntry) {
+    const removedGap = originalEntryGaps.get(removedEntry) ?? EMPTY_ENTRY_GAP;
+    const followingGap = originalEntryGaps.get(followingEntry) ?? EMPTY_ENTRY_GAP;
+    originalEntryGaps.set(followingEntry, {
+      embeddedCommentBlankLines: followingGap.embeddedCommentBlankLines,
+      externalBlankLines: Math.max(removedGap.externalBlankLines, followingGap.externalBlankLines),
+      hasAttachedCommentMarker: followingGap.hasAttachedCommentMarker,
+    });
+  }
+};
+
+const applyExistingEntryChange = (
+  source: string,
+  terms: readonly Term[],
+  sequence: YAMLSeq,
+  change: Exclude<GlossaryChange, Readonly<{ term: Term; type: "add" }>>,
+  originalEntryGaps: Map<object, EntryGap>,
+): boolean => {
+  const index = resolveSelectedIndex(source, terms, change.original);
+  if (
+    index === -1 ||
+    terms[index].term !== change.original.term ||
+    terms[index].definition !== change.original.definition
+  ) {
+    throw new GlossaryError(
+      "stale-term",
+      "The selected term changed or was removed. Reload the glossary and try again.",
+    );
+  }
+  if (change.type === "delete") {
+    transferDeletedEntryExternalGap(sequence, index, originalEntryGaps);
+    sequence.delete(index);
+    return true;
+  }
+
+  const entry = sequence.items[index];
+  const normalizedTerm = normalizeTerm(change.term);
+  if (normalizedTerm.term === terms[index].term && normalizedTerm.definition === terms[index].definition) {
+    return false;
+  }
+  if (!isMap(entry)) {
+    throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
+  }
+  const termScalar = entry.get("term", true);
+  const definitionScalar = entry.get("definition", true);
+  if (!isScalar(termScalar) || !isScalar(definitionScalar)) {
+    throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
+  }
+  termScalar.value = normalizedTerm.term;
+  definitionScalar.value = normalizedTerm.definition;
+  return true;
+};
+
 export const applyGlossaryChange = (source: string, change: GlossaryChange): string => {
   const { document, terms } = parseValidatedGlossarySource(source);
   const sequence = document.get("terms", true);
   if (!isSeq(sequence)) {
     throw new GlossaryError("invalid-schema", "The glossary terms field must be a sequence.");
   }
+  const flowSourceMetadata = normalizeBareInlineFlowComments(source, sequence);
+  const originalEntryGaps = captureEntryGaps(source, sequence, flowSourceMetadata.markers);
 
   if (change.type === "add") {
     const term = normalizeTerm(change.term);
     document.addIn(["terms"], document.createNode(term));
     sortTermsSequence(sequence, [...terms, term]);
   } else {
-    const index = resolveSelectedIndex(source, terms, change.original);
-    if (
-      index === -1 ||
-      terms[index].term !== change.original.term ||
-      terms[index].definition !== change.original.definition
-    ) {
-      throw new GlossaryError(
-        "stale-term",
-        "The selected term changed or was removed. Reload the glossary and try again.",
-      );
-    }
-    if (change.type === "delete") {
-      sequence.delete(index);
-    } else {
-      const entry = sequence.items[index];
-      const normalizedTerm = normalizeTerm(change.term);
-      if (!isMap(entry)) {
-        throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
-      }
-      const termScalar = entry.get("term", true);
-      const definitionScalar = entry.get("definition", true);
-      if (!isScalar(termScalar) || !isScalar(definitionScalar)) {
-        throw new GlossaryError("invalid-schema", "The selected term must have string fields.");
-      }
-      termScalar.value = normalizedTerm.term;
-      definitionScalar.value = normalizedTerm.definition;
+    const changed = applyExistingEntryChange(source, terms, sequence, change, originalEntryGaps);
+    if (!changed) {
+      return source;
     }
   }
 
-  const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${document.toString()}`;
+  const requiredEntryGaps = separateTerms(sequence, originalEntryGaps);
+  const ownerIndexes = new Map<FlowEntry, number>();
+  for (const [index, entry] of sequence.items.entries()) {
+    if (entry) {
+      ownerIndexes.set(entry, index);
+    }
+  }
+  const flowMarkerPlacements = flowSourceMetadata.markers
+    .map(({ owner, suffix }) => ({ ownerIndex: ownerIndexes.get(owner) ?? -1, suffix }))
+    .filter(({ ownerIndex }) => ownerIndex >= 0);
+  const gapRestoredSource = restoreLargerEntryGaps(document.toString(), requiredEntryGaps);
+  const markerRestoredSource = restoreFlowMarkers(gapRestoredSource, flowMarkerPlacements);
+  const serializedSource = restoreZeroGapStandaloneTail(markerRestoredSource, flowSourceMetadata.zeroGapStandaloneTail);
+  const nextSource = `${source.startsWith("\uFEFF") ? "\uFEFF" : ""}${serializedSource}`;
   if (Buffer.byteLength(nextSource, "utf8") > MAXIMUM_GLOSSARY_BYTES) {
     throw new GlossaryError("too-large", "The glossary file is larger than 5 MiB.");
   }

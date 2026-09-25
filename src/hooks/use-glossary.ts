@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch } fr
 import type { Term } from "../utils/types";
 import { GlossaryError, loadGlossary } from "../glossary/glossary";
 import type { GlossaryTarget } from "../glossary/glossary-target";
-import { searchTerms, type SearchResult } from "./search";
+import { prepareTermsForSearch, searchPreparedTerms, type PreparedTermsForSearch, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState, type GlossaryAction } from "./glossary-reducer";
 
 export type { CommandState } from "./glossary-reducer";
@@ -75,20 +75,21 @@ export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget
   const reload = useGlossaryReload(glossaryFile, dispatch);
   const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
   const recordTerm = useCallback((term: Term) => dispatch({ term, type: "termUsed" }), []);
+  const preparedTerms: PreparedTermsForSearch | null = useMemo(
+    () => (model.state.status === "ready" ? prepareTermsForSearch(model.state.terms) : null),
+    [model.state],
+  );
   const hasTypedQuery = model.query.trim().length > 0;
   const typedResult = useMemo(
-    () =>
-      model.state.status === "ready" && hasTypedQuery
-        ? searchTerms(model.state.terms, model.query)
-        : EMPTY_SEARCH_RESULT,
-    [hasTypedQuery, model.query, model.state],
+    () => (preparedTerms && hasTypedQuery ? searchPreparedTerms(preparedTerms, model.query) : EMPTY_SEARCH_RESULT),
+    [hasTypedQuery, model.query, preparedTerms],
   );
   const blankQueryResult = useMemo(
     () =>
-      model.state.status === "ready" && !hasTypedQuery
-        ? searchTerms(model.state.terms, model.query, model.recentTerms)
+      preparedTerms && !hasTypedQuery
+        ? searchPreparedTerms(preparedTerms, model.query, model.recentTerms)
         : EMPTY_SEARCH_RESULT,
-    [hasTypedQuery, model.query, model.recentTerms, model.state],
+    [hasTypedQuery, model.query, model.recentTerms, preparedTerms],
   );
   const result = hasTypedQuery ? typedResult : blankQueryResult;
 

@@ -9,9 +9,14 @@ A user-owned collection of terms and their definitions.
 _Avoid_: Dictionary, configuration
 
 **Glossary File**:
-The effective YAML file that encodes a Glossary. It is either the optional user-selected file or GlossaryGo's default
-file in Raycast's extension support directory.
+The effective YAML file that encodes a Glossary. It is `glossary.yaml` inside the optional Glossary Location,
+GlossaryGo's default file in Raycast's extension support directory, or a file retained from the legacy file preference.
 _Avoid_: Configuration file, glossary document
+
+**Glossary Location**:
+The optional user-selected folder that contains the Glossary File. Selecting it does not create `glossary.yaml`; the
+first valid Add Term or Quick Add Term creates the file.
+_Avoid_: Glossary File, configuration folder
 
 **Term**:
 A named glossary entry that has a definition and can appear in search results. Multiple terms may share the same name, including case- or Unicode-equivalent spellings. Each is an independent entry with its own definition; even identical name-and-definition entries remain separate.

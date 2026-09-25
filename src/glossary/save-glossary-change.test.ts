@@ -516,7 +516,7 @@ describe("saveGlossaryChange queue recovery", () => {
   test.each(["", "\uFEFF"])(
     "skips replacement when a loaded unchanged edit preserves source prefix %j",
     async (prefix) => {
-      const source = `${prefix}terms:\n  - term: API\n    definition: Interface\n`;
+      const source = `${prefix}terms:\n  - term: API\n    definition: Interface\n  - term: HTTP\n    definition: Protocol\n`;
       const path = await writeGlossary(source);
       const before = await stat(path);
 
