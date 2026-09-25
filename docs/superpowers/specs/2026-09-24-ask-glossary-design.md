@@ -134,17 +134,17 @@ while a request is active so one question cannot create duplicate concurrent cal
 
 ## Failure behavior
 
-| Condition | User-visible outcome | AI request |
-| --- | --- | --- |
-| Empty question | Question field validation | No |
-| Disclosure cancelled | Form remains available | No |
-| AI access unavailable | Raycast AI access explanation | No |
-| Missing or invalid file | Existing actionable Glossary error | No |
-| Empty Glossary | Insufficient Glossary evidence | No |
-| Question over 2,000 characters | Shorten-question guidance | No |
-| Context over 32 KiB | Context-limit explanation; no partial context | No |
-| AI rejection | Fixed retry guidance | Attempted once |
-| Request aborted | No stale completion or failure | Existing request cancelled |
+| Condition                      | User-visible outcome                          | AI request                 |
+| ------------------------------ | --------------------------------------------- | -------------------------- |
+| Empty question                 | Question field validation                     | No                         |
+| Disclosure cancelled           | Form remains available                        | No                         |
+| AI access unavailable          | Raycast AI access explanation                 | No                         |
+| Missing or invalid file        | Existing actionable Glossary error            | No                         |
+| Empty Glossary                 | Insufficient Glossary evidence                | No                         |
+| Question over 2,000 characters | Shorten-question guidance                     | No                         |
+| Context over 32 KiB            | Context-limit explanation; no partial context | No                         |
+| AI rejection                   | Fixed retry guidance                          | Attempted once             |
+| Request aborted                | No stale completion or failure                | Existing request cancelled |
 
 ## Verification
 
