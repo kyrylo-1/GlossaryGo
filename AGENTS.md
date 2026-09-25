@@ -33,9 +33,10 @@ PRs explain problem, resulting behavior, validation; link issues and include scr
 ## Privacy and agent rules
 
 Keep glossary content local and in memory. Only permitted persistence: explicit Add Term, Edit Term, or Delete Term
-through glossary save service to effective Glossary File. Target user-selected `.yaml` when configured; otherwise
-`glossary.yaml` under Raycast's `environment.supportPath`. Never persist content elsewhere, log it, or transmit it.
-Use synthetic test data.
+through glossary save service to effective Glossary File. Target `glossary.yaml` inside the user-selected Glossary
+Location when configured; preserve a legacy user-selected `.yaml` file preference; otherwise target `glossary.yaml`
+under Raycast's `environment.supportPath`. Never persist content elsewhere, log it, or transmit it. Use synthetic test
+data.
 
 Preserve unrelated worktree changes. DSG hook blocks file deletion: provide deletion commands instead.
 When committing, delegate creation to separate Luna agent with low reasoning.
