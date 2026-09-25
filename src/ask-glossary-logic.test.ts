@@ -85,11 +85,16 @@ describe("runAskGlossary AI answer", () => {
   test("passes the ready prompt and original signal, forwards chunks, and returns the final answer", async () => {
     const controller = new AbortController();
     const onData = vi.fn<(chunk: string) => void>();
+    const expectedPrompt = buildAskGlossaryPrompt("What is API?", terms);
+    expect(expectedPrompt.status).toBe("ready");
+    if (expectedPrompt.status !== "ready") {
+      throw new Error("Expected a ready prompt for the valid question and glossary.");
+    }
     const askAi = vi.fn<AskGlossaryAi>().mockImplementation((prompt, { onData: receiveData, signal }) => {
       expect(signal).toBe(controller.signal);
       receiveData("An ");
       receiveData("API");
-      expect(prompt).toBe(buildAskGlossaryPrompt("What is API?", terms).prompt);
+      expect(prompt).toBe(expectedPrompt.prompt);
       return Promise.resolve("An API is an application programming interface.");
     });
 

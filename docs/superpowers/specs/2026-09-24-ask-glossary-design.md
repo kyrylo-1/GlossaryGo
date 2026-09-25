@@ -20,16 +20,25 @@ AI request, and leaves the Glossary File and filesystem unchanged.
 Opening the command shows a form with:
 
 - a required multiline **Question** field;
-- a privacy description stating that submitting will send the question and supplied Glossary context to Raycast AI;
+- a privacy description stating the complete transmission scope and over-limit refusal below;
 - an explicit statement that opening the command alone sends nothing; and
 - an **Ask Glossary** submit action.
 
-The first submission in each mounted command session opens a confirmation alert before any AI request. Accepting the
+The form and **Send to Raycast AI?** confirmation use this exact disclosure:
+
+> If processing proceeds, your question and every term and definition in the Glossary are sent to Raycast AI. Glossaries
+> over the 32 KiB context limit are refused and not sent.
+
+The form appends: **Opening this command alone sends nothing.**
+
+The first non-empty submission in each mounted command session opens a confirmation alert before any AI request. Accepting the
 alert records an in-memory acknowledgement for that command session. Cancelling returns to the form and sends nothing.
 The acknowledgement is neither persisted nor shared with another command session.
 
 After submission, the command displays a detail view. It streams available response text, indicates loading, and ends
-with an **Ask Another Question** action that returns to a blank question form. Completed questions and answers remain in
+with an **Ask Another Question** action that explicitly returns to a blank question form. Failure details also offer
+**Edit Question**, which restores the exact submitted question, including whitespace, for correction or retry.
+Resubmission starts a new attempt and retains the session acknowledgement. Completed questions and answers remain in
 component memory only and disappear when the command unmounts.
 
 The detail view presents specific recovery messages for:
@@ -49,12 +58,14 @@ The following sequence is mandatory for every submitted question:
 
 1. Reject an empty or whitespace-only question locally.
 2. If this command session has not acknowledged disclosure, show the confirmation alert and stop on cancellation.
-3. Check `environment.canAccess(AI)` and stop with access guidance when false.
-4. Resolve the effective Glossary File through `getGlossaryTarget()` and load it through `loadGlossary()`.
-5. Validate the question and serialized Glossary context limits.
+3. Validate the trimmed question limit locally, then check `environment.canAccess(AI)` and stop with access guidance when false.
+4. Inside the `loadTerms` callback, resolve the current effective Glossary File through `getGlossaryTarget()` and load it
+   through `loadGlossary()`. Resolve on each accepted, accessible attempt, including retries, never on mount.
+5. Validate the serialized Glossary context limit.
 6. Build the grounding prompt.
 7. Start exactly one `AI.ask()` request.
 
+Opening, typing, cancelling disclosure, and failing AI access do not resolve or load a target.
 Opening the command, typing, cancelling disclosure, failing AI access, failing file loading, loading an empty Glossary,
 or exceeding a limit starts no AI request. Only the question, the bounded serialized term/definition values, and static
 grounding instructions enter the prompt. Paths, YAML source text, comments, preferences, file metadata, and unrelated
@@ -92,7 +103,8 @@ independent and are all included, matching the domain model.
 
 Owns pure question normalization, JSON serialization, UTF-8 context measurement, limits, and prompt construction. It
 returns a discriminated result for a ready prompt, empty question, oversized question, empty Glossary, or oversized
-Glossary context. Tests use literal synthetic prompts and boundary-sized Unicode inputs.
+Glossary context. A ready result contains only `prompt` and `status`. Tests use literal synthetic prompts and
+boundary-sized Unicode inputs.
 
 ### `src/ask-glossary-logic.ts`
 
@@ -126,7 +138,7 @@ The UI uses these states:
 - `question`: editable form, optional field error, and disclosure status retained in memory;
 - `loading`: submitted question, accumulated streamed answer, and active `AbortController`;
 - `answered`: completed answer; and
-- `failure`: actionable safe message.
+- `failure`: actionable safe message and exact submitted question for **Edit Question** recovery.
 
 Only the latest request may update state. Returning to the form or unmounting aborts the active request and invalidates
 its completion callback. An aborted request does not replace the current view with an AI failure. Submission is guarded
@@ -150,21 +162,23 @@ while a request is active so one question cannot create duplicate concurrent cal
 
 Development follows red-green-refactor. Automated coverage includes:
 
-- opening and typing without an AI request;
-- disclosure cancellation and one acknowledgement per mounted session;
-- access denial before load/request;
-- default and custom effective target wiring;
+- exact form and confirmation disclosure of every term/definition and whole-context over-limit refusal;
+- opening, typing, pending/cancelled disclosure, and access denial without target resolution, loading, or an AI request;
+- one acknowledgement per mounted session, retained across correction and retry;
+- default/custom target wiring and current-target resolution after access on each accepted attempt;
 - known, missing, empty, invalid, unreadable, wrong-extension, and oversized Glossary cases;
 - exact question and UTF-8 context boundaries, including multibyte definitions;
 - prompt instructions, exact supporting-term requirement, same-name entry preservation, and instruction-like Glossary
   values remaining inside the serialized data boundary;
 - streamed and completed answers, repeat questions, duplicate-submit prevention, abort, and safe AI failure;
+- exact failed-question recovery, overlong-question correction, unchanged AI-failure retry, and explicit blank reset;
 - successful and failed attempts preserving Glossary bytes and directory entries; and
 - manifest registration and rendered form/detail states.
 
 `README.md` documents setup, the per-session disclosure, the exact transmission boundary, context refusal, and the
 unchanged local-only behavior of other commands. `TESTING.md` adds fresh Raycast scenarios for access available and
-unavailable, disclosure accept/cancel, known/unknown questions, custom/default files, limits, file recovery, streaming,
+unavailable, disclosure accept/cancel, known/unknown questions, custom/default files, limits, Edit Question correction and
+retry without repeat disclosure, file recovery, streaming,
 read-only bytes, no persistent cache, and full command reopen. Automated component evidence remains distinct from live
 Raycast evidence, and unavailable live checks are reported explicitly.
 

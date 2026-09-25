@@ -32,7 +32,7 @@ describe("buildAskGlossaryPrompt question limits", () => {
     const question = ` ${"q".repeat(MAX_ASK_QUESTION_CHARACTERS)} `;
 
     expect(buildAskGlossaryPrompt(question, [{ definition: "Interface", term: "API" }])).toMatchObject({
-      question: "q".repeat(MAX_ASK_QUESTION_CHARACTERS),
+      prompt: expect.stringContaining(`Question:\n${"q".repeat(MAX_ASK_QUESTION_CHARACTERS)}\n\nGlossary data`),
       status: "ready",
     });
   });
@@ -85,7 +85,6 @@ ${serializedGlossaryFixture}
 
     expect(buildAskGlossaryPrompt("  What does the API mean?  ", terms)).toEqual({
       prompt: expectedPrompt,
-      question: "What does the API mean?",
       status: "ready",
     });
     expect(serializedGlossaryFixture.match(/"term":"API"/g)).toHaveLength(2);

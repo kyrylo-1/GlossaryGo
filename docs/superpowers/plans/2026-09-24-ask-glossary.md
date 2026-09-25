@@ -14,8 +14,12 @@
 
 - Register one `mode: "view"` command named `ask-glossary`, titled **Ask Glossary**.
 - Opening, typing, cancelling disclosure, access denial, file failure, empty Glossary, or limit failure starts no AI request.
-- Ask for disclosure confirmation once per mounted command session and persist no acknowledgement.
-- Resolve the effective path only through `getGlossaryTarget()` and load/validate only through `loadGlossary()`.
+- Ask for disclosure confirmation once per mounted command session and persist no acknowledgement. Both form and
+  confirmation explicitly disclose every term and definition and refusal of over-limit Glossaries without transmission.
+- Resolve the current effective path through `getGlossaryTarget()` inside the `loadTerms` callback after AI access on
+  every accepted attempt, including retries; load/validate only through `loadGlossary()`. Never resolve on mount.
+- After a failure, **Edit Question** restores the exact submitted question for correction/resubmission;
+  **Ask Another Question** explicitly clears it. Both retain acknowledgement for the mounted session.
 - Limit trimmed questions to 2,000 JavaScript string characters.
 - Limit complete serialized Glossary JSON to 32 KiB by UTF-8 byte length; send all entries or none.
 - Send decoded `term` and `definition` values only; exclude paths, YAML source, comments, preferences, and metadata.
@@ -103,7 +107,6 @@ type AskGlossaryPromptFailure = Readonly<{
 
 type AskGlossaryPrompt = Readonly<{
   prompt: string;
-  question: string;
   status: "ready";
 }>;
 
@@ -184,7 +187,8 @@ test("stops before loading when Raycast AI access is unavailable", async () => {
 });
 ```
 
-Add separate tests for each prompt rejection reason and assert `askAi` stays untouched. Empty question must be rejected before loading; other prompt failures occur after one successful load.
+Add separate tests for each prompt rejection reason and assert `askAi` stays untouched. Empty and overlong questions
+must be rejected before access/loading; empty and over-limit Glossary context failures occur after one successful load.
 
 - [ ] **Step 2: Run the orchestration test and verify RED**
 
@@ -290,9 +294,9 @@ Run: `bun run test -- src/add-term.test.tsx src/search-term.test.tsx`
 Render `AskGlossaryCommand` with controlled dependencies. Assert:
 
 - the **Question** textarea and privacy description render;
-- mount and typing invoke neither confirmation, load, nor AI;
+- mount and typing invoke neither confirmation, target resolution, load, nor AI;
 - whitespace submit shows a field error without confirmation;
-- cancelling confirmation preserves the question and starts no load/AI;
+- cancelling confirmation preserves the question and starts no target resolution/load/AI;
 - accepting confirmation allows one attempt; and
 - a later question in the same mounted session skips confirmation, while remounting requires it again.
 
@@ -321,7 +325,9 @@ export const AskGlossaryCommand = ({
 };
 ```
 
-The default export resolves the target once per mount and adapts Raycast streaming:
+The default export resolves the current target only inside `loadTerms: () => loadGlossary(getGlossaryTarget().path)`.
+`runAskGlossary` invokes this callback after question validation and AI access, on each accepted attempt. It adapts
+Raycast streaming:
 
 ```ts
 const askAi: AskGlossaryAi = async (prompt, { onData, signal }) => {
@@ -331,7 +337,10 @@ const askAi: AskGlossaryAi = async (prompt, { onData, signal }) => {
 };
 ```
 
-Use a confirmation titled **Send to Raycast AI?** that states the question and supplied Glossary context will be sent for processing. Add the manifest command adjacent to Search Term:
+Use a confirmation titled **Send to Raycast AI?**. Both form and confirmation must match the exact disclosure in the
+design spec: the question and every term and definition go to Raycast AI if processing proceeds; Glossaries over the
+32 KiB context limit are refused and not sent. Assert the complete literal text in component tests. Add the manifest
+command adjacent to Search Term:
 
 ```json
 {
@@ -349,6 +358,8 @@ Assert:
 - loading detail renders accumulated chunks and `data-loading="true"`;
 - completion displays the authoritative final answer and clears loading;
 - each failure kind renders its actionable message;
+- **Edit Question** on failure restores the exact submitted question, including whitespace, and allows overlong-question
+  correction or an unchanged AI-failure retry; successful retry starts one new attempt without repeating disclosure;
 - **Ask Another Question** aborts any active request, returns a blank form, and retains session disclosure;
 - two submit gestures while confirmation is pending cause one confirmation and one attempt;
 - two submit gestures while AI is pending cause one attempt;
@@ -359,7 +370,11 @@ The mutation that each test catches is a duplicate external request or stale sta
 
 - [ ] **Step 6: Add failing default-wiring and manifest tests**
 
-Mock `getGlossaryTarget()` to return a synthetic custom path and `loadGlossary()` to record its argument. Render the default command, accept disclosure, submit, and assert the loader receives that exact path while AI receives a bounded prompt without the path. Repeat target setup for the default support-path result.
+Mock `getGlossaryTarget()` to return a synthetic custom path and `loadGlossary()` to record its argument. Assert zero
+target resolution/loading on mount, typing, pending/cancelled disclosure, and access denial. After acceptance and
+access, assert target resolution precedes loading and the loader receives the current path while AI receives a bounded
+prompt without the path. Change the mocked target before acceptance and between attempts to prove it is read on demand.
+Repeat target setup for the default support-path result.
 
 Read `package.json` as JSON and assert the exact command contract: name, title, description, and `mode: "view"`.
 
@@ -401,10 +416,14 @@ Add an **Asking the glossary** section that states:
 - Raycast AI access is required;
 - opening and typing send nothing;
 - first submission per command session requires disclosure confirmation;
+- both visible disclosures explicitly name every term and definition and refuse over-limit Glossaries without sending;
 - the question and complete bounded decoded context are sent only after confirmation;
+- the current target is resolved and loaded only after access on each submission, including retries;
 - context over 32 KiB is refused rather than truncated;
 - answers identify supporting terms or state insufficient evidence;
-- questions, answers, and acknowledgement are not persisted; and
+- questions, answers, and acknowledgement are not persisted;
+- **Edit Question** restores failed input for correction/retry without repeating disclosure in the same session, while
+  **Ask Another Question** explicitly starts blank; and
 - Search, Add, Edit, Delete, Copy, Reload, and Reveal retain their existing local-only behavior except explicit clipboard/Finder actions.
 
 Revise the Privacy section so it no longer falsely promises zero Glossary transmission for every command, while keeping the local-only guarantees precise for all existing commands.
@@ -416,10 +435,11 @@ Add stable scenario IDs for:
 - initial form and zero-request gate;
 - disclosure cancel/accept and reopen reset;
 - known and insufficient-evidence questions with exact supporting terms;
-- AI access unavailable;
+- AI access unavailable without target resolution/loading;
 - custom/default target resolution and every file failure class;
 - exact question/context boundaries and multibyte over-limit refusal;
-- streaming, repeat question, duplicate-submit prevention, and abort;
+- streaming, repeat question, exact failed-question correction/retry, explicit blank reset, duplicate-submit prevention,
+  and abort;
 - byte/directory preservation and absence of persistent cache/history; and
 - fresh Raycast runtime identity and effective synthetic path.
 

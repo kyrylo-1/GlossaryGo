@@ -164,12 +164,18 @@ crash durability on every filesystem. Avoid external edits during saves.
 
 ## Asking the glossary
 
-**Ask Glossary** requires Raycast AI access. Its **Question** form states that submitting sends the question and
-supplied Glossary context to Raycast AI; opening the command and typing send nothing. The first non-empty submission in each
-command session asks **Send to Raycast AI?**. Choose **Send to Raycast AI** to continue or **Cancel** to return
-without sending. Confirmation applies only to that open command session.
+**Ask Glossary** requires Raycast AI access. Both its **Question** form and **Send to Raycast AI?** confirmation explain:
 
-After confirmation and an AI-access check, Ask Glossary loads the effective Glossary File and sends the trimmed
+> If processing proceeds, your question and every term and definition in the Glossary are sent to Raycast AI. Glossaries
+> over the 32 KiB context limit are refused and not sent.
+
+Opening the command and typing send nothing. The first non-empty submission in each command session asks for
+confirmation. Choose **Send to Raycast AI** to continue or **Cancel** to return without sending. Confirmation applies
+only to that open command session.
+
+After confirmation, question validation, and an AI-access check, Ask Glossary resolves and loads the current effective
+Glossary File for each submission, including retries. Opening, typing, cancelling disclosure, and unavailable AI access
+do not resolve or load the file. Ask Glossary sends the trimmed
 question with the complete decoded term-and-definition context, plus static grounding instructions, in one Raycast AI
 request. It does not send file paths, YAML source, comments, preferences, or file metadata. The trimmed question is
 limited to 2,000 JavaScript characters. The serialized context is limited to 32 KiB measured as UTF-8 bytes; when the complete
@@ -177,8 +183,10 @@ context exceeds that limit, Ask Glossary refuses the request rather than truncat
 An empty Glossary is reported locally without an AI request.
 
 Answers are grounded in the supplied Glossary: they should name exact supporting terms or say when the Glossary
-lacks sufficient information. **Ask Another Question** returns to a blank question form. Questions, answers, and
-disclosure acknowledgement remain in command memory only and are not persisted.
+lacks sufficient information. After a failure, **Edit Question** restores exactly what you submitted so you can correct
+an overlong question or retry after a file, access, or AI failure. Submitting again makes a new attempt without repeating
+disclosure in the same open session. **Ask Another Question** explicitly starts a blank question form, including after
+a failure. Questions, answers, and disclosure acknowledgement remain in command memory only and are not persisted.
 
 Search Term, Add Term, Quick Add Term, Edit Term, Delete Term, Copy, Reload Glossary, and Reveal Glossary in Finder
 retain their existing local-only behavior. Explicit copy actions place the selected value on the clipboard, and Reveal

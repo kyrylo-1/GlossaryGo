@@ -7,6 +7,9 @@ import { loadGlossary } from "./glossary/glossary";
 import { prepareMarkdownForDisplay } from "./utils/prepare-markdown-for-display";
 import type { Term } from "./utils/types";
 
+const disclosureMessage =
+  "If processing proceeds, your question and every term and definition in the Glossary are sent to Raycast AI. Glossaries over the 32 KiB context limit are refused and not sent.";
+
 export type AskGlossaryCommandDependencies = Readonly<{
   askAi: AskGlossaryAi;
   canAccessAi: () => boolean;
@@ -18,7 +21,7 @@ type View =
   | Readonly<{ status: "question" }>
   | Readonly<{ answer: string; status: "loading"; token: number }>
   | Readonly<{ answer: string; status: "answered" }>
-  | Readonly<{ message: string; status: "failure" }>;
+  | Readonly<{ message: string; question: string; status: "failure" }>;
 
 // The request lifecycle stays in one component so its refs share one mounted-session boundary.
 // eslint-disable-next-line max-lines-per-function
@@ -41,12 +44,12 @@ export const AskGlossaryCommand = ({
     };
   }, []);
 
-  const askAnotherQuestion = (): void => {
+  const returnToQuestion = (value: string): void => {
     requestToken.current += 1;
     activeController.current?.abort();
     activeController.current = null;
     submitting.current = false;
-    setQuestion("");
+    setQuestion(value);
     setError("");
     setView({ status: "question" });
   };
@@ -101,7 +104,7 @@ export const AskGlossaryCommand = ({
     if (outcome.status === "answered") {
       setView({ answer: outcome.answer, status: "answered" });
     } else if (outcome.status === "failed") {
-      setView({ message: outcome.message, status: "failure" });
+      setView({ message: outcome.message, question, status: "failure" });
     }
   };
 
@@ -113,7 +116,10 @@ export const AskGlossaryCommand = ({
         navigationTitle="Ask Glossary"
         actions={
           <ActionPanel>
-            <Action title="Ask Another Question" onAction={askAnotherQuestion} />
+            {view.status === "failure" ? (
+              <Action title="Edit Question" onAction={() => returnToQuestion(view.question)} />
+            ) : null}
+            <Action title="Ask Another Question" onAction={() => returnToQuestion("")} />
           </ActionPanel>
         }
       />
@@ -138,13 +144,12 @@ export const AskGlossaryCommand = ({
           setError("");
         }}
       />
-      <Form.Description text="Submitting will send the question and supplied Glossary context to Raycast AI for processing. Opening this command alone sends nothing." />
+      <Form.Description text={`${disclosureMessage} Opening this command alone sends nothing.`} />
     </Form>
   );
 };
 
 export default function Command(): ReactElement {
-  const [target] = useState(getGlossaryTarget);
   const askAi: AskGlossaryAi = async (prompt, { onData, signal }) => {
     const stream = AI.ask(prompt, { creativity: "none", signal });
     stream.on("data", onData);
@@ -159,11 +164,11 @@ export default function Command(): ReactElement {
         confirmDisclosure: () =>
           confirmAlert({
             dismissAction: { style: Alert.ActionStyle.Cancel, title: "Cancel" },
-            message: "Your question and supplied Glossary context will be sent to Raycast AI for processing.",
+            message: disclosureMessage,
             primaryAction: { title: "Send to Raycast AI" },
             title: "Send to Raycast AI?",
           }),
-        loadTerms: () => loadGlossary(target.path),
+        loadTerms: () => loadGlossary(getGlossaryTarget().path),
       }}
     />
   );

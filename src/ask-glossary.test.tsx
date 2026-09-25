@@ -85,7 +85,9 @@ describe("Ask Glossary disclosure", () => {
 
     expect(screen.getByText("Question")).toBeTruthy();
     expect(
-      screen.getByText(/submitting will send the question and supplied Glossary context to Raycast AI/i),
+      screen.getByText(
+        "If processing proceeds, your question and every term and definition in the Glossary are sent to Raycast AI. Glossaries over the 32 KiB context limit are refused and not sent. Opening this command alone sends nothing.",
+      ),
     ).toBeTruthy();
     expect(screen.getByText(/opening this command alone sends nothing/i)).toBeTruthy();
     fireEvent.change(screen.getByTestId("question"), { target: { value: "What is API?" } });
@@ -420,6 +422,137 @@ describe("Ask Glossary response", () => {
   });
 });
 
+// eslint-disable-next-line max-lines-per-function
+describe("Ask Glossary failure recovery", () => {
+  test("Edit Question preserves an overlong submission and allows correction without repeating disclosure", async () => {
+    const dependencies = createDependencies();
+    const original = `  ${"q".repeat(2_001)}\n`;
+    render(<AskGlossaryCommand dependencies={dependencies} />);
+
+    ask(original);
+
+    expect(await screen.findByText("Questions must be 2,000 characters or fewer.")).toBeTruthy();
+    expect(dependencies.loadTerms).not.toHaveBeenCalled();
+    expect(dependencies.askAi).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Question" }));
+    expect(questionValue()).toBe(original);
+    ask("What is API?");
+    expect(await screen.findByText("The API is an interface.")).toBeTruthy();
+    expect(dependencies.askAi).toHaveBeenCalledOnce();
+    expect(dependencies.confirmDisclosure).toHaveBeenCalledOnce();
+  });
+
+  test("Edit Question retries an AI failure with the exact submitted question and no repeat disclosure", async () => {
+    const dependencies = createDependencies();
+    const original = "  What is API?\nExplain it.  ";
+    dependencies.askAi.mockRejectedValueOnce(new Error("service unavailable"));
+    render(<AskGlossaryCommand dependencies={dependencies} />);
+
+    ask(original);
+
+    expect(await screen.findByText("Raycast AI could not answer this question. Try again.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit Question" }));
+    expect(questionValue()).toBe(original);
+    fireEvent.click(screen.getByRole("button", { name: "Ask Glossary" }));
+    expect(await screen.findByText("The API is an interface.")).toBeTruthy();
+    expect(dependencies.askAi).toHaveBeenCalledTimes(2);
+    expect(dependencies.askAi.mock.calls[1][0]).toBe(dependencies.askAi.mock.calls[0][0]);
+    expect(dependencies.loadTerms).toHaveBeenCalledTimes(2);
+    expect(dependencies.confirmDisclosure).toHaveBeenCalledOnce();
+  });
+
+  test("Ask Another Question explicitly clears the failed question and retains disclosure", async () => {
+    const dependencies = createDependencies();
+    dependencies.askAi.mockRejectedValueOnce(new Error("service unavailable"));
+    render(<AskGlossaryCommand dependencies={dependencies} />);
+    ask("What is API?");
+    expect(await screen.findByText("Raycast AI could not answer this question. Try again.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask Another Question" }));
+
+    expect(questionValue()).toBe("");
+    ask("Explain API again");
+    expect(await screen.findByText("The API is an interface.")).toBeTruthy();
+    expect(dependencies.confirmDisclosure).toHaveBeenCalledOnce();
+  });
+});
+
+// eslint-disable-next-line max-lines-per-function
+describe("Ask Glossary target gates", () => {
+  test("mount and typing do not resolve or load the target", () => {
+    render(<Command />);
+    expect(defaultMocks.target).not.toHaveBeenCalled();
+    expect(defaultMocks.load).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId("question"), { target: { value: "What is API?" } });
+
+    expect(defaultMocks.target).not.toHaveBeenCalled();
+    expect(defaultMocks.load).not.toHaveBeenCalled();
+    expect(confirmAlert).not.toHaveBeenCalled();
+    expect(environment.canAccess).not.toHaveBeenCalled();
+    expect(AI.ask).not.toHaveBeenCalled();
+  });
+
+  test("cancelled disclosure does not resolve or load the target", async () => {
+    vi.mocked(confirmAlert).mockResolvedValue(false);
+    render(<Command />);
+    ask("What is API?");
+    await waitFor(() => expect(confirmAlert).toHaveBeenCalledOnce());
+
+    expect(defaultMocks.target).not.toHaveBeenCalled();
+    expect(defaultMocks.load).not.toHaveBeenCalled();
+    expect(environment.canAccess).not.toHaveBeenCalled();
+    expect(AI.ask).not.toHaveBeenCalled();
+  });
+
+  test("access denial after disclosure does not resolve or load the target", async () => {
+    vi.mocked(environment.canAccess).mockReturnValue(false);
+    render(<Command />);
+    ask("What is API?");
+    expect(
+      await screen.findByText("Raycast AI access is unavailable. Check Raycast AI settings and try again."),
+    ).toBeTruthy();
+
+    expect(confirmAlert).toHaveBeenCalledOnce();
+    expect(defaultMocks.target).not.toHaveBeenCalled();
+    expect(defaultMocks.load).not.toHaveBeenCalled();
+    expect(AI.ask).not.toHaveBeenCalled();
+  });
+
+  test("accepted accessible submissions resolve the current target after access on every attempt", async () => {
+    const confirmation = deferred<boolean>();
+    vi.mocked(confirmAlert).mockReturnValue(confirmation.promise);
+    const on = vi.fn<(event: string, callback: (chunk: string) => void) => void>();
+    vi.mocked(AI.ask).mockReturnValue(Object.assign(Promise.resolve("Final answer"), { on }));
+    render(<Command />);
+    ask("What is API?");
+    expect(defaultMocks.target).not.toHaveBeenCalled();
+    expect(defaultMocks.load).not.toHaveBeenCalled();
+    expect(environment.canAccess).not.toHaveBeenCalled();
+    defaultMocks.path = "/synthetic/current.yaml";
+
+    await act(async () => {
+      confirmation.resolve(true);
+      await confirmation.promise;
+    });
+
+    expect(await screen.findByText("Final answer")).toBeTruthy();
+    expect(defaultMocks.load).toHaveBeenCalledExactlyOnceWith("/synthetic/current.yaml");
+    expect(vi.mocked(environment.canAccess).mock.invocationCallOrder[0]).toBeLessThan(
+      defaultMocks.target.mock.invocationCallOrder[0],
+    );
+    expect(defaultMocks.target.mock.invocationCallOrder[0]).toBeLessThan(defaultMocks.load.mock.invocationCallOrder[0]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask Another Question" }));
+    defaultMocks.path = "/synthetic/next.yaml";
+    ask("Explain API again");
+    expect(await screen.findByText("Final answer")).toBeTruthy();
+    expect(defaultMocks.target).toHaveBeenCalledTimes(2);
+    expect(defaultMocks.load).toHaveBeenLastCalledWith("/synthetic/next.yaml");
+    expect(confirmAlert).toHaveBeenCalledOnce();
+  });
+});
+
 describe("Ask Glossary command wiring", () => {
   test.each([
     ["custom", "/synthetic/custom.yaml"],
@@ -437,7 +570,8 @@ describe("Ask Glossary command wiring", () => {
     expect(defaultMocks.load).toHaveBeenCalledExactlyOnceWith(path);
     expect(confirmAlert).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: expect.stringContaining("question and supplied Glossary context"),
+        message:
+          "If processing proceeds, your question and every term and definition in the Glossary are sent to Raycast AI. Glossaries over the 32 KiB context limit are refused and not sent.",
         title: "Send to Raycast AI?",
       }),
     );

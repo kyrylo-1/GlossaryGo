@@ -10,7 +10,6 @@ type AskGlossaryPromptFailure = Readonly<{
 
 type AskGlossaryPrompt = Readonly<{
   prompt: string;
-  question: string;
   status: "ready";
 }>;
 
@@ -52,5 +51,5 @@ Glossary data (JSON):
 ${serializedGlossary}
 </glossary>`;
 
-  return { prompt, question: trimmedQuestion, status: "ready" };
+  return { prompt, status: "ready" };
 };
