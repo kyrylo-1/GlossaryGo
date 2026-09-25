@@ -1,7 +1,7 @@
 # GlossaryGo
 
 Search and update private local YAML glossary in Raycast. **Search Term** finds prefixes; **Add Term** opens reusable
-form; **Quick Add Term** saves from root search; **Reveal Glossary File** locates storage in Finder.
+form; **Quick Add Term** saves from root search. In-context **Reveal Glossary in Finder** actions locate storage.
 
 ## Setup
 
@@ -80,15 +80,13 @@ successive entries.
 
 ## Revealing the glossary file
 
-Open **Reveal Glossary File** from Raycast root search to select the effective Glossary File in Finder. It uses the
-shared custom file preference when set, otherwise the default support-directory file. It needs no search result and
-works with invalid YAML, an empty glossary, or a blank file without reading or validating its contents.
+Choose **Reveal Glossary in Finder** from Search results, the full-definition reader, Add/Edit forms, or Search Term
+recovery views. Every action uses the shared effective Glossary File path: the custom file preference when set,
+otherwise the default support-directory file. Revealing does not read or validate glossary contents.
 
-If the file is missing, Finder reveals the nearest existing folder, including when intermediate folders are absent.
-A **Glossary File Is Missing** dialog stays available after Finder opens, explains how to create or select a file,
-and offers **Open Extension Preferences** or **Done**. Path or Finder failures use the same recovery dialog. If
-Preferences cannot open, a second dialog explains how to find the setting manually. Reveal never creates folders
-or files and never changes glossary contents.
+Finder selects an existing Glossary File or reveals the nearest existing folder when the file or intermediate folders
+are missing. Path and Finder failures report **Could Not Reveal Glossary**. Reveal never creates folders or files and
+never changes glossary contents.
 
 ## Searching and actions
 
