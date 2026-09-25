@@ -101,6 +101,21 @@ describe("glossary source cache", () => {
     expect(parseSource).toHaveBeenCalledOnce();
   });
 
+  test("does not parse a source after its load is cancelled while reading", async () => {
+    const pendingRead = Promise.withResolvers<string>();
+    const readSource = vi.fn<() => Promise<string>>().mockReturnValue(pendingRead.promise);
+    const parseSource = vi.fn<(source: string) => readonly Term[]>().mockReturnValue(apiTerms);
+    const cache = createGlossarySourceCache({ parseSource, readSource });
+    const controller = new AbortController();
+    const loading = cache.load("/synthetic/glossary.yaml", controller.signal);
+
+    controller.abort();
+    pendingRead.resolve("terms: []\n");
+
+    await expect(loading).rejects.toMatchObject({ name: "AbortError" });
+    expect(parseSource).not.toHaveBeenCalled();
+  });
+
   test("forgets a source when the command session is cleared", async () => {
     const readSource = vi.fn<() => Promise<string>>().mockResolvedValue("terms: []\n");
     const parseSource = vi.fn<(source: string) => readonly Term[]>().mockReturnValue(apiTerms);

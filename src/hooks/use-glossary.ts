@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dis
 
 import type { Term } from "../utils/types";
 import { GlossaryError } from "../glossary/glossary";
+import { isGlossaryLoadCancelledError } from "../glossary/glossary-load-cancellation";
 import type { GlossaryTarget } from "../glossary/glossary-target";
 import { createGlossarySourceCache, type GlossarySourceCache } from "../glossary/glossary-source-cache";
 import { prepareTermsForSearch, searchPreparedTerms, type PreparedTermsForSearch, type SearchResult } from "./search";
@@ -30,13 +31,25 @@ const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
 };
 
+const dispatchLoadError = (error: unknown, dispatch: Dispatch<GlossaryAction>): void => {
+  if (error instanceof GlossaryError && error.code === "missing") {
+    dispatch({ type: "loadMissing" });
+  } else {
+    dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
+  }
+};
+
 const useGlossaryReload = (
   glossaryFile: string,
   dispatch: Dispatch<GlossaryAction>,
   sourceCache: GlossarySourceCache,
 ): (() => Promise<void>) => {
+  const loadController = useRef<AbortController>();
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     const sequence = ++loadSequence.current;
     await Promise.resolve();
     if (sequence !== loadSequence.current) {
@@ -45,17 +58,16 @@ const useGlossaryReload = (
     dispatch({ type: "loadStarted" });
 
     try {
-      const terms = await sourceCache.load(glossaryFile);
+      const terms = await sourceCache.load(glossaryFile, controller.signal);
       if (sequence === loadSequence.current) {
         dispatch({ terms, type: "loadSucceeded" });
       }
     } catch (error: unknown) {
+      if (isGlossaryLoadCancelledError(error)) {
+        return;
+      }
       if (sequence === loadSequence.current) {
-        if (error instanceof GlossaryError && error.code === "missing") {
-          dispatch({ type: "loadMissing" });
-        } else {
-          dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
-        }
+        dispatchLoadError(error, dispatch);
       }
     }
   }, [dispatch, glossaryFile, sourceCache]);
@@ -68,6 +80,7 @@ const useGlossaryReload = (
     });
     return (): void => {
       isActive = false;
+      loadController.current?.abort();
       loadSequence.current += 1;
       sourceCache.clear();
     };

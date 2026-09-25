@@ -2,11 +2,13 @@
 /// <reference lib="dom" />
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { confirmAlert } from "@raycast/api";
 
 import { getEntryIdentity } from "./glossary/entry-identity";
 import { GlossaryError, parseGlossarySource } from "./glossary/glossary";
+import { useGlossary } from "./hooks/use-glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import type * as GlossaryModule from "./glossary/glossary";
 import * as SearchModule from "./hooks/search";
@@ -18,7 +20,7 @@ import type * as RaycastUtils from "@raycast/utils";
 import type * as MarkdownRenderer from "./utils/prepare-markdown-for-display";
 
 const mocks = vi.hoisted(() => ({
-  load: vi.fn<(path: string) => Promise<readonly Term[]>>(),
+  load: vi.fn<(path: string, signal?: AbortSignal) => Promise<readonly Term[]>>(),
   path: "/tmp/first.yaml",
   save: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>(),
 }));
@@ -28,8 +30,8 @@ vi.mock("@raycast/utils", async (importOriginal) => ({
 }));
 vi.mock("./glossary/glossary", async (importOriginal) => ({
   ...(await importOriginal<typeof GlossaryModule>()),
-  loadGlossarySource: async (path: string): Promise<string> => {
-    const loadedTerms = await mocks.load(path);
+  loadGlossarySource: async (path: string, signal?: AbortSignal): Promise<string> => {
+    const loadedTerms = await mocks.load(path, signal);
     return `terms: ${JSON.stringify(loadedTerms)}\n`;
   },
 }));
@@ -66,8 +68,30 @@ const reload = (): void => {
   fireEvent.click(screen.getAllByRole("button", { name: "Reload Glossary" })[0]);
 };
 
+const createDeferred = <Value,>(): Readonly<{
+  promise: Promise<Value>;
+  reject: (error: unknown) => void;
+  resolve: (value: Value | PromiseLike<Value>) => void;
+}> => Promise.withResolvers<Value>();
+
+const ReloadHarness = ({ path }: Readonly<{ path: string }>): ReactElement => {
+  const { reload: reloadGlossary, result, state } = useGlossary({ createParent: false, path });
+  const triggerReload = (): void => {
+    reloadGlossary().catch(() => null);
+  };
+  return (
+    <>
+      <button onClick={triggerReload}>Reload</button>
+      <output data-testid="load-status">{state.status}</output>
+      <output data-testid="loaded-terms">{result.terms.map(({ term }) => term).join(",")}</output>
+    </>
+  );
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.load.mockReset();
+  mocks.save.mockReset();
   mocks.path = "/tmp/first.yaml";
   mocks.load.mockResolvedValue(terms);
   mocks.save.mockResolvedValue();
@@ -303,6 +327,80 @@ describe("full definition reader recency", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     search("");
     expect(names()).toEqual(["Zulu", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]);
+  });
+});
+
+describe("Search Term reload cancellation", () => {
+  test("cancels an obsolete reload and retains newer terms when it resolves late", async () => {
+    const obsoleteLoad = createDeferred<readonly Term[]>();
+    let obsoleteSignal: AbortSignal | undefined;
+    const view = render(<ReloadHarness path="/tmp/first.yaml" />);
+    await waitFor(() => expect(view.getByTestId("load-status").textContent).toBe("ready"));
+    mocks.load
+      .mockImplementationOnce((_path, signal) => {
+        obsoleteSignal = signal;
+        return obsoleteLoad.promise;
+      })
+      .mockResolvedValueOnce([{ definition: "New source", term: "Fresh" }]);
+
+    fireEvent.click(view.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(mocks.load).toHaveBeenCalledTimes(2));
+    fireEvent.click(view.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(obsoleteSignal?.aborted).toBe(true));
+
+    await waitFor(() => expect(view.getByTestId("load-status").textContent).toBe("ready"));
+    expect(view.getByTestId("loaded-terms").textContent).toBe("Fresh");
+    obsoleteLoad.resolve([{ definition: "Stale source", term: "Stale" }]);
+    await waitFor(() => expect(view.getByTestId("loaded-terms").textContent).toBe("Fresh"));
+  });
+
+  test("cancels outstanding loads when the command unmounts or its Glossary File changes", async () => {
+    const signals: AbortSignal[] = [];
+    const pendingLoad = Promise.withResolvers<readonly Term[]>();
+    mocks.load.mockImplementation((_path, signal) => {
+      if (!signal) {
+        throw new TypeError("Expected a cancellation signal");
+      }
+      signals.push(signal);
+      return pendingLoad.promise;
+    });
+    const view = render(<ReloadHarness path="/tmp/first.yaml" />);
+    await waitFor(() => expect(signals).toHaveLength(1));
+
+    view.rerender(<ReloadHarness path="/tmp/second.yaml" />);
+    await waitFor(() => expect(signals[0].aborted).toBe(true));
+    await waitFor(() => expect(signals).toHaveLength(2));
+
+    view.unmount();
+    expect(signals[1].aborted).toBe(true);
+  });
+});
+
+describe("Search Term post-save refresh", () => {
+  test("reads the saved source during the post-save refresh", async () => {
+    let source = terms;
+    mocks.load.mockImplementation(() => Promise.resolve(source));
+    mocks.save.mockImplementation((_path, change) => {
+      if (change.type === "add") {
+        source = [...source, change.term];
+      }
+      return Promise.resolve();
+    });
+    render(<Command />);
+    const selected = await screen.findByRole("article", { name: "Alpha" });
+
+    fireEvent.click(within(selected).getByRole("button", { name: "Add Term" }));
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "Fresh" } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: "New source" } });
+    const form = screen.getByTestId("term").closest("section");
+    if (form === null) {
+      throw new TypeError("Expected Add Term form");
+    }
+    fireEvent.click(within(form).getByRole("button", { name: "Add Term" }));
+
+    await screen.findByRole("article", { name: "Fresh" });
+    expect(mocks.load).toHaveBeenCalledTimes(2);
+    expect(mocks.load.mock.calls[1][0]).toBe("/tmp/first.yaml");
   });
 });
 

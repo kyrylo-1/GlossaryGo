@@ -1,9 +1,10 @@
 import { loadGlossarySource, parseGlossarySource } from "./glossary";
+import { throwIfGlossaryLoadCancelled } from "./glossary-load-cancellation";
 import type { Term } from "../utils/types";
 
 type SourceCacheDependencies = Readonly<{
   parseSource: (source: string) => readonly Term[];
-  readSource: (path: string) => Promise<string>;
+  readSource: (path: string, signal?: AbortSignal) => Promise<string>;
 }>;
 
 type SourceCacheEntry = Readonly<{
@@ -14,7 +15,7 @@ type SourceCacheEntry = Readonly<{
 
 export type GlossarySourceCache = Readonly<{
   clear: () => void;
-  load: (path: string) => Promise<readonly Term[]>;
+  load: (path: string, signal?: AbortSignal) => Promise<readonly Term[]>;
 }>;
 
 const productionDependencies: SourceCacheDependencies = {
@@ -33,14 +34,16 @@ export const createGlossarySourceCache = (
     entry = null;
   };
 
-  const load = async (path: string): Promise<readonly Term[]> => {
+  const load = async (path: string, signal?: AbortSignal): Promise<readonly Term[]> => {
     if (activePath !== path) {
       entry = null;
       activePath = path;
     }
 
     try {
-      const source = await dependencies.readSource(path);
+      throwIfGlossaryLoadCancelled(signal);
+      const source = await dependencies.readSource(path, signal);
+      throwIfGlossaryLoadCancelled(signal);
       if (activePath !== path) {
         return dependencies.parseSource(source);
       }
@@ -48,6 +51,7 @@ export const createGlossarySourceCache = (
         return entry.terms;
       }
 
+      throwIfGlossaryLoadCancelled(signal);
       const terms = dependencies.parseSource(source);
       entry = { path, source, terms };
       return terms;
