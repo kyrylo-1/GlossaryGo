@@ -59,6 +59,14 @@ const questionValue = (): string => {
   return field.value;
 };
 
+const displayedMarkdown = (): string => {
+  const markdown = globalThis.document.querySelector("section pre");
+  if (!markdown) {
+    throw new TypeError("Expected an answer detail.");
+  }
+  return markdown.textContent ?? "";
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   defaultMocks.path = "/synthetic/custom.yaml";
@@ -167,6 +175,48 @@ describe("Ask Glossary response", () => {
 
   test.each([
     {
+      final: "Final ![private term](https://tracker.test/pixel?term=API)",
+      finalSafe: "Final &#33;[private term](https://tracker.test/pixel?term=API)",
+      name: "CommonMark image",
+      streamed: "Streaming ![private term](https://tracker.test/pixel?term=API)",
+      streamedSafe: "Streaming &#33;[private term](https://tracker.test/pixel?term=API)",
+    },
+    {
+      final: 'Final <img src="https://tracker.test/pixel?term=API">',
+      finalSafe:
+        "Final &#60;img src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;pixel&#63;term&#61;API&#34;&#62;",
+      name: "raw HTML image",
+      streamed: 'Streaming <img src="https://tracker.test/pixel?term=API">',
+      streamedSafe:
+        "Streaming &#60;img src&#61;&#34;https&#58;&#47;&#47;tracker&#46;test&#47;pixel&#63;term&#61;API&#34;&#62;",
+    },
+  ])(
+    "neutralizes $name in streamed and final answer snapshots",
+    async ({ final, finalSafe, streamed, streamedSafe }) => {
+      const dependencies = createDependencies();
+      const pending = deferred<string>();
+      let onData: (chunk: string) => void = vi.fn<(chunk: string) => void>();
+      dependencies.askAi.mockImplementation((_prompt, options) => {
+        onData = options.onData;
+        return pending.promise;
+      });
+      render(<AskGlossaryCommand dependencies={dependencies} />);
+
+      ask("What is API?");
+      await waitFor(() => expect(dependencies.askAi).toHaveBeenCalledOnce());
+      act(() => onData(streamed));
+      expect(displayedMarkdown()).toBe(streamedSafe);
+
+      await act(async () => {
+        pending.resolve(final);
+        await pending.promise;
+      });
+      expect(displayedMarkdown()).toBe(finalSafe);
+    },
+  );
+
+  test.each([
+    {
       message: "Raycast AI access is unavailable. Check Raycast AI settings and try again.",
       name: "access",
       prepare: (dependencies: ReturnType<typeof createDependencies>): void => {
@@ -259,6 +309,50 @@ describe("Ask Glossary response", () => {
     });
     expect(screen.queryByText(/late chunk|late final answer/)).toBeNull();
     expect(questionValue()).toBe("");
+  });
+
+  test("late chunks and completion from an aborted request cannot overwrite its replacement answer", async () => {
+    const dependencies = createDependencies();
+    const first = deferred<string>();
+    const second = deferred<string>();
+    let oldOnData: (chunk: string) => void = vi.fn<(chunk: string) => void>();
+    let newOnData: (chunk: string) => void = vi.fn<(chunk: string) => void>();
+    dependencies.askAi
+      .mockImplementationOnce((_prompt, options) => {
+        oldOnData = options.onData;
+        return first.promise;
+      })
+      .mockImplementationOnce((_prompt, options) => {
+        newOnData = options.onData;
+        return second.promise;
+      });
+    render(<AskGlossaryCommand dependencies={dependencies} />);
+
+    ask("First question");
+    await waitFor(() => expect(dependencies.askAi).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("button", { name: "Ask Another Question" }));
+    ask("Second question");
+    await waitFor(() => expect(dependencies.askAi).toHaveBeenCalledTimes(2));
+
+    act(() => newOnData("Current answer in progress."));
+    expect(displayedMarkdown()).toBe("Current answer in progress.");
+    act(() => oldOnData("STALE CHUNK"));
+    await act(async () => {
+      first.resolve("STALE FINAL");
+      await first.promise;
+    });
+    expect(displayedMarkdown()).toBe("Current answer in progress.");
+    expect(screen.getByRole("button", { name: "Ask Another Question" }).closest("section")?.dataset.loading).toBe(
+      "true",
+    );
+
+    act(() => newOnData(" More context."));
+    expect(displayedMarkdown()).toBe("Current answer in progress. More context.");
+    await act(async () => {
+      second.resolve("Current final answer.");
+      await second.promise;
+    });
+    expect(displayedMarkdown()).toBe("Current final answer.");
   });
 
   test("two submissions while confirmation is pending start one confirmation and one request", async () => {

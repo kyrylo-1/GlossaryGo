@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactElement } from "react";
 import { runAskGlossary, type AskGlossaryAi } from "./ask-glossary-logic";
 import { getGlossaryTarget } from "./glossary/get-glossary-target";
 import { loadGlossary } from "./glossary/glossary";
+import { prepareMarkdownForDisplay } from "./utils/prepare-markdown-for-display";
 import type { Term } from "./utils/types";
 
 export type AskGlossaryCommandDependencies = Readonly<{
@@ -108,7 +109,7 @@ export const AskGlossaryCommand = ({
     return (
       <Detail
         isLoading={view.status === "loading"}
-        markdown={view.status === "failure" ? view.message : view.answer}
+        markdown={view.status === "failure" ? view.message : prepareMarkdownForDisplay(view.answer)}
         navigationTitle="Ask Glossary"
         actions={
           <ActionPanel>
