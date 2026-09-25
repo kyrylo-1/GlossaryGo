@@ -23,7 +23,7 @@ type FieldProps = Readonly<{
   value?: string;
 }>;
 type SubmitProps = Readonly<{
-  onSubmit: (values: Readonly<{ definition: string; term: string }>) => unknown;
+  onSubmit: (values: Readonly<{ definition: string; question: string; term: string }>) => unknown;
   title: string;
 }>;
 
@@ -45,6 +45,9 @@ const actionPanel = ({ children }: ContainerProps): ReactElement => createElemen
 
 const getFieldValue = (id: string): string => {
   const field = globalThis.document.querySelector(`[data-testid="${id}"]`);
+  if (field === null) {
+    return "";
+  }
   if (!(field instanceof globalThis.HTMLInputElement) && !(field instanceof globalThis.HTMLTextAreaElement)) {
     throw new TypeError(`Missing ${id} form field.`);
   }
@@ -56,9 +59,13 @@ const submitForm = ({ onSubmit, title }: SubmitProps): ReactElement =>
     "button",
     {
       onClick: () => {
-        Promise.resolve(onSubmit({ definition: getFieldValue("definition"), term: getFieldValue("term") })).catch(
-          () => null,
-        );
+        Promise.resolve(
+          onSubmit({
+            definition: getFieldValue("definition"),
+            question: getFieldValue("question"),
+            term: getFieldValue("term"),
+          }),
+        ).catch(() => null);
       },
       type: "button",
     },
@@ -106,10 +113,16 @@ export const Action = Object.assign(action, {
   SubmitForm: submitForm,
 });
 export const ActionPanel = Object.assign(actionPanel, { Section: actionPanel });
-export const Detail = ({ actions, markdown, metadata, navigationTitle }: ContainerProps): ReactElement =>
+export const Detail = ({
+  actions,
+  isLoading,
+  markdown,
+  metadata,
+  navigationTitle,
+}: ContainerProps & Readonly<{ isLoading?: boolean }>): ReactElement =>
   createElement(
     "section",
-    {},
+    { "data-loading": isLoading },
     createElement("h1", {}, navigationTitle),
     createElement("pre", {}, markdown),
     metadata,
@@ -118,7 +131,8 @@ export const Detail = ({ actions, markdown, metadata, navigationTitle }: Contain
 export const Form = Object.assign(
   ({ actions, children }: ContainerProps): ReactElement => createElement("section", {}, children, actions),
   {
-    Description: (): null => null,
+    Description: ({ text, title }: Readonly<{ text: string; title?: string }>): ReactElement =>
+      createElement("p", {}, title ? createElement("strong", {}, title) : null, text),
     TextArea: (props: FieldProps): ReactElement => renderField("textarea", props),
     TextField: (props: FieldProps): ReactElement => renderField("input", props),
   },
@@ -132,7 +146,12 @@ export const showToast = raycastApiMocks.showToast;
 
 export const Clipboard = { copy: raycastApiMocks.copy };
 export const Alert = { ActionStyle: { Cancel: "cancel", Destructive: "destructive" } };
-export const confirmAlert = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+export const confirmAlert = vi.fn<(options: unknown) => Promise<boolean>>().mockResolvedValue(false);
+export const environment = {
+  canAccess: vi.fn<(_value: unknown) => boolean>().mockReturnValue(true),
+  supportPath: "/tmp/glossarygo-support",
+};
+export const AI = { ask: vi.fn<(_prompt: string, _options: unknown) => Promise<string>>() };
 const pop = vi.fn<() => void>();
 export const useNavigation = (): { pop: () => void } => ({ pop });
 
