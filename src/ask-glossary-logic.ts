@@ -41,6 +41,25 @@ const failed = (kind: "access" | "ai" | "context" | "glossary" | "question", mes
   status: "failed",
 });
 
+const promptFailure = (
+  reason: "context-too-large" | "empty-glossary" | "empty-question" | "question-too-long",
+): AskGlossaryOutcome => {
+  switch (reason) {
+    case "context-too-large": {
+      return failed("context", failureMessages.context);
+    }
+    case "empty-glossary": {
+      return failed("glossary", failureMessages.emptyGlossary);
+    }
+    case "empty-question": {
+      return failed("question", failureMessages.emptyQuestion);
+    }
+    case "question-too-long": {
+      return failed("question", failureMessages.questionTooLong);
+    }
+  }
+};
+
 export const runAskGlossary = async (options: RunAskGlossaryOptions): Promise<AskGlossaryOutcome> => {
   if (options.signal.aborted) {
     return { status: "cancelled" };
@@ -73,16 +92,7 @@ export const runAskGlossary = async (options: RunAskGlossaryOptions): Promise<As
 
   const promptResult = buildAskGlossaryPrompt(options.question, terms);
   if (promptResult.status === "rejected") {
-    switch (promptResult.reason) {
-      case "context-too-large":
-        return failed("context", failureMessages.context);
-      case "empty-glossary":
-        return failed("glossary", failureMessages.emptyGlossary);
-      case "empty-question":
-        return failed("question", failureMessages.emptyQuestion);
-      case "question-too-long":
-        return failed("question", failureMessages.questionTooLong);
-    }
+    return promptFailure(promptResult.reason);
   }
 
   try {

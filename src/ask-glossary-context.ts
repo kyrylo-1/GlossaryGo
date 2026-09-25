@@ -16,7 +16,7 @@ type AskGlossaryPrompt = Readonly<{
 
 export type AskGlossaryPromptResult = AskGlossaryPrompt | AskGlossaryPromptFailure;
 
-export function buildAskGlossaryPrompt(question: string, terms: readonly Term[]): AskGlossaryPromptResult {
+export const buildAskGlossaryPrompt = (question: string, terms: readonly Term[]): AskGlossaryPromptResult => {
   const trimmedQuestion = question.trim();
 
   if (trimmedQuestion.length === 0) {
@@ -31,6 +31,8 @@ export function buildAskGlossaryPrompt(question: string, terms: readonly Term[])
     return { reason: "empty-glossary", status: "rejected" };
   }
 
+  // Preserve the established prompt JSON field order.
+  // eslint-disable-next-line sort-keys
   const serializedGlossary = JSON.stringify(terms.map(({ term, definition }) => ({ term, definition })));
 
   if (Buffer.byteLength(serializedGlossary, "utf8") > MAX_GLOSSARY_CONTEXT_BYTES) {
@@ -51,4 +53,4 @@ ${serializedGlossary}
 </glossary>`;
 
   return { prompt, question: trimmedQuestion, status: "ready" };
-}
+};

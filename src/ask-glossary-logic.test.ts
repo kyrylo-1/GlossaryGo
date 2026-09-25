@@ -19,26 +19,26 @@ afterEach(async () => {
   await removeTemporaryDirectories();
 });
 
-const terms: readonly Term[] = [{ term: "API", definition: "Application Programming Interface" }];
+const terms: readonly Term[] = [{ definition: "Application Programming Interface", term: "API" }];
 
-function createOptions(overrides: Partial<RunAskGlossaryOptions> = {}): RunAskGlossaryOptions {
+const createOptions = (overrides: Partial<RunAskGlossaryOptions> = {}): RunAskGlossaryOptions => {
   return {
     askAi: vi.fn<AskGlossaryAi>().mockResolvedValue("An API is an interface."),
     canAccessAi: () => true,
-    loadTerms: async () => terms,
-    onData: vi.fn(),
+    loadTerms: () => Promise.resolve(terms),
+    onData: vi.fn<(chunk: string) => void>(),
     question: "What is API?",
     signal: new AbortController().signal,
     ...overrides,
   };
-}
+};
 
-function makeTermAtSerializedByteLength(byteLength: number): Term {
+const makeTermAtSerializedByteLength = (byteLength: number): Term => {
   const term = "API";
-  const definitionPrefix = JSON.stringify([{ term, definition: "" }]);
+  const definitionPrefix = JSON.stringify([{ definition: "", term }]);
   const definitionLength = byteLength - Buffer.byteLength(definitionPrefix, "utf8");
-  return { term, definition: "a".repeat(definitionLength) };
-}
+  return { definition: "a".repeat(definitionLength), term };
+};
 
 describe("runAskGlossary request gates", () => {
   test("stops before loading when Raycast AI access is unavailable", async () => {
@@ -50,7 +50,7 @@ describe("runAskGlossary request gates", () => {
         askAi,
         canAccessAi: () => false,
         loadTerms,
-        onData: vi.fn(),
+        onData: vi.fn<(chunk: string) => void>(),
         question: "What is API?",
         signal: new AbortController().signal,
       }),
@@ -69,30 +69,28 @@ describe("runAskGlossary request gates", () => {
       reason === "empty-glossary" ? [] : [makeTermAtSerializedByteLength(MAX_GLOSSARY_CONTEXT_BYTES + 1)];
     const loadTerms = vi.fn<() => Promise<readonly Term[]>>().mockResolvedValue(rejectedTerms);
     const askAi = vi.fn<AskGlossaryAi>();
-    const canAccessAi = vi.fn(() => true);
+    const canAccessAi = vi.fn<() => boolean>(() => true);
 
     const outcome = await runAskGlossary(createOptions({ askAi, canAccessAi, loadTerms, question }));
 
-    expect(outcome).toMatchObject({ kind, status: "failed", message: expect.any(String) });
+    expect(outcome).toMatchObject({ kind, message: expect.any(String), status: "failed" });
     expect(canAccessAi).toHaveBeenCalledTimes(loadCount === 0 ? 0 : 1);
     expect(loadTerms).toHaveBeenCalledTimes(loadCount);
     expect(askAi).not.toHaveBeenCalled();
-    if (loadCount === 1) {
-      expect(buildAskGlossaryPrompt(question, rejectedTerms)).toEqual({ reason, status: "rejected" });
-    }
+    expect(buildAskGlossaryPrompt(question, rejectedTerms)).toEqual({ reason, status: "rejected" });
   });
 });
 
-describe("runAskGlossary AI attempt", () => {
+describe("runAskGlossary AI answer", () => {
   test("passes the ready prompt and original signal, forwards chunks, and returns the final answer", async () => {
     const controller = new AbortController();
     const onData = vi.fn<(chunk: string) => void>();
-    const askAi = vi.fn<AskGlossaryAi>().mockImplementation(async (prompt, { onData: receiveData, signal }) => {
+    const askAi = vi.fn<AskGlossaryAi>().mockImplementation((prompt, { onData: receiveData, signal }) => {
       expect(signal).toBe(controller.signal);
       receiveData("An ");
       receiveData("API");
       expect(prompt).toBe(buildAskGlossaryPrompt("What is API?", terms).prompt);
-      return "An API is an application programming interface.";
+      return Promise.resolve("An API is an application programming interface.");
     });
 
     await expect(runAskGlossary(createOptions({ askAi, onData, signal: controller.signal }))).resolves.toEqual({
@@ -102,14 +100,18 @@ describe("runAskGlossary AI attempt", () => {
     expect(onData.mock.calls).toEqual([["An "], ["API"]]);
     expect(askAi).toHaveBeenCalledOnce();
   });
+});
 
+describe("runAskGlossary failures", () => {
   test("preserves a safe GlossaryError message without an AI request", async () => {
     const askAi = vi.fn<AskGlossaryAi>();
     const error = new GlossaryError("missing", "No glossary exists at this path.");
 
-    await expect(
-      runAskGlossary(createOptions({ askAi, loadTerms: async () => Promise.reject(error) })),
-    ).resolves.toEqual({ kind: "glossary", message: error.message, status: "failed" });
+    await expect(runAskGlossary(createOptions({ askAi, loadTerms: () => Promise.reject(error) }))).resolves.toEqual({
+      kind: "glossary",
+      message: error.message,
+      status: "failed",
+    });
     expect(askAi).not.toHaveBeenCalled();
   });
 
@@ -117,7 +119,7 @@ describe("runAskGlossary AI attempt", () => {
     const askAi = vi.fn<AskGlossaryAi>();
 
     await expect(
-      runAskGlossary(createOptions({ askAi, loadTerms: async () => Promise.reject(new Error("private detail")) })),
+      runAskGlossary(createOptions({ askAi, loadTerms: () => Promise.reject(new Error("private detail")) })),
     ).resolves.toEqual({
       kind: "glossary",
       message: "The glossary could not be loaded. Try again.",
@@ -136,7 +138,9 @@ describe("runAskGlossary AI attempt", () => {
     });
     expect(askAi).toHaveBeenCalledOnce();
   });
+});
 
+describe("runAskGlossary cancellation and retry", () => {
   test("returns cancelled when already aborted before the request", async () => {
     const controller = new AbortController();
     controller.abort();
@@ -152,9 +156,9 @@ describe("runAskGlossary AI attempt", () => {
 
   test("returns cancelled when aborted before an AI rejection", async () => {
     const controller = new AbortController();
-    const askAi = vi.fn<AskGlossaryAi>().mockImplementation(async () => {
+    const askAi = vi.fn<AskGlossaryAi>().mockImplementation(() => {
       controller.abort();
-      throw new Error("private AI detail");
+      return Promise.reject(new Error("private AI detail"));
     });
 
     await expect(runAskGlossary(createOptions({ askAi, signal: controller.signal }))).resolves.toEqual({
