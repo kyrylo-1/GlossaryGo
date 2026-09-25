@@ -58,9 +58,9 @@
   "preferences": [
     {
       "name": "glossaryFile",
-      "title": "Glossary File",
-      "description": "YAML format and example: https://github.com/kyrylo-1/GlossaryGo#glossary-format",
-      "type": "file",
+      "title": "Glossary Location",
+      "description": "Choose a folder for glossary.yaml. The file is created on the first valid Add Term or Quick Add Term. YAML format and example: https://github.com/kyrylo-1/GlossaryGo#glossary-format",
+      "type": "directory",
       "required": false
     }
   ],

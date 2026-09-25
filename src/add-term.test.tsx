@@ -1,18 +1,25 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 
+import { stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type * as RaycastUtils from "@raycast/utils";
+import type * as SaveGlossaryChangeModule from "./glossary/save-glossary-change";
 import Command from "./add-term";
 import { TermForm } from "./components/term-form";
-import { GlossaryError } from "./glossary/glossary";
+import { GlossaryError, loadGlossary } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
+import { createTemporaryPath, removeTemporaryDirectories } from "./glossary/glossary-test-utils";
 import { raycastApiMocks } from "./test/raycast-api-stub";
 
 const mocks = vi.hoisted(() => ({
-  saveGlossaryChange: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>(),
+  glossaryTarget: { createParent: false, path: "/tmp/glossary.yaml" },
+  saveGlossaryChange:
+    vi.fn<(path: string, change: GlossaryChange, options?: { createParent?: boolean }) => Promise<void>>(),
 }));
 
 vi.mock("@raycast/utils", async (importOriginal) => ({
@@ -20,10 +27,7 @@ vi.mock("@raycast/utils", async (importOriginal) => ({
   showFailureToast: vi.fn<(...args: unknown[]) => void>(),
 }));
 vi.mock("./glossary/get-glossary-target", () => ({
-  getGlossaryTarget: (): { createParent: boolean; path: string } => ({
-    createParent: false,
-    path: "/tmp/glossary.yaml",
-  }),
+  getGlossaryTarget: (): { createParent: boolean; path: string } => mocks.glossaryTarget,
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.saveGlossaryChange }));
 
@@ -46,12 +50,44 @@ const expectPristineForm = (): ReturnType<typeof screen.getByTestId> => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.glossaryTarget = { createParent: false, path: "/tmp/glossary.yaml" };
   raycastApiMocks.closeMainWindow.mockResolvedValue();
   raycastApiMocks.showInFinder.mockResolvedValue();
   raycastApiMocks.showToast.mockResolvedValue();
 });
 
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  await removeTemporaryDirectories();
+});
+
+describe("standalone Add Term folder creation", () => {
+  test("creates glossary.yaml in the selected folder only after a valid submission", async () => {
+    const selectedFolder = dirname(await createTemporaryPath("placeholder"));
+    const glossaryFile = join(selectedFolder, "glossary.yaml");
+    const actual = await vi.importActual<typeof SaveGlossaryChangeModule>("./glossary/save-glossary-change");
+    mocks.glossaryTarget = { createParent: false, path: glossaryFile };
+    mocks.saveGlossaryChange.mockImplementation(actual.saveGlossaryChange);
+
+    render(<Command />);
+    await expect(stat(glossaryFile)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+
+    fireEvent.change(screen.getByTestId("term"), { target: { value: " " } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+    await expect(stat(glossaryFile)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "Folder Term" } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: "Created by Add Term" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Term" }));
+
+    expect(await screen.findByRole("heading", { name: "Term Added" })).toBeTruthy();
+    await expect(loadGlossary(glossaryFile)).resolves.toEqual([
+      { definition: "Created by Add Term", term: "Folder Term" },
+    ]);
+  });
+});
 
 describe("standalone Add Term command", () => {
   test("shows saved values, supports Done, and starts another pristine focused form", async () => {
