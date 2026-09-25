@@ -4,7 +4,7 @@ import type { Term } from "../utils/types";
 import { GlossaryError } from "../glossary/glossary";
 import type { GlossaryTarget } from "../glossary/glossary-target";
 import { createGlossarySourceCache, type GlossarySourceCache } from "../glossary/glossary-source-cache";
-import { searchTerms, type SearchResult } from "./search";
+import { prepareTermsForSearch, searchPreparedTerms, type PreparedTermsForSearch, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState, type GlossaryAction } from "./glossary-reducer";
 
 export type { CommandState } from "./glossary-reducer";
@@ -82,18 +82,29 @@ export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget
   const reload = useGlossaryReload(glossaryFile, dispatch, sourceCache);
   const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
   const recordTerm = useCallback((term: Term) => dispatch({ term, type: "termUsed" }), []);
-  const result = useMemo(
-    () =>
-      model.state.status === "ready"
-        ? searchTerms(model.state.terms, model.query, model.recentTerms)
-        : EMPTY_SEARCH_RESULT,
-    [model.query, model.recentTerms, model.state],
+  const loadedTerms = model.state.status === "ready" ? model.state.terms : null;
+  const preparedTerms: PreparedTermsForSearch | null = useMemo(
+    () => (loadedTerms ? prepareTermsForSearch(loadedTerms) : null),
+    [loadedTerms],
   );
+  const hasTypedQuery = model.query.trim().length > 0;
+  const typedResult = useMemo(
+    () => (preparedTerms && hasTypedQuery ? searchPreparedTerms(preparedTerms, model.query) : EMPTY_SEARCH_RESULT),
+    [hasTypedQuery, model.query, preparedTerms],
+  );
+  const blankQueryResult = useMemo(
+    () =>
+      preparedTerms && !hasTypedQuery
+        ? searchPreparedTerms(preparedTerms, model.query, model.recentTerms)
+        : EMPTY_SEARCH_RESULT,
+    [hasTypedQuery, model.query, model.recentTerms, preparedTerms],
+  );
+  const result = hasTypedQuery ? typedResult : blankQueryResult;
 
   return {
     createParent,
     glossaryFile,
-    isRecent: model.query.trim().length === 0 && model.recentTerms.length > 0,
+    isRecent: !hasTypedQuery && model.recentTerms.length > 0,
     query: model.query,
     recordTerm,
     reload,

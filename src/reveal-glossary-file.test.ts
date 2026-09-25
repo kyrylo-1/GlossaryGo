@@ -28,6 +28,17 @@ beforeEach(async () => {
 afterEach(removeTemporaryDirectories);
 
 describe("Reveal Glossary File existing targets", () => {
+  test("reveals glossary.yaml inside the selected glossary folder", async () => {
+    const path = await writeGlossary("terms: []\n");
+    api.getPreferenceValues.mockReturnValue({ glossaryFile: dirname(path) });
+
+    await Command();
+
+    expect(api.showInFinder).toHaveBeenCalledExactlyOnceWith(path);
+    expect(await readFile(path, "utf8")).toBe("terms: []\n");
+    expect(api.confirmAlert).not.toHaveBeenCalled();
+  });
+
   test.each(["terms: []\n", "terms: [invalid YAML\n", ""])(
     "reveals a configured file without validating or changing its contents: %j",
     async (contents) => {
@@ -68,7 +79,7 @@ describe("Reveal Glossary File missing targets", () => {
       expect(existsSync(join(api.environment.supportPath, "missing"))).toBe(false);
       expect(api.confirmAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringMatching(/Add Term.*Preferences/u),
+          message: expect.stringMatching(/selected folder.*Add Term.*recreate the folder.*Preferences/u),
           primaryAction: expect.objectContaining({ title: "Open Extension Preferences" }),
           title: "Glossary File Is Missing",
         }),
@@ -112,7 +123,7 @@ describe("Reveal Glossary File recovery", () => {
 
     expect(api.showInFinder).not.toHaveBeenCalled();
     expect(api.confirmAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringMatching(/path.*permissions/u) }),
+      expect.objectContaining({ message: expect.stringMatching(/Glossary Location.*folder permissions/u) }),
     );
   });
 });
@@ -181,7 +192,7 @@ describe("Reveal Glossary File recovery choices", () => {
     expect(api.confirmAlert).toHaveBeenCalledTimes(2);
     expect(api.confirmAlert).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        message: expect.stringMatching(/Raycast Settings.*GlossaryGo.*Glossary File/u),
+        message: expect.stringMatching(/Raycast Settings.*GlossaryGo.*Glossary Location/u),
         primaryAction: { title: "OK" },
         title: "Could Not Open Preferences",
       }),

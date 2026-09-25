@@ -9,10 +9,13 @@ import { getEntryIdentity } from "./glossary/entry-identity";
 import { GlossaryError, parseGlossarySource } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import type * as GlossaryModule from "./glossary/glossary";
+import * as SearchModule from "./hooks/search";
 import Command from "./search-term";
 import { raycastApiMocks } from "./test/raycast-api-stub";
+import { prepareMarkdownForDisplay } from "./utils/prepare-markdown-for-display";
 import type { Term } from "./utils/types";
 import type * as RaycastUtils from "@raycast/utils";
+import type * as MarkdownRenderer from "./utils/prepare-markdown-for-display";
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn<(path: string) => Promise<readonly Term[]>>(),
@@ -34,6 +37,13 @@ vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => ({ createParent: false, path: mocks.path }),
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.save }));
+vi.mock("./utils/prepare-markdown-for-display", async (importOriginal) => {
+  const original = await importOriginal<typeof MarkdownRenderer>();
+  return {
+    ...original,
+    prepareMarkdownForDisplay: vi.fn<typeof original.prepareMarkdownForDisplay>(original.prepareMarkdownForDisplay),
+  };
+});
 const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].map((term) => ({
   definition: `${term} definition`,
   term,
@@ -333,6 +343,22 @@ describe("Search Term result details", () => {
 });
 
 describe("Search Term recent history", () => {
+  test("keeps typed matches cached when a successful copy updates recent history", async () => {
+    const searchTerms = vi.spyOn(SearchModule, "searchTerms");
+    render(<Command />);
+    await screen.findByRole("article", { name: "Alpha" });
+    search("a");
+    expect(names()).toEqual(["Alpha"]);
+    const typedMatchCalls = searchTerms.mock.calls.filter(([, query]) => query === "a").length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy Definition" }));
+    await waitFor(() => expect(raycastApiMocks.showToast).toHaveBeenCalled());
+
+    expect(searchTerms.mock.calls.filter(([, query]) => query === "a")).toHaveLength(typedMatchCalls);
+    search("");
+    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
+  });
+
   test("records both successful copy actions, deduplicates repeats, and leaves typing alphabetical", async () => {
     render(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
@@ -378,6 +404,28 @@ describe("Search Term complete result list", () => {
     const last = within(screen.getByRole("article", { name: "A07" }));
     fireEvent.click(last.getByRole("button", { name: "Copy Definition" }));
     await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith("A07 original definition"));
+  });
+
+  test("formats a large result list once when its parent rerenders", async () => {
+    mocks.load.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => ({
+        definition: `Synthetic definition ${index + 1}`,
+        term: `Term ${String(index + 1).padStart(3, "0")}`,
+      })),
+    );
+    const view = render(<Command />);
+    await screen.findByRole("article", { name: "Term 001" });
+    expect(screen.getAllByTestId("result")).toHaveLength(200);
+    expect(prepareMarkdownForDisplay).toHaveBeenCalledTimes(200);
+
+    const selected = screen.getByRole("article", { name: "Term 200" });
+    fireEvent.click(selected);
+    await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId));
+    view.rerender(<Command />);
+
+    expect(prepareMarkdownForDisplay).toHaveBeenCalledTimes(200);
+    expect(screen.getAllByTestId("result")).toHaveLength(200);
+    expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId);
   });
 });
 
