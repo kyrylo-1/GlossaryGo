@@ -52,7 +52,7 @@ export default async function Command(): Promise<void> {
   if (revealPath !== glossaryFile) {
     await showRecovery(
       "Glossary File Is Missing",
-      "Revealed the nearest folder. Use Add Term to create the missing glossary, or choose a Glossary Location in Preferences.",
+      "Revealed the nearest folder. If the selected folder still exists, use Add Term to create glossary.yaml. Otherwise, recreate the folder or choose another Glossary Location in Preferences.",
     );
   }
 }

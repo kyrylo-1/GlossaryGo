@@ -8,20 +8,23 @@ export type GlossaryTarget = Readonly<{
   path: string;
 }>;
 
-export const resolveGlossaryTarget = (supportPath: string, glossaryFile?: string): GlossaryTarget => {
-  if (!glossaryFile) {
+export const resolveGlossaryTarget = (supportPath: string, glossaryLocation?: string): GlossaryTarget => {
+  if (!glossaryLocation) {
     return { createParent: true, path: join(supportPath, "glossary.yaml") };
   }
 
   try {
     return {
       createParent: false,
-      path: statSync(glossaryFile).isDirectory() ? join(glossaryFile, "glossary.yaml") : glossaryFile,
+      path: statSync(glossaryLocation).isDirectory() ? join(glossaryLocation, "glossary.yaml") : glossaryLocation,
     };
   } catch {
+    // The preference key previously held file-picker values, including files that may now be missing.
     return {
       createParent: false,
-      path: glossaryFile.endsWith(GLOSSARY_FILE_EXTENSION) ? glossaryFile : join(glossaryFile, "glossary.yaml"),
+      path: glossaryLocation.endsWith(GLOSSARY_FILE_EXTENSION)
+        ? glossaryLocation
+        : join(glossaryLocation, "glossary.yaml"),
     };
   }
 };

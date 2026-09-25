@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, test } from "vitest";
@@ -44,6 +44,16 @@ describe("resolveGlossaryTarget folder locations", () => {
     await expect(stat(join(glossaryFolder, "glossary.yaml"))).rejects.toEqual(
       expect.objectContaining({ code: "ENOENT" }),
     );
+  });
+
+  test("uses glossary.yaml inside an existing selected folder whose name ends in .yaml", async () => {
+    const glossaryFolder = await createTemporaryPath("archive.yaml");
+    await mkdir(glossaryFolder);
+
+    expect(resolveGlossaryTarget("/Users/test/support", glossaryFolder)).toEqual({
+      createParent: false,
+      path: join(glossaryFolder, "glossary.yaml"),
+    });
   });
 
   test("treats another missing configured path as a glossary folder without creating it", async () => {

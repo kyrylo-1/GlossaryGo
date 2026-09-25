@@ -79,7 +79,7 @@ describe("Reveal Glossary File missing targets", () => {
       expect(existsSync(join(api.environment.supportPath, "missing"))).toBe(false);
       expect(api.confirmAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringMatching(/Add Term.*Preferences/u),
+          message: expect.stringMatching(/selected folder.*Add Term.*recreate the folder.*Preferences/u),
           primaryAction: expect.objectContaining({ title: "Open Extension Preferences" }),
           title: "Glossary File Is Missing",
         }),
