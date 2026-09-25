@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, type Dispatch } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch } from "react";
 
 import type { Term } from "../utils/types";
-import { GlossaryError, loadGlossary } from "../glossary/glossary";
+import { GlossaryError } from "../glossary/glossary";
+import { isGlossaryLoadCancelledError } from "../glossary/glossary-load-cancellation";
 import type { GlossaryTarget } from "../glossary/glossary-target";
-import { searchTerms, type SearchResult } from "./search";
+import { createGlossarySourceCache, type GlossarySourceCache } from "../glossary/glossary-source-cache";
+import { prepareTermsForSearch, searchPreparedTerms, type PreparedTermsForSearch, type SearchResult } from "./search";
 import { glossaryReducer, type CommandState, type GlossaryAction } from "./glossary-reducer";
 
 export type { CommandState } from "./glossary-reducer";
@@ -29,9 +31,25 @@ const getSafeErrorMessage = (error: unknown): string => {
   return error instanceof GlossaryError ? error.message : "The glossary could not be loaded. Try reloading it.";
 };
 
-const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryAction>): (() => Promise<void>) => {
+const dispatchLoadError = (error: unknown, dispatch: Dispatch<GlossaryAction>): void => {
+  if (error instanceof GlossaryError && error.code === "missing") {
+    dispatch({ type: "loadMissing" });
+  } else {
+    dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
+  }
+};
+
+const useGlossaryReload = (
+  glossaryFile: string,
+  dispatch: Dispatch<GlossaryAction>,
+  sourceCache: GlossarySourceCache,
+): (() => Promise<void>) => {
+  const loadController = useRef<AbortController>();
   const loadSequence = useRef(0);
   const reload = useCallback(async () => {
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
     const sequence = ++loadSequence.current;
     await Promise.resolve();
     if (sequence !== loadSequence.current) {
@@ -40,20 +58,19 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
     dispatch({ type: "loadStarted" });
 
     try {
-      const terms = await loadGlossary(glossaryFile);
+      const terms = await sourceCache.load(glossaryFile, controller.signal);
       if (sequence === loadSequence.current) {
         dispatch({ terms, type: "loadSucceeded" });
       }
     } catch (error: unknown) {
+      if (isGlossaryLoadCancelledError(error)) {
+        return;
+      }
       if (sequence === loadSequence.current) {
-        if (error instanceof GlossaryError && error.code === "missing") {
-          dispatch({ type: "loadMissing" });
-        } else {
-          dispatch({ message: getSafeErrorMessage(error), type: "loadFailed" });
-        }
+        dispatchLoadError(error, dispatch);
       }
     }
-  }, [dispatch, glossaryFile]);
+  }, [dispatch, glossaryFile, sourceCache]);
   useEffect(() => {
     let isActive = true;
     queueMicrotask(() => {
@@ -63,30 +80,44 @@ const useGlossaryReload = (glossaryFile: string, dispatch: Dispatch<GlossaryActi
     });
     return (): void => {
       isActive = false;
+      loadController.current?.abort();
       loadSequence.current += 1;
+      sourceCache.clear();
     };
-  }, [reload]);
+  }, [reload, sourceCache]);
 
   return reload;
 };
 
 export const useGlossary = ({ createParent, path: glossaryFile }: GlossaryTarget): GlossaryController => {
   const [model, dispatch] = useReducer(glossaryReducer, { query: "", recentTerms: [], state: { status: "loading" } });
-  const reload = useGlossaryReload(glossaryFile, dispatch);
+  const [sourceCache] = useState<GlossarySourceCache>(createGlossarySourceCache);
+  const reload = useGlossaryReload(glossaryFile, dispatch, sourceCache);
   const setQuery = useCallback((query: string) => dispatch({ query, type: "queryChanged" }), []);
   const recordTerm = useCallback((term: Term) => dispatch({ term, type: "termUsed" }), []);
-  const result = useMemo(
-    () =>
-      model.state.status === "ready"
-        ? searchTerms(model.state.terms, model.query, model.recentTerms)
-        : EMPTY_SEARCH_RESULT,
-    [model.query, model.recentTerms, model.state],
+  const loadedTerms = model.state.status === "ready" ? model.state.terms : null;
+  const preparedTerms: PreparedTermsForSearch | null = useMemo(
+    () => (loadedTerms ? prepareTermsForSearch(loadedTerms) : null),
+    [loadedTerms],
   );
+  const hasTypedQuery = model.query.trim().length > 0;
+  const typedResult = useMemo(
+    () => (preparedTerms && hasTypedQuery ? searchPreparedTerms(preparedTerms, model.query) : EMPTY_SEARCH_RESULT),
+    [hasTypedQuery, model.query, preparedTerms],
+  );
+  const blankQueryResult = useMemo(
+    () =>
+      preparedTerms && !hasTypedQuery
+        ? searchPreparedTerms(preparedTerms, model.query, model.recentTerms)
+        : EMPTY_SEARCH_RESULT,
+    [hasTypedQuery, model.query, model.recentTerms, preparedTerms],
+  );
+  const result = hasTypedQuery ? typedResult : blankQueryResult;
 
   return {
     createParent,
     glossaryFile,
-    isRecent: model.query.trim().length === 0 && model.recentTerms.length > 0,
+    isRecent: !hasTypedQuery && model.recentTerms.length > 0,
     query: model.query,
     recordTerm,
     reload,

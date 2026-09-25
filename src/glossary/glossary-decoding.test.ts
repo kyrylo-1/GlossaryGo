@@ -1,12 +1,52 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, type FileHandle } from "node:fs/promises";
 
 import { saveGlossaryChange } from "./save-glossary-change";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { GlossaryError, loadGlossary } from "./glossary";
+import { glossaryReadFileSystem } from "./glossary-file";
 import { removeTemporaryDirectories, writeGlossary } from "./glossary-test-utils";
 
-afterEach(removeTemporaryDirectories);
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await removeTemporaryDirectories();
+});
+
+describe("loadGlossary cancellation", () => {
+  test("stops before reading when its load is already cancelled", async () => {
+    const path = await writeGlossary("terms: []\n");
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(loadGlossary(path, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  test("closes a source after cancellation during a chunk read and before parsing it", async () => {
+    const controller = new AbortController();
+    const source = "unexpected: source\n";
+    const close = vi.fn<() => Promise<void>>((): Promise<void> => Promise.resolve());
+    let hasRead = false;
+    const handle = {
+      close,
+      read: vi.fn<(chunk: Buffer) => Promise<{ buffer: Buffer; bytesRead: number }>>((chunk) => {
+        if (hasRead) {
+          return Promise.resolve({ buffer: chunk, bytesRead: 0 });
+        }
+        hasRead = true;
+        chunk.write(source);
+        controller.abort();
+        return Promise.resolve({ buffer: chunk, bytesRead: Buffer.byteLength(source) });
+      }),
+      stat: vi.fn<() => Promise<{ isFile: () => boolean; size: number }>>(() =>
+        Promise.resolve({ isFile: (): boolean => true, size: source.length }),
+      ),
+    } as unknown as FileHandle;
+    vi.spyOn(glossaryReadFileSystem, "open").mockResolvedValue(handle);
+
+    await expect(loadGlossary("/synthetic.yaml", controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    expect(close).toHaveBeenCalledOnce();
+  });
+});
 
 describe("loadGlossary decoding and size", () => {
   test("rejects bytes that are not valid UTF-8", async () => {

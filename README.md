@@ -5,17 +5,24 @@ form; **Quick Add Term** saves from root search; **Reveal Glossary File** locate
 
 ## Setup
 
-Open any command. No file setup required. Without **Glossary File** preference, all commands use `glossary.yaml` in
-Raycast's extension-specific Application Support directory. First valid add creates file and support directory.
-Opening commands, canceling forms, or submitting invalid fields creates nothing.
+Open any command. No file setup required. Without the optional **Glossary Location** preference, all commands use
+`glossary.yaml` in Raycast's extension-specific Application Support directory. First valid Add Term or Quick Add Term
+creates the file and default support directory. Opening commands, choosing a location, canceling forms, or submitting
+invalid fields creates nothing.
 
-Select existing `.yaml` in shared **Glossary File** preference for custom storage. Custom path always takes precedence.
-If removed, valid Add Term can recreate file only when parent folder exists. GlossaryGo never creates custom folders.
+Select an existing folder in the shared **Glossary Location** preference for custom storage. Every command then uses
+`glossary.yaml` inside that folder. First valid Add Term or Quick Add Term creates only that file; GlossaryGo never
+creates a selected custom folder. An existing `glossary.yaml` is loaded and validated through the normal command flow
+and is never overwritten as setup.
+
+An existing stored preference from an earlier GlossaryGo version that points directly to an existing or missing
+`.yaml` file remains a direct Glossary File path. GlossaryGo does not move, rename, or delete it. Reselect a folder in
+**Glossary Location** to opt into folder-based storage.
 
 macOS only. Existing file must be readable, contain one YAML document, and not exceed 5 MiB. Writes require writable
 ordinary file with exactly one filesystem link. Symbolic links and multiply hard-linked files support search only:
 replacement could change link semantics. `.yml` is unsupported. Raycast may remove default file on uninstall;
-choose custom file for storage beyond installation.
+choose a custom folder for storage beyond installation.
 
 ## Glossary format
 
@@ -80,12 +87,13 @@ successive entries.
 
 ## Revealing the glossary file
 
-Open **Reveal Glossary File** from Raycast root search to select the effective Glossary File in Finder. It uses the
-shared custom file preference when set, otherwise the default support-directory file. It needs no search result and
-works with invalid YAML, an empty glossary, or a blank file without reading or validating its contents.
+Open **Reveal Glossary File** from Raycast root search to select the effective Glossary File in Finder. A selected
+folder resolves to its `glossary.yaml`; a retained legacy direct-file preference remains direct. Without a preference,
+Reveal uses the default support-directory file. It needs no search result and works with invalid YAML, an empty
+glossary, or a blank file without reading or validating its contents.
 
 If the file is missing, Finder reveals the nearest existing folder, including when intermediate folders are absent.
-A **Glossary File Is Missing** dialog stays available after Finder opens, explains how to create or select a file,
+A **Glossary File Is Missing** dialog stays available after Finder opens, explains how to create the file or select a folder,
 and offers **Open Extension Preferences** or **Done**. Path or Finder failures use the same recovery dialog. If
 Preferences cannot open, a second dialog explains how to find the setting manually. Reveal never creates folders
 or files and never changes glossary contents.
@@ -214,15 +222,18 @@ in Finder.
 
 ## Troubleshooting
 
-- **No file selected:** Add first term for default storage or select custom `.yaml` in extension preferences.
-- **Custom file cannot be recreated:** Ensure existing parent folder is writable. Missing custom folders are not created.
-- **Load fails:** Require readable `.yaml`, valid UTF-8, at most 5 MiB. Select another file in preferences if needed.
+- **No location selected:** Add the first term for default storage or select an existing custom folder in extension preferences.
+- **Custom glossary cannot be created:** Ensure the selected folder still exists and is writable. Missing custom folders
+  are not created.
+- **Load fails:** Require the effective Glossary File to be readable, valid UTF-8, and at most 5 MiB. Select another
+  existing folder in preferences if needed.
 - **Validation fails:** Require one document, only `terms` root, only non-empty `term`/`definition` per entry.
   Remove anchors, aliases, merge keys, custom tags. Same-name entries are valid.
 - **No terms:** `terms: []` is valid. Otherwise fix validation error and **Reload Glossary**.
 - **No matches:** Use term-name prefix; shorten/correct query. Definitions and middle-of-name text are not searched.
 - **External edits missing:** Choose **Reload Glossary**. No automatic reload.
 - **Add/Edit fails:** Correct form errors. Failure toast offers **Reload Glossary** for conflicts;
-  otherwise **Open Extension Preferences** to choose writable ordinary `.yaml` with one filesystem link.
+  otherwise **Open Extension Preferences** to choose an existing writable Glossary Location folder. A retained legacy
+  file must remain an ordinary `.yaml` file with exactly one filesystem link.
 - **Delete fails:** Resolve external edits; retry refreshed result. No writes to symbolic links, multiply hard-linked
   files, or stale selections.

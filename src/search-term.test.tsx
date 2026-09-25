@@ -2,20 +2,25 @@
 /// <reference lib="dom" />
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { confirmAlert } from "@raycast/api";
 
 import { getEntryIdentity } from "./glossary/entry-identity";
 import { GlossaryError, parseGlossarySource } from "./glossary/glossary";
+import { useGlossary } from "./hooks/use-glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
 import type * as GlossaryModule from "./glossary/glossary";
+import * as SearchModule from "./hooks/search";
 import Command from "./search-term";
 import { raycastApiMocks } from "./test/raycast-api-stub";
+import { prepareMarkdownForDisplay } from "./utils/prepare-markdown-for-display";
 import type { Term } from "./utils/types";
 import type * as RaycastUtils from "@raycast/utils";
+import type * as MarkdownRenderer from "./utils/prepare-markdown-for-display";
 
 const mocks = vi.hoisted(() => ({
-  load: vi.fn<(path: string) => Promise<readonly Term[]>>(),
+  load: vi.fn<(path: string, signal?: AbortSignal) => Promise<readonly Term[]>>(),
   path: "/tmp/first.yaml",
   save: vi.fn<(path: string, change: GlossaryChange) => Promise<void>>(),
 }));
@@ -25,12 +30,22 @@ vi.mock("@raycast/utils", async (importOriginal) => ({
 }));
 vi.mock("./glossary/glossary", async (importOriginal) => ({
   ...(await importOriginal<typeof GlossaryModule>()),
-  loadGlossary: mocks.load,
+  loadGlossarySource: async (path: string, signal?: AbortSignal): Promise<string> => {
+    const loadedTerms = await mocks.load(path, signal);
+    return `terms: ${JSON.stringify(loadedTerms)}\n`;
+  },
 }));
 vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => ({ createParent: false, path: mocks.path }),
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.save }));
+vi.mock("./utils/prepare-markdown-for-display", async (importOriginal) => {
+  const original = await importOriginal<typeof MarkdownRenderer>();
+  return {
+    ...original,
+    prepareMarkdownForDisplay: vi.fn<typeof original.prepareMarkdownForDisplay>(original.prepareMarkdownForDisplay),
+  };
+});
 const terms = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"].map((term) => ({
   definition: `${term} definition`,
   term,
@@ -53,8 +68,30 @@ const reload = (): void => {
   fireEvent.click(screen.getAllByRole("button", { name: "Reload Glossary" })[0]);
 };
 
+const createDeferred = <Value,>(): Readonly<{
+  promise: Promise<Value>;
+  reject: (error: unknown) => void;
+  resolve: (value: Value | PromiseLike<Value>) => void;
+}> => Promise.withResolvers<Value>();
+
+const ReloadHarness = ({ path }: Readonly<{ path: string }>): ReactElement => {
+  const { reload: reloadGlossary, result, state } = useGlossary({ createParent: false, path });
+  const triggerReload = (): void => {
+    reloadGlossary().catch(() => null);
+  };
+  return (
+    <>
+      <button onClick={triggerReload}>Reload</button>
+      <output data-testid="load-status">{state.status}</output>
+      <output data-testid="loaded-terms">{result.terms.map(({ term }) => term).join(",")}</output>
+    </>
+  );
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.load.mockReset();
+  mocks.save.mockReset();
   mocks.path = "/tmp/first.yaml";
   mocks.load.mockResolvedValue(terms);
   mocks.save.mockResolvedValue();
@@ -293,6 +330,80 @@ describe("full definition reader recency", () => {
   });
 });
 
+describe("Search Term reload cancellation", () => {
+  test("cancels an obsolete reload and retains newer terms when it resolves late", async () => {
+    const obsoleteLoad = createDeferred<readonly Term[]>();
+    let obsoleteSignal: AbortSignal | undefined;
+    const view = render(<ReloadHarness path="/tmp/first.yaml" />);
+    await waitFor(() => expect(view.getByTestId("load-status").textContent).toBe("ready"));
+    mocks.load
+      .mockImplementationOnce((_path, signal) => {
+        obsoleteSignal = signal;
+        return obsoleteLoad.promise;
+      })
+      .mockResolvedValueOnce([{ definition: "New source", term: "Fresh" }]);
+
+    fireEvent.click(view.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(mocks.load).toHaveBeenCalledTimes(2));
+    fireEvent.click(view.getByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(obsoleteSignal?.aborted).toBe(true));
+
+    await waitFor(() => expect(view.getByTestId("load-status").textContent).toBe("ready"));
+    expect(view.getByTestId("loaded-terms").textContent).toBe("Fresh");
+    obsoleteLoad.resolve([{ definition: "Stale source", term: "Stale" }]);
+    await waitFor(() => expect(view.getByTestId("loaded-terms").textContent).toBe("Fresh"));
+  });
+
+  test("cancels outstanding loads when the command unmounts or its Glossary File changes", async () => {
+    const signals: AbortSignal[] = [];
+    const pendingLoad = Promise.withResolvers<readonly Term[]>();
+    mocks.load.mockImplementation((_path, signal) => {
+      if (!signal) {
+        throw new TypeError("Expected a cancellation signal");
+      }
+      signals.push(signal);
+      return pendingLoad.promise;
+    });
+    const view = render(<ReloadHarness path="/tmp/first.yaml" />);
+    await waitFor(() => expect(signals).toHaveLength(1));
+
+    view.rerender(<ReloadHarness path="/tmp/second.yaml" />);
+    await waitFor(() => expect(signals[0].aborted).toBe(true));
+    await waitFor(() => expect(signals).toHaveLength(2));
+
+    view.unmount();
+    expect(signals[1].aborted).toBe(true);
+  });
+});
+
+describe("Search Term post-save refresh", () => {
+  test("reads the saved source during the post-save refresh", async () => {
+    let source = terms;
+    mocks.load.mockImplementation(() => Promise.resolve(source));
+    mocks.save.mockImplementation((_path, change) => {
+      if (change.type === "add") {
+        source = [...source, change.term];
+      }
+      return Promise.resolve();
+    });
+    render(<Command />);
+    const selected = await screen.findByRole("article", { name: "Alpha" });
+
+    fireEvent.click(within(selected).getByRole("button", { name: "Add Term" }));
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "Fresh" } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: "New source" } });
+    const form = screen.getByTestId("term").closest("section");
+    if (form === null) {
+      throw new TypeError("Expected Add Term form");
+    }
+    fireEvent.click(within(form).getByRole("button", { name: "Add Term" }));
+
+    await screen.findByRole("article", { name: "Fresh" });
+    expect(mocks.load).toHaveBeenCalledTimes(2);
+    expect(mocks.load.mock.calls[1][0]).toBe("/tmp/first.yaml");
+  });
+});
+
 describe("Search Term result details", () => {
   test("keeps literal term content and native Markdown definitions without exposing the glossary path", async () => {
     const definition = "Literal # heading\nA *definition* with `code`.\nRésumé.";
@@ -330,6 +441,22 @@ describe("Search Term result details", () => {
 });
 
 describe("Search Term recent history", () => {
+  test("keeps typed matches cached when a successful copy updates recent history", async () => {
+    const searchTerms = vi.spyOn(SearchModule, "searchTerms");
+    render(<Command />);
+    await screen.findByRole("article", { name: "Alpha" });
+    search("a");
+    expect(names()).toEqual(["Alpha"]);
+    const typedMatchCalls = searchTerms.mock.calls.filter(([, query]) => query === "a").length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Copy Definition" }));
+    await waitFor(() => expect(raycastApiMocks.showToast).toHaveBeenCalled());
+
+    expect(searchTerms.mock.calls.filter(([, query]) => query === "a")).toHaveLength(typedMatchCalls);
+    search("");
+    expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
+  });
+
   test("records both successful copy actions, deduplicates repeats, and leaves typing alphabetical", async () => {
     render(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
@@ -375,6 +502,28 @@ describe("Search Term complete result list", () => {
     const last = within(screen.getByRole("article", { name: "A07" }));
     fireEvent.click(last.getByRole("button", { name: "Copy Definition" }));
     await waitFor(() => expect(raycastApiMocks.copy).toHaveBeenLastCalledWith("A07 original definition"));
+  });
+
+  test("formats a large result list once when its parent rerenders", async () => {
+    mocks.load.mockResolvedValue(
+      Array.from({ length: 200 }, (_, index) => ({
+        definition: `Synthetic definition ${index + 1}`,
+        term: `Term ${String(index + 1).padStart(3, "0")}`,
+      })),
+    );
+    const view = render(<Command />);
+    await screen.findByRole("article", { name: "Term 001" });
+    expect(screen.getAllByTestId("result")).toHaveLength(200);
+    expect(prepareMarkdownForDisplay).toHaveBeenCalledTimes(200);
+
+    const selected = screen.getByRole("article", { name: "Term 200" });
+    fireEvent.click(selected);
+    await waitFor(() => expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId));
+    view.rerender(<Command />);
+
+    expect(prepareMarkdownForDisplay).toHaveBeenCalledTimes(200);
+    expect(screen.getAllByTestId("result")).toHaveLength(200);
+    expect(screen.getByRole("main").dataset.selectedItemId).toBe(selected.dataset.entryId);
   });
 });
 

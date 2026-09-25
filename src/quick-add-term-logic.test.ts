@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -73,7 +73,7 @@ describe("runQuickAddTerm target selection", () => {
     ]);
   });
 
-  test("saves to the selected custom glossary instead of the default", async () => {
+  test("saves to the selected legacy glossary file instead of the default", async () => {
     const supportPath = await createTemporaryPath("support");
     const customGlossary = await createTemporaryPath("custom.yaml");
     const glossaryTarget = resolveGlossaryTarget(supportPath, customGlossary);
@@ -88,6 +88,49 @@ describe("runQuickAddTerm target selection", () => {
 
     await expect(loadGlossary(customGlossary)).resolves.toEqual([
       { definition: "Architectural Decision Record", term: "ADR" },
+    ]);
+    await expect(stat(join(supportPath, "glossary.yaml"))).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+});
+
+describe("runQuickAddTerm folder target selection", () => {
+  test("creates glossary.yaml on the first valid save into the selected folder", async () => {
+    const supportPath = await createTemporaryPath("support");
+    const glossaryFolder = dirname(await createTemporaryPath("placeholder"));
+    const glossaryTarget = resolveGlossaryTarget(supportPath, glossaryFolder);
+
+    await runQuickAddTerm({
+      arguments: { definition: "Architectural Decision Record", term: "ADR" },
+      glossaryTarget,
+      onFailure: vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue(),
+      onSuccess: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      saveChange: saveGlossaryChange,
+    });
+
+    await expect(loadGlossary(join(glossaryFolder, "glossary.yaml"))).resolves.toEqual([
+      { definition: "Architectural Decision Record", term: "ADR" },
+    ]);
+    await expect(stat(join(supportPath, "glossary.yaml"))).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+
+  test("adds to an existing glossary.yaml in the selected folder", async () => {
+    const supportPath = await createTemporaryPath("support");
+    const existingGlossary = await writeGlossary(
+      "terms:\n  - term: API\n    definition: Application Programming Interface\n",
+    );
+    const glossaryTarget = resolveGlossaryTarget(supportPath, dirname(existingGlossary));
+
+    await runQuickAddTerm({
+      arguments: { definition: "Architectural Decision Record", term: "ADR" },
+      glossaryTarget,
+      onFailure: vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue(),
+      onSuccess: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      saveChange: saveGlossaryChange,
+    });
+
+    await expect(loadGlossary(existingGlossary)).resolves.toEqual([
+      { definition: "Architectural Decision Record", term: "ADR" },
+      { definition: "Application Programming Interface", term: "API" },
     ]);
     await expect(stat(join(supportPath, "glossary.yaml"))).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
   });
