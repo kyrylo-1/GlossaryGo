@@ -114,8 +114,9 @@ Record native app-picker observations separately from component tests.
 | O2  | Use a missing selected-folder, direct legacy, and isolated default file. Inspect Search Term and Add Term forms, then use Reveal, Preferences, and Add Term recovery.                                                                                                                                    | **Open Glossary With…** is absent for the missing file. Opening views and menus creates nothing; Reveal finds the nearest existing folder, Preferences remains available, and an explicit valid Add creates the file. |
 | O3  | Record synthetic file bytes, directory entries, query, and selected result; choose a compatible app through **Open Glossary With…**. Return to Search Term and repeat after a recoverable load error.                                                                                                    | GlossaryGo does not rewrite the file, change query/selection, record a recent term, log or transmit glossary content. The chosen app receives the exact file. Check any later edits made in that app separately.      |
 
-Automated coverage in `src/components/open-glossary-file-action.test.tsx`, `src/search-term.test.tsx`, and
-`src/add-term.test.tsx` checks path wiring, action availability, missing-file recovery, and read-only state. It cannot
+Automated coverage in `src/components/open-glossary-file-action.test.tsx`, `src/search-term-open-with.test.tsx`,
+`src/search-term.test.tsx`, and `src/add-term.test.tsx` checks path wiring, action availability, missing-file recovery,
+and read-only state. It cannot
 prove which apps Raycast lists or that an external app opened the file; those require live Raycast evidence.
 
 ### Search, reading, and clipboard
