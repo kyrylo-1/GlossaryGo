@@ -8,8 +8,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type * as RaycastUtils from "@raycast/utils";
+import type * as IsExistingGlossaryFileModule from "./components/is-existing-glossary-file";
 import type * as SaveGlossaryChangeModule from "./glossary/save-glossary-change";
 import Command from "./add-term";
+import { isExistingGlossaryFile } from "./components/is-existing-glossary-file";
 import { TermForm } from "./components/term-form";
 import { GlossaryError, loadGlossary } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
@@ -30,6 +32,10 @@ vi.mock("./glossary/get-glossary-target", () => ({
   getGlossaryTarget: (): { createParent: boolean; path: string } => mocks.glossaryTarget,
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.saveGlossaryChange }));
+vi.mock("./components/is-existing-glossary-file", async (importOriginal) => {
+  const actual = await importOriginal<typeof IsExistingGlossaryFileModule>();
+  return { isExistingGlossaryFile: vi.fn<typeof actual.isExistingGlossaryFile>(actual.isExistingGlossaryFile) };
+});
 
 const valueOf = (id: string): string => {
   const field = screen.getByTestId(id);
@@ -86,6 +92,8 @@ describe("standalone Add Term folder creation", () => {
     await expect(loadGlossary(glossaryFile)).resolves.toEqual([
       { definition: "Created by Add Term", term: "Folder Term" },
     ]);
+    fireEvent.click(screen.getByRole("button", { name: "Add Another Term" }));
+    expect(screen.getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(glossaryFile);
   });
 });
 
@@ -96,6 +104,19 @@ describe("standalone Add Term Open With action", () => {
     render(<Command />);
 
     expect(screen.getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.glossaryTarget.path);
+  });
+
+  test("keeps Open With available without checking the file again as the form changes", async () => {
+    mocks.glossaryTarget.path = await writeGlossary("terms: []\n", "legacy.yaml");
+
+    render(<Command />);
+    expect(isExistingGlossaryFile).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByTestId("term"), { target: { value: "Synthetic term" } });
+    fireEvent.change(screen.getByTestId("definition"), { target: { value: "Synthetic definition" } });
+
+    expect(screen.getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.glossaryTarget.path);
+    expect(isExistingGlossaryFile).toHaveBeenCalledTimes(1);
   });
 });
 
