@@ -74,8 +74,37 @@ describe("Create Glossary File command", () => {
     );
     expect(confirmAlert).toHaveBeenCalledWith(expect.objectContaining({ title: "Create Glossary File?" }));
     expect(await screen.findByRole("heading", { name: "Glossary File Created" })).toBeTruthy();
-    expect(screen.getByText(/\/tmp\/selected\/glossary.yaml/)).toBeTruthy();
+    expect(screen.getByText(/&#47;tmp&#47;selected&#47;glossary&#46;yaml/)).toBeTruthy();
     expect(screen.getByText(/shared Glossary Location preference/)).toBeTruthy();
+  });
+
+  test("shows a literal path when folder punctuation resembles Markdown", async () => {
+    mocks.createGlossaryFile.mockResolvedValueOnce("/tmp/[linked](https://example.com)/glossary.yaml");
+    render(<Command />);
+    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
+
+    const result = await screen.findByRole("heading", { name: "Glossary File Created" });
+    expect(result.parentElement?.textContent).toContain(
+      "&#91;linked&#93;&#40;https&#58;&#47;&#47;example&#46;com&#41;",
+    );
+    expect(result.parentElement?.textContent).not.toContain("[linked](https://example.com)");
+  });
+
+  test("reports Finder failure without losing the created path", async () => {
+    raycastApiMocks.showInFinder.mockRejectedValueOnce(new Error("Finder unavailable"));
+    render(<Command />);
+    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
+    await screen.findByRole("heading", { name: "Glossary File Created" });
+    fireEvent.click(screen.getByRole("button", { name: "Reveal Glossary in Finder" }));
+
+    await waitFor(() =>
+      expect(raycastApiMocks.showToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Could Not Reveal Glossary File" }),
+      ),
+    );
+    expect(screen.getByText(/&#47;tmp&#47;selected&#47;glossary&#46;yaml/)).toBeTruthy();
   });
 
   test("creates an empty glossary only after confirmation", async () => {

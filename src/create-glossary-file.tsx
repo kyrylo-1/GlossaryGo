@@ -19,6 +19,7 @@ import { useRef, useState, type ReactElement } from "react";
 import { validateTermForm } from "./components/term-form-logic";
 import { createGlossaryFile } from "./glossary/create-glossary-file";
 import { GlossaryError } from "./glossary/glossary-error";
+import { renderPlainTextAsMarkdown } from "./utils/render-plain-text-as-markdown";
 import type { Term } from "./utils/types";
 
 type InitialTerm = Readonly<Term & { id: number }>;
@@ -104,14 +105,21 @@ export default function Command(): ReactElement {
               title="Reveal Glossary in Finder"
               icon={Icon.Finder}
               onAction={() => {
-                showInFinder(createdPath).catch(() => null);
+                showInFinder(createdPath).catch(() =>
+                  showToast({
+                    message:
+                      "Finder could not reveal the new file. Open the folder shown above and select glossary.yaml.",
+                    style: Toast.Style.Failure,
+                    title: "Could Not Reveal Glossary File",
+                  }).catch(() => null),
+                );
               }}
             />
             <Action title="Open Extension Preferences" onAction={openPreferences} />
             <Action title="Done" icon={Icon.Checkmark} onAction={closeCommand} />
           </ActionPanel>
         }
-        markdown={`# Glossary File Created\n\n${createdPath}\n\nTo use this file in Search Term and other commands, select its folder in the shared Glossary Location preference.`}
+        markdown={`# Glossary File Created\n\n${renderPlainTextAsMarkdown(createdPath)}\n\nTo use this file in Search Term and other commands, select its folder in the shared Glossary Location preference.`}
         navigationTitle="Glossary File Created"
       />
     );
