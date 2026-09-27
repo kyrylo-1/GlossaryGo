@@ -1,7 +1,8 @@
 # GlossaryGo
 
 Search and update private local YAML glossary in Raycast. **Search Term** finds prefixes; **Add Term** opens reusable
-form; **Quick Add Term** saves from root search; **Reveal Glossary File** locates storage in Finder.
+form; **Quick Add Term** saves from root search; **Create Glossary File** creates a new file in a chosen folder;
+**Reveal Glossary File** locates storage in Finder.
 
 ## Setup
 
@@ -18,6 +19,24 @@ and is never overwritten as setup.
 An existing stored preference from an earlier GlossaryGo version that points directly to an existing or missing
 `.yaml` file remains a direct Glossary File path. GlossaryGo does not move, rename, or delete it. Reselect a folder in
 **Glossary Location** to opt into folder-based storage.
+
+## Creating a Glossary File
+
+Open **Create Glossary File** and select an existing local folder. The form shows the destination
+`<selected folder>/glossary.yaml`. Initial terms are optional: create a valid empty `terms: []` file, or use **Add Initial
+Term** to enter one or more term and definition pairs. Each pair follows Add Term's trimming and non-whitespace rules;
+invalid input stays in the form and writes nothing. The saved entries use Add Term's deterministic name order.
+
+Choose **Review and Create**, then explicitly confirm **Create Glossary File**. Opening the command, selecting a folder,
+editing fields, canceling, and failed validation create nothing. Confirmation makes one exclusive file creation with
+private `0600` permissions and writes all initial terms together. Existing files, folders, and symbolic links named
+`glossary.yaml` are never overwritten. Missing or unwritable folders and I/O failures show a recovery error; a failed
+write, flush, or close leaves the path untouched for inspection. It may contain an incomplete file or a replacement
+from another process. Inspect it before retrying or choosing another folder.
+
+Success shows the complete created path and **Reveal Glossary in Finder**. Creation does not change the active Glossary
+File used by Search Term or the shared **Glossary Location** preference. To use the new file across commands, select its
+folder in that preference.
 
 macOS only. Existing file must be readable, contain one YAML document, and not exceed 5 MiB. Writes require writable
 ordinary file with exactly one filesystem link. Symbolic links and multiply hard-linked files support search only:
@@ -207,17 +226,19 @@ See [Testing GlossaryGo](TESTING.md) for Raycast setup, automated checks, manual
 
 ## Privacy
 
-Commands read only the effective Glossary File. Existing content, form input, and inline arguments stay on device and
+Commands read only the effective Glossary File, except Create Glossary File writes a new file only after explicit
+confirmation. Existing content, form input, and inline arguments stay on device and
 in memory while the command is open, except when a user explicitly submits a question to Ask Glossary after its
 disclosure confirmation. That single Raycast AI request contains the question and complete decoded term-and-definition
 context within the 32 KiB UTF-8 limit, plus static grounding instructions. Oversized context is refused in full. Ask
 Glossary does not persist questions, answers, or acknowledgement; it does not write the Glossary File, cache/history,
 logs, or telemetry.
 
-Search, Add, Edit, Delete, Copy, Reload, and Reveal do not send Glossary content over a network. Explicit valid first
+Search, Add, Edit, Delete, Create Glossary File, Copy, Reload, and Reveal do not send Glossary content over a network. Explicit valid first
 Add may create the effective file; later changes use a restricted sibling temporary copy. Normal failures remove files
-created by the failed operation. A crash or cleanup failure may leave an incomplete first file or temporary copy for
-manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
+created by a failed Add, Edit, or Delete operation. A failed Create Glossary File operation leaves its path untouched
+for manual inspection because another process may have replaced the new file. A crash or cleanup failure may leave an
+incomplete first file or temporary copy for manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
 in Finder.
 
 ## Troubleshooting
