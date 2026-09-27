@@ -1,4 +1,4 @@
-import { lstat, mkdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, rename, stat, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
@@ -101,30 +101,46 @@ describe("createGlossaryFile target safety", () => {
     await expect(lstat(dirname(path))).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
   });
 
-  test("reports write failure without claiming success or leaving a partial file", async () => {
+  test("reports write failure and leaves the created file for inspection", async () => {
     const path = await createTemporaryPath("glossary.yaml");
     vi.spyOn(glossarySaveFileSystem, "write").mockRejectedValueOnce(new Error("EIO: hidden private data"));
 
     await expect(createGlossaryFile(dirname(path), [])).rejects.toEqual(
       new GlossaryError(
         "unwritable",
-        "The glossary file could not be created. Check available disk space and folder access, then try again.",
+        `Could not finish creating ${path}. Inspect the path before retrying; the file may be incomplete or may have changed. Check disk space and folder access.`,
       ),
     );
-    await expect(lstat(path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+    await expect(lstat(path)).resolves.toBeDefined();
   });
 
-  test("warns when a failed write leaves a partial file that needs inspection", async () => {
+  test("does not remove a replacement placed at the destination after exclusive creation", async () => {
     const path = await createTemporaryPath("glossary.yaml");
-    vi.spyOn(glossarySaveFileSystem, "write").mockRejectedValueOnce(new Error("ENOSPC"));
-    vi.spyOn(glossarySaveFileSystem, "remove").mockRejectedValueOnce(new Error("EACCES"));
+    vi.spyOn(glossarySaveFileSystem, "write").mockImplementationOnce(async () => {
+      await rename(path, join(dirname(path), "moved-glossary.yaml"));
+      await writeFile(path, "replacement from another process");
+      throw new Error("EIO");
+    });
 
     await expect(createGlossaryFile(dirname(path), [])).rejects.toEqual(
       new GlossaryError(
         "unwritable",
-        "The glossary file could not be created, and a partial glossary.yaml may remain. Inspect that file before retrying.",
+        `Could not finish creating ${path}. Inspect the path before retrying; the file may be incomplete or may have changed. Check disk space and folder access.`,
       ),
     );
-    await expect(lstat(path)).resolves.toBeDefined();
+    await expect(readFile(path, "utf8")).resolves.toBe("replacement from another process");
+  });
+
+  test.each(["flush", "close"] as const)("leaves the created file for inspection after %s failure", async (step) => {
+    const path = await createTemporaryPath("glossary.yaml");
+    vi.spyOn(glossarySaveFileSystem, step).mockRejectedValueOnce(new Error("EIO"));
+
+    await expect(createGlossaryFile(dirname(path), [])).rejects.toEqual(
+      new GlossaryError(
+        "unwritable",
+        `Could not finish creating ${path}. Inspect the path before retrying; the file may be incomplete or may have changed. Check disk space and folder access.`,
+      ),
+    );
+    await expect(readFile(path, "utf8")).resolves.toBe("terms: []\n");
   });
 });

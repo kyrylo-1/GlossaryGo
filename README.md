@@ -31,7 +31,8 @@ Choose **Review and Create**, then explicitly confirm **Create Glossary File**. 
 editing fields, canceling, and failed validation create nothing. Confirmation makes one exclusive file creation with
 private `0600` permissions and writes all initial terms together. Existing files, folders, and symbolic links named
 `glossary.yaml` are never overwritten. Missing or unwritable folders and I/O failures show a recovery error; a failed
-write normally removes its partial new file.
+write, flush, or close leaves the path untouched for inspection. It may contain an incomplete file or a replacement
+from another process. Inspect it before retrying or choosing another folder.
 
 Success shows the complete created path and **Reveal Glossary in Finder**. Creation does not change the active Glossary
 File used by Search Term or the shared **Glossary Location** preference. To use the new file across commands, select its
@@ -235,8 +236,9 @@ logs, or telemetry.
 
 Search, Add, Edit, Delete, Create Glossary File, Copy, Reload, and Reveal do not send Glossary content over a network. Explicit valid first
 Add may create the effective file; later changes use a restricted sibling temporary copy. Normal failures remove files
-created by the failed operation. A crash or cleanup failure may leave an incomplete first file or temporary copy for
-manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
+created by a failed Add, Edit, or Delete operation. A failed Create Glossary File operation leaves its path untouched
+for manual inspection because another process may have replaced the new file. A crash or cleanup failure may leave an
+incomplete first file or temporary copy for manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
 in Finder.
 
 ## Troubleshooting

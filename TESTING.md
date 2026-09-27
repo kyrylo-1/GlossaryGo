@@ -207,6 +207,8 @@ shared Glossary Location remains on the previously recorded target, then select 
 Search Term uses it. Exercise an existing target and a missing/unwritable folder; verify actionable failure with no false
 success or overwritten bytes. Restore the original preference and synthetic fixtures, and report any case that could
 not be exercised in Raycast separately from automated tests.
+For a write, flush, or close failure after exclusive creation, verify the command reports failure and leaves the path
+for inspection. If another process replaces the path during creation, verify its replacement survives.
 
 ## Finish and report
 
