@@ -11,6 +11,8 @@ _Avoid_: Dictionary, configuration
 **Glossary File**:
 The effective YAML file that encodes a Glossary. It is `glossary.yaml` inside the optional Glossary Location,
 GlossaryGo's default file in Raycast's extension support directory, or a file retained from the legacy file preference.
+The Create Glossary File command can create another Glossary File in an explicitly selected folder without changing the
+active Glossary Location preference.
 _Avoid_: Configuration file, glossary document
 
 **Glossary Location**:

@@ -194,6 +194,18 @@ For changed boundary mechanisms, also exercise a feasible UI failure and recover
 compare-and-swap or crash durability beyond the README guarantees. Record any leftover synthetic temporary file as a
 finding and provide cleanup commands according to `AGENTS.md`.
 
+### Create Glossary File acceptance
+
+Use a dedicated existing synthetic folder with no `glossary.yaml`. In the active worktree's Raycast development runtime,
+open **Create Glossary File** and verify the selected folder and displayed destination. Cancel a confirmation and verify
+no file; enter an invalid initial term and verify the inputs remain with no file. Confirm an empty file, then inspect its
+`terms: []` bytes and `0600` permissions. Repeat in another folder with several out-of-order terms and verify the
+deterministic stored order. Check that the success view shows the complete path and Reveal selects that file. Verify the
+shared Glossary Location remains on the previously recorded target, then select the new folder in preferences and verify
+Search Term uses it. Exercise an existing target and a missing/unwritable folder; verify actionable failure with no false
+success or overwritten bytes. Restore the original preference and synthetic fixtures, and report any case that could
+not be exercised in Raycast separately from automated tests.
+
 ## Finish and report
 
 1. For code changes or full acceptance, run the current test, lint, formatting, and build scripts from `package.json`.
