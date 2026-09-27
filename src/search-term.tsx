@@ -16,6 +16,7 @@ import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 
 
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
+import { isExistingGlossaryFile } from "./components/is-existing-glossary-file";
 import { OpenGlossaryFileAction } from "./components/open-glossary-file-action";
 import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-action";
 import { TermForm } from "./components/term-form";
@@ -56,13 +57,14 @@ const OpenPreferencesAction = (): ReactElement => {
 
 const RecoveryActions = ({
   glossaryFile,
+  openWithAvailable,
   onReload,
-}: Readonly<{ glossaryFile: string; onReload: () => Promise<void> }>): ReactElement => {
+}: Readonly<{ glossaryFile: string; openWithAvailable: boolean; onReload: () => Promise<void> }>): ReactElement => {
   return (
     <ActionPanel>
       <ReloadAction onReload={onReload} />
       <RevealGlossaryFileAction glossaryFile={glossaryFile} />
-      <OpenGlossaryFileAction glossaryFile={glossaryFile} />
+      <OpenGlossaryFileAction glossaryFile={glossaryFile} isAvailable={openWithAvailable} />
       <OpenPreferencesAction />
     </ActionPanel>
   );
@@ -71,11 +73,18 @@ const RecoveryActions = ({
 type AddTermActionProps = Readonly<{
   createParent: boolean;
   glossaryFile: string;
+  openWithAvailable: boolean;
   initialTerm: string;
   onSaved: (term: Term) => Promise<void>;
 }>;
 
-const AddTermAction = ({ createParent, glossaryFile, initialTerm, onSaved }: AddTermActionProps): ReactElement => {
+const AddTermAction = ({
+  createParent,
+  glossaryFile,
+  openWithAvailable,
+  initialTerm,
+  onSaved,
+}: AddTermActionProps): ReactElement => {
   return (
     <Action.Push
       title="Add Term"
@@ -85,6 +94,7 @@ const AddTermAction = ({ createParent, glossaryFile, initialTerm, onSaved }: Add
         <TermForm
           createParent={createParent}
           glossaryFile={glossaryFile}
+          openWithAvailable={openWithAvailable}
           initialTerm={initialTerm}
           mode="add"
           onSaved={onSaved}
@@ -96,19 +106,33 @@ const AddTermAction = ({ createParent, glossaryFile, initialTerm, onSaved }: Add
 
 type EditTermActionProps = Readonly<{
   glossaryFile: string;
+  openWithAvailable: boolean;
   onReload: () => Promise<void>;
   onSaved: (term: Term) => Promise<void>;
   original: Term;
 }>;
 
-const EditTermAction = ({ glossaryFile, onReload, onSaved, original }: EditTermActionProps): ReactElement => {
+const EditTermAction = ({
+  glossaryFile,
+  openWithAvailable,
+  onReload,
+  onSaved,
+  original,
+}: EditTermActionProps): ReactElement => {
   return (
     <Action.Push
       title="Edit Term"
       shortcut={Keyboard.Shortcut.Common.Edit}
       icon={Icon.Pencil}
       target={
-        <TermForm glossaryFile={glossaryFile} mode="edit" onReload={onReload} onSaved={onSaved} original={original} />
+        <TermForm
+          glossaryFile={glossaryFile}
+          openWithAvailable={openWithAvailable}
+          mode="edit"
+          onReload={onReload}
+          onSaved={onSaved}
+          original={original}
+        />
       }
     />
   );
@@ -183,7 +207,7 @@ const EmptyGlossaryActions = (props: SearchActionsProps): ReactElement => {
       <ActionPanel.Section>
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
-        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
+        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} isAvailable={props.openWithAvailable} />
         <OpenPreferencesAction />
       </ActionPanel.Section>
     </ActionPanel>
@@ -197,7 +221,7 @@ const NoMatchActions = (props: SearchActionsProps): ReactElement => {
       <ActionPanel.Section>
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
-        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
+        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} isAvailable={props.openWithAvailable} />
       </ActionPanel.Section>
     </ActionPanel>
   );
@@ -234,10 +258,15 @@ const CopyTermActions = ({ onTermUsed, term }: CopyTermActionsProps): ReactEleme
 const FullDefinition = ({
   formatDefinition,
   glossaryFile,
+  openWithAvailable,
   onTermUsed,
   term,
 }: CopyTermActionsProps &
-  Readonly<{ formatDefinition: (definition: string) => string; glossaryFile: string }>): ReactElement => {
+  Readonly<{
+    formatDefinition: (definition: string) => string;
+    glossaryFile: string;
+    openWithAvailable: boolean;
+  }>): ReactElement => {
   return (
     <Detail
       navigationTitle={term.term}
@@ -246,7 +275,7 @@ const FullDefinition = ({
         <ActionPanel>
           <CopyTermActions onTermUsed={onTermUsed} term={term} />
           <RevealGlossaryFileAction glossaryFile={glossaryFile} />
-          <OpenGlossaryFileAction glossaryFile={glossaryFile} />
+          <OpenGlossaryFileAction glossaryFile={glossaryFile} isAvailable={openWithAvailable} />
         </ActionPanel>
       }
     />
@@ -265,6 +294,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
           <FullDefinition
             formatDefinition={props.formatDefinition}
             glossaryFile={props.glossaryFile}
+            openWithAvailable={props.openWithAvailable}
             onTermUsed={props.onTermUsed}
             term={term}
           />
@@ -274,6 +304,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         <AddTermAction {...props} />
         <EditTermAction
           glossaryFile={props.glossaryFile}
+          openWithAvailable={props.openWithAvailable}
           onReload={props.onEditConflictReload}
           onSaved={props.onSaved}
           original={term}
@@ -281,7 +312,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         <DeleteTermAction glossaryFile={props.glossaryFile} onReload={props.onReload} term={term} />
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
-        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
+        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} isAvailable={props.openWithAvailable} />
       </ActionPanel.Section>
     </ActionPanel>
   );
@@ -386,7 +417,7 @@ const CommandContent = ({
       <List.EmptyView
         title="Glossary Could Not Be Loaded"
         description={`${state.message}\n\nGlossary File: ${props.glossaryFile}`}
-        actions={<RecoveryActions glossaryFile={props.glossaryFile} onReload={onReload} />}
+        actions={<RecoveryActions {...props} onReload={onReload} />}
       />
     );
   }
@@ -442,12 +473,16 @@ const useResultSelection = (
   return { onSelectionChange, selectedItemId };
 };
 
+const useOpenWithAvailable = (glossaryFile: string, status: CommandState["status"]): boolean =>
+  useMemo(() => status !== "missing" && isExistingGlossaryFile(glossaryFile), [glossaryFile, status]);
+
 const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): ReactElement => {
   const { createParent, glossaryFile, isRecent, query, recordTerm, reload, result, setQuery, state } =
     useGlossary(target);
   const { pop } = useNavigation();
   const [definitionMarkdownCache] = useState(createDefinitionMarkdownCache);
   const { onSelectionChange, selectedItemId } = useResultSelection(state.status, result.terms);
+  const openWithAvailable = useOpenWithAvailable(glossaryFile, state.status);
   const onSaved = useCallback(
     async (term: Term): Promise<void> => {
       setQuery(term.term);
@@ -476,6 +511,7 @@ const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): Re
         createParent={createParent}
         formatDefinition={definitionMarkdownCache.getMarkdown}
         glossaryFile={glossaryFile}
+        openWithAvailable={openWithAvailable}
         initialTerm={query}
         isRecent={isRecent}
         onTermUsed={recordTerm}

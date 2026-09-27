@@ -1,14 +1,13 @@
-import { statSync } from "node:fs";
-
 import { Action } from "@raycast/api";
 import type { ReactElement } from "react";
 
-export const OpenGlossaryFileAction = ({ glossaryFile }: Readonly<{ glossaryFile: string }>): ReactElement | null => {
-  try {
-    if (!statSync(glossaryFile).isFile()) {
-      return null;
-    }
-  } catch {
+import { isExistingGlossaryFile } from "./is-existing-glossary-file";
+
+export const OpenGlossaryFileAction = ({
+  glossaryFile,
+  isAvailable = isExistingGlossaryFile(glossaryFile),
+}: Readonly<{ glossaryFile: string; isAvailable?: boolean }>): ReactElement | null => {
+  if (!isAvailable) {
     return null;
   }
 

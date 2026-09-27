@@ -16,6 +16,7 @@ import {
 
 export type TermFormProps = Readonly<{
   glossaryFile: string;
+  openWithAvailable?: boolean;
   onSaved: (term: Term) => Promise<void>;
 }> &
   (
@@ -141,7 +142,7 @@ export const TermForm = (props: TermFormProps): ReactElement => {
           />
           <ActionPanel.Section>
             <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
-            <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
+            <OpenGlossaryFileAction glossaryFile={props.glossaryFile} isAvailable={props.openWithAvailable} />
           </ActionPanel.Section>
         </ActionPanel>
       }
