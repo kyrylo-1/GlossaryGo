@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { confirmAlert } from "@raycast/api";
+import { AI, confirmAlert } from "@raycast/api";
 
 import { getEntryIdentity } from "./glossary/entry-identity";
 import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
@@ -117,6 +117,26 @@ const fieldValue = (id: string): string => {
 };
 
 describe("Open With across Search Term views", () => {
+  test("does not change the Glossary File, query, selection, or invoke save or AI", async () => {
+    mocks.path = await writeGlossary("terms:\n  - term: Alpha\n    definition: Synthetic definition\n", "custom.yaml");
+    const before = await readFile(mocks.path);
+    render(<Command />);
+    const result = within(await screen.findByRole("article", { name: "Alpha" }));
+    search("Al");
+    const selectedId = screen.getByRole("main").getAttribute("data-selected-item-id");
+
+    fireEvent.click(result.getByRole("button", { name: "Open With…" }));
+
+    const query = screen.getByRole("textbox", { name: "Search terms" });
+    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Al");
+    expect(screen.getByRole("main").getAttribute("data-selected-item-id")).toBe(selectedId);
+    expect(await readFile(mocks.path)).toEqual(before);
+    expect(mocks.save).not.toHaveBeenCalled();
+    expect(raycastApiMocks.copy).not.toHaveBeenCalled();
+    expect(raycastApiMocks.showInFinder).not.toHaveBeenCalled();
+    expect(AI.ask).not.toHaveBeenCalled();
+  });
+
   test("keeps creation and recovery actions without offering Open With for a missing file", async () => {
     mocks.path = await createTemporaryPath("glossary.yaml");
     mocks.load.mockRejectedValue(new GlossaryError("missing", "Missing synthetic glossary."));
