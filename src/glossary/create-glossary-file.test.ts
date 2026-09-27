@@ -60,6 +60,7 @@ describe("createGlossaryFile", () => {
   });
 });
 
+// eslint-disable-next-line max-lines-per-function
 describe("createGlossaryFile target safety", () => {
   test("refuses an existing file without replacing it", async () => {
     const path = await createTemporaryPath("glossary.yaml");
@@ -105,8 +106,25 @@ describe("createGlossaryFile target safety", () => {
     vi.spyOn(glossarySaveFileSystem, "write").mockRejectedValueOnce(new Error("EIO: hidden private data"));
 
     await expect(createGlossaryFile(dirname(path), [])).rejects.toEqual(
-      new GlossaryError("unwritable", "The glossary file could not be saved. Check its permissions and try again."),
+      new GlossaryError(
+        "unwritable",
+        "The glossary file could not be created. Check available disk space and folder access, then try again.",
+      ),
     );
     await expect(lstat(path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+
+  test("warns when a failed write leaves a partial file that needs inspection", async () => {
+    const path = await createTemporaryPath("glossary.yaml");
+    vi.spyOn(glossarySaveFileSystem, "write").mockRejectedValueOnce(new Error("ENOSPC"));
+    vi.spyOn(glossarySaveFileSystem, "remove").mockRejectedValueOnce(new Error("EACCES"));
+
+    await expect(createGlossaryFile(dirname(path), [])).rejects.toEqual(
+      new GlossaryError(
+        "unwritable",
+        "The glossary file could not be created, and a partial glossary.yaml may remain. Inspect that file before retrying.",
+      ),
+    );
+    await expect(lstat(path)).resolves.toBeDefined();
   });
 });

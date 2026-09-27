@@ -24,11 +24,22 @@ export const createGlossaryFile = async (directory: string, terms: readonly Term
     handle = null;
     return path;
   } catch (error: unknown) {
+    let cleanupFailed = false;
     if (handle !== null) {
       await glossarySaveFileSystem.close(handle).catch(() => null);
     }
     if (created) {
-      await glossarySaveFileSystem.remove(path).catch(() => null);
+      try {
+        await glossarySaveFileSystem.remove(path);
+      } catch {
+        cleanupFailed = true;
+      }
+    }
+    if (cleanupFailed) {
+      throw new GlossaryError(
+        "unwritable",
+        "The glossary file could not be created, and a partial glossary.yaml may remain. Inspect that file before retrying.",
+      );
     }
     if (hasFileSystemCode(error, "EEXIST")) {
       throw new GlossaryError(
@@ -38,6 +49,12 @@ export const createGlossaryFile = async (directory: string, terms: readonly Term
     }
     if (hasFileSystemCode(error, "ENOENT") || hasFileSystemCode(error, "ENOTDIR")) {
       throw createMissingParentError();
+    }
+    if (created) {
+      throw new GlossaryError(
+        "unwritable",
+        "The glossary file could not be created. Check available disk space and folder access, then try again.",
+      );
     }
     throw createUnwritableError();
   }
