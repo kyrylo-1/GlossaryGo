@@ -37,7 +37,8 @@ in-session disclosure confirmation, Ask Glossary may send the question and compl
 within its limit to Raycast AI with static grounding instructions. Refuse over-limit context in full; exclude paths,
 YAML source, comments, and metadata. Persist, log, and cache none of the question, answer, or context.
 Only permitted glossary persistence: explicit Add Term, Edit Term, or Delete Term through the glossary save service to
-the effective Glossary File: `glossary.yaml` inside the user-selected Glossary Location, preserving a legacy
+the effective Glossary File, or explicit Create Glossary File after confirmation through its exclusive-create service.
+The effective file is `glossary.yaml` inside the user-selected Glossary Location, preserving a legacy
 user-selected `.yaml` file preference, otherwise `glossary.yaml` under Raycast's `environment.supportPath`.
 Use synthetic test data.
 

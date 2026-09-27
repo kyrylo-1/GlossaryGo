@@ -146,6 +146,31 @@ export const Form = Object.assign(
   {
     Description: ({ text, title }: Readonly<{ text: string; title?: string }>): ReactElement =>
       createElement("p", {}, title ? createElement("strong", {}, title) : null, text),
+    FilePicker: ({
+      error,
+      id,
+      onChange,
+      title,
+      value,
+    }: Readonly<{
+      error?: string;
+      id: string;
+      onChange: (value: string[]) => void;
+      title: string;
+      value: string[];
+    }>): ReactElement =>
+      createElement(
+        "label",
+        {},
+        title,
+        createElement("input", {
+          "data-testid": id,
+          onChange: (event: Readonly<{ target: Readonly<{ value: string }> }>) =>
+            onChange(event.target.value ? [event.target.value] : []),
+          value: value[0] ?? "",
+        }),
+        error ? createElement("span", { role: "alert" }, error) : null,
+      ),
     TextArea: (props: FieldProps): ReactElement => renderField("textarea", props),
     TextField: (props: FieldProps): ReactElement => renderField("input", props),
   },
