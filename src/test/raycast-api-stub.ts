@@ -4,7 +4,13 @@ import { createElement, useEffect, useRef, useState, type ReactElement, type Rea
 import { vi } from "vitest";
 import type { KeyboardShortcut } from "@raycast/api";
 
-type ActionProps = Readonly<{ onAction?: () => void; shortcut?: KeyboardShortcut; title: string }>;
+type ActionProps = Readonly<{
+  nativeOpenWith?: boolean;
+  onAction?: () => void;
+  path?: string;
+  shortcut?: KeyboardShortcut;
+  title: string;
+}>;
 type ContainerProps = Readonly<{
   actions?: ReactNode;
   children?: ReactNode;
@@ -34,10 +40,16 @@ export const raycastApiMocks = {
   showToast: vi.fn<(options: unknown) => Promise<void>>().mockResolvedValue(),
 };
 
-const action = ({ onAction, shortcut, title }: ActionProps): ReactElement =>
+const action = ({ nativeOpenWith, onAction, path, shortcut, title }: ActionProps): ReactElement =>
   createElement(
     "button",
-    { "data-shortcut": shortcut ? JSON.stringify(shortcut) : null, onClick: onAction, type: "button" },
+    {
+      "data-native-open-with": nativeOpenWith ? "true" : null,
+      "data-path": path,
+      "data-shortcut": shortcut ? JSON.stringify(shortcut) : null,
+      onClick: onAction,
+      type: "button",
+    },
     title,
   );
 
@@ -108,6 +120,7 @@ export const Keyboard = {
 };
 
 export const Action = Object.assign(action, {
+  OpenWith: (props: ActionProps): ReactElement => action({ ...props, nativeOpenWith: true }),
   Push: PushAction,
   Style: { Destructive: "destructive" },
   SubmitForm: submitForm,
@@ -165,6 +178,7 @@ export const Form = Object.assign(
 export const Icon = { Checkmark: "checkmark", Document: "document", Finder: "finder", Pencil: "pencil", Plus: "plus" };
 export const Toast = { Style: { Failure: "failure", Success: "success" } };
 export const closeMainWindow = raycastApiMocks.closeMainWindow;
+export const getPreferenceValues = vi.fn<() => { glossaryFile?: string }>().mockReturnValue({});
 export const openExtensionPreferences = vi.fn<() => Promise<void>>().mockResolvedValue();
 export const showInFinder = raycastApiMocks.showInFinder;
 export const showToast = raycastApiMocks.showToast;

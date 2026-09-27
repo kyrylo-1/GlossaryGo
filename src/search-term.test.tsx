@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 
+import { readFile, stat } from "node:fs/promises";
+import { dirname } from "node:path";
+
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { confirmAlert } from "@raycast/api";
+import { AI, confirmAlert } from "@raycast/api";
 
 import { getEntryIdentity } from "./glossary/entry-identity";
+import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
 import { GlossaryError, parseGlossarySource } from "./glossary/glossary";
 import { useGlossary } from "./hooks/use-glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
@@ -99,7 +103,10 @@ beforeEach(() => {
   raycastApiMocks.copy.mockResolvedValue();
   raycastApiMocks.showToast.mockResolvedValue();
 });
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  await removeTemporaryDirectories();
+});
 
 const fieldValue = (id: string): string => {
   const field = screen.getByTestId(id);
@@ -108,6 +115,102 @@ const fieldValue = (id: string): string => {
   }
   return field.value;
 };
+
+describe("Open With preserves Glossary state", () => {
+  test("does not change the Glossary File, query, selection, or invoke save or AI", async () => {
+    mocks.path = await writeGlossary("terms:\n  - term: Alpha\n    definition: Synthetic definition\n", "custom.yaml");
+    const before = await readFile(mocks.path);
+    render(<Command />);
+    const result = within(await screen.findByRole("article", { name: "Alpha" }));
+    search("Al");
+    const selectedId = screen.getByRole("main").dataset.selectedItemId;
+
+    fireEvent.click(result.getByRole("button", { name: "Open Glossary With…" }));
+
+    const query = screen.getByRole("textbox", { name: "Search terms" });
+    expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Al");
+    expect(screen.getByRole("main").dataset.selectedItemId).toBe(selectedId);
+    expect(await readFile(mocks.path)).toEqual(before);
+    expect(mocks.save).not.toHaveBeenCalled();
+    expect(raycastApiMocks.copy).not.toHaveBeenCalled();
+    expect(raycastApiMocks.showInFinder).not.toHaveBeenCalled();
+    expect(AI.ask).not.toHaveBeenCalled();
+  });
+});
+
+describe("Open With missing-file recovery", () => {
+  test("keeps creation and recovery actions without offering Open With for a missing file", async () => {
+    mocks.path = await createTemporaryPath("glossary.yaml");
+    mocks.load.mockRejectedValue(new GlossaryError("missing", "Missing synthetic glossary."));
+    render(<Command />);
+
+    const missingView = (await screen.findByRole("heading", { name: "Create Your Glossary" })).closest("section");
+    if (!missingView) {
+      throw new Error("Missing Glossary recovery view.");
+    }
+    const actions = within(missingView);
+    expect(actions.queryByRole("button", { name: "Open Glossary With…" })).toBeNull();
+    expect(actions.getByRole("button", { name: "Add Term" })).toBeTruthy();
+    expect(actions.getByRole("button", { name: "Reveal Glossary in Finder" })).toBeTruthy();
+    expect(actions.getByRole("button", { name: "Open Extension Preferences" })).toBeTruthy();
+
+    fireEvent.click(actions.getByRole("button", { name: "Reveal Glossary in Finder" }));
+    await waitFor(() => expect(raycastApiMocks.showInFinder).toHaveBeenCalledWith(dirname(mocks.path)));
+    fireEvent.click(actions.getByRole("button", { name: "Add Term" }));
+    const addForm = screen.getByTestId("term").closest("section");
+    expect(addForm && within(addForm).queryByRole("button", { name: "Open Glossary With…" })).toBeNull();
+    await expect(stat(mocks.path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+});
+
+describe("Open With across Search Term views", () => {
+  test("offers the effective file from a result, full definition, and Add and Edit forms", async () => {
+    mocks.path = await writeGlossary("terms: []\n", "custom.yaml");
+    render(<Command />);
+    const result = within(await screen.findByRole("article", { name: "Alpha" }));
+    expect(result.getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.path);
+
+    fireEvent.click(result.getByRole("button", { name: "View Full Definition" }));
+    const reader = screen.getByRole("heading", { level: 1, name: "Alpha" }).closest("section");
+    expect(reader && within(reader).getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.path);
+
+    fireEvent.click(result.getByRole("button", { name: "Add Term" }));
+    const addForm = screen.getByTestId("term").closest("section");
+    expect(addForm && within(addForm).getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(
+      mocks.path,
+    );
+    if (!addForm?.parentElement) {
+      throw new Error("Missing Add Term action container.");
+    }
+    fireEvent.click(within(addForm.parentElement).getByRole("button", { name: "Back" }));
+
+    fireEvent.click(result.getByRole("button", { name: "Edit Term" }));
+    const editForm = screen.getByTestId("term").closest("section");
+    expect(editForm && within(editForm).getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(
+      mocks.path,
+    );
+  });
+
+  test.each([
+    { load: "empty", query: "", title: "No Terms in Glossary" },
+    { load: "ready", query: "none", title: "No Matching Terms" },
+    { load: "error", query: "", title: "Glossary Could Not Be Loaded" },
+  ])("offers Open With from $title when the file exists", async ({ load, query, title }) => {
+    mocks.path = await writeGlossary("terms: []\n", "custom.yaml");
+    if (load === "empty") {
+      mocks.load.mockResolvedValue([]);
+    } else if (load === "error") {
+      mocks.load.mockRejectedValue(new GlossaryError("invalid-schema", "Synthetic error."));
+    }
+    render(<Command />);
+    if (query) {
+      await screen.findByRole("article", { name: "Alpha" });
+      search(query);
+    }
+    const view = (await screen.findByRole("heading", { name: title })).closest("section");
+    expect(view && within(view).getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.path);
+  });
+});
 
 describe("Search Term action shortcuts", () => {
   test("registers distinct shortcuts on selected actions and preserves default copy shortcuts", async () => {
