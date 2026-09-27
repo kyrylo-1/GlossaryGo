@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 
+import { stat } from "node:fs/promises";
+import { dirname } from "node:path";
+
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { confirmAlert } from "@raycast/api";
 
 import { getEntryIdentity } from "./glossary/entry-identity";
-import { removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
+import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
 import { GlossaryError, parseGlossarySource } from "./glossary/glossary";
 import { useGlossary } from "./hooks/use-glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
@@ -114,6 +117,29 @@ const fieldValue = (id: string): string => {
 };
 
 describe("Open With across Search Term views", () => {
+  test("keeps creation and recovery actions without offering Open With for a missing file", async () => {
+    mocks.path = await createTemporaryPath("glossary.yaml");
+    mocks.load.mockRejectedValue(new GlossaryError("missing", "Missing synthetic glossary."));
+    render(<Command />);
+
+    const missingView = (await screen.findByRole("heading", { name: "Create Your Glossary" })).closest("section");
+    if (!missingView) {
+      throw new Error("Missing Glossary recovery view.");
+    }
+    const actions = within(missingView);
+    expect(actions.queryByRole("button", { name: "Open With…" })).toBeNull();
+    expect(actions.getByRole("button", { name: "Add Term" })).toBeTruthy();
+    expect(actions.getByRole("button", { name: "Reveal Glossary in Finder" })).toBeTruthy();
+    expect(actions.getByRole("button", { name: "Open Extension Preferences" })).toBeTruthy();
+
+    fireEvent.click(actions.getByRole("button", { name: "Reveal Glossary in Finder" }));
+    await waitFor(() => expect(raycastApiMocks.showInFinder).toHaveBeenCalledWith(dirname(mocks.path)));
+    fireEvent.click(actions.getByRole("button", { name: "Add Term" }));
+    const addForm = screen.getByTestId("term").closest("section");
+    expect(addForm && within(addForm).queryByRole("button", { name: "Open With…" })).toBeNull();
+    await expect(stat(mocks.path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
+  });
+
   test("offers the effective file from a result, full definition, and Add and Edit forms", async () => {
     mocks.path = await writeGlossary("terms: []\n", "custom.yaml");
     render(<Command />);
