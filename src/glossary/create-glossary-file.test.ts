@@ -50,7 +50,6 @@ describe("createGlossaryFile", () => {
     );
     await expect(lstat(path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
   });
-
 });
 
 describe("createGlossaryFile target safety", () => {
