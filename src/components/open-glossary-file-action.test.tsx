@@ -18,7 +18,7 @@ describe("Open Glossary File action", () => {
 
     render(<OpenGlossaryFileAction glossaryFile={path} />);
 
-    const openWith = screen.getByRole("button", { name: "Open With…" });
+    const openWith = screen.getByRole("button", { name: "Open Glossary With…" });
     expect(openWith.dataset.path).toBe(path);
     expect(openWith.dataset.nativeOpenWith).toBe("true");
   });
@@ -28,6 +28,6 @@ describe("Open Glossary File action", () => {
 
     render(<OpenGlossaryFileAction glossaryFile={path} />);
 
-    expect(screen.queryByRole("button", { name: "Open With…" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open Glossary With…" })).toBeNull();
   });
 });

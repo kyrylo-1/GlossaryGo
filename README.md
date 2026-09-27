@@ -73,7 +73,7 @@ reloading, canceling, and failed saves never sort or rewrite the file.
 
 After save, **Term Added** keeps saved fields visible. **Add Another Term** opens pristine form focused on **Term**;
 **Done** closes command. Failed saves retain both inputs and show actionable error. No saved drafts.
-Form shows effective Glossary File path, **Reveal Glossary in Finder**, and **Open With…** when the file exists.
+Form shows effective Glossary File path, **Reveal Glossary in Finder**, and **Open Glossary With…** when the file exists.
 
 Standalone Add uses same safe save service and shared preference as Search Term. Saved term appears when Search Term
 next opens or after **Reload Glossary** in an open search.
@@ -100,7 +100,7 @@ or files and never changes glossary contents.
 
 ## Opening the glossary file in another app
 
-**Open With…** uses Raycast's native installed-app picker for the exact effective Glossary File. It is available from
+**Open Glossary With…** uses Raycast's native installed-app picker for the exact effective Glossary File. It is available from
 Search Term results, the full-definition reader, Add/Edit forms, empty and no-match views, and recoverable load-error
 views when the file exists. The action also supports a retained direct `.yaml` preference and the default support
 directory file. It does not appear while the file is missing; use Add Term to create it, Reveal to locate its folder,
@@ -140,11 +140,11 @@ spacing and line breaks. Active CommonMark image syntax and raw HTML tags are sh
 cannot fetch resources; `![[...]]` remains literal inert text because it is not a CommonMark image. Ordinary Markdown
 links remain links and require user activation. Term names stay literal. **View Full
 Definition** opens a full-width scrollable reader titled with term. Reader offers **Copy Definition**, **Copy Term**,
-**Reveal Glossary in Finder**, and **Open With…** when the file exists. Copy Definition and Edit retain the exact original definition, including whitespace.
+**Reveal Glossary in Finder**, and **Open Glossary With…** when the file exists. Copy Definition and Edit retain the exact original definition, including whitespace.
 Successful copies in either view update Recent Terms. Go back to same query.
 
 Selected-result action order: **Copy Definition**, **Copy Term**, **View Full Definition**, **Add Term**, **Edit Term**,
-**Delete Term**, **Reload Glossary**, **Reveal Glossary in Finder**, **Open With…** when the file exists. Copy does not close command.
+**Delete Term**, **Reload Glossary**, **Reveal Glossary in Finder**, **Open Glossary With…** when the file exists. Copy does not close command.
 
 With a selected result, keyboard shortcuts appear beside actions: **View Full Definition** uses **⌘⇧V**, **Add Term** uses **⌘N**,
 **Edit Term** uses **⌘E**, and **Delete Term** uses **⌃X**. **Return** still copies the definition; **⌘Return**

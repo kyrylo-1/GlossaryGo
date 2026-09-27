@@ -95,7 +95,7 @@ describe("standalone Add Term Open With action", () => {
 
     render(<Command />);
 
-    expect(screen.getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.glossaryTarget.path);
+    expect(screen.getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.glossaryTarget.path);
   });
 });
 
