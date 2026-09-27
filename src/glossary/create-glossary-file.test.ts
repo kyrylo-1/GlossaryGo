@@ -24,6 +24,14 @@ describe("createGlossaryFile", () => {
     expect((await stat(path)).mode & 0o777).toBe(0o600);
   });
 
+  test("creates one normalized term without changing its definition", async () => {
+    const directory = dirname(await createTemporaryPath("glossary.yaml"));
+
+    const path = await createGlossaryFile(directory, [{ definition: " First line\nSecond line ", term: " API " }]);
+
+    await expect(loadGlossary(path)).resolves.toEqual([{ definition: " First line\nSecond line ", term: "API" }]);
+  });
+
   test("creates one or multiple terms in deterministic name order in one write", async () => {
     const directory = dirname(await createTemporaryPath("glossary.yaml"));
     const write = vi.spyOn(glossarySaveFileSystem, "write");
