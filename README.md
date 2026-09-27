@@ -73,7 +73,7 @@ reloading, canceling, and failed saves never sort or rewrite the file.
 
 After save, **Term Added** keeps saved fields visible. **Add Another Term** opens pristine form focused on **Term**;
 **Done** closes command. Failed saves retain both inputs and show actionable error. No saved drafts.
-Form shows effective Glossary File path and **Reveal Glossary in Finder**.
+Form shows effective Glossary File path, **Reveal Glossary in Finder**, and **Open With…** when the file exists.
 
 Standalone Add uses same safe save service and shared preference as Search Term. Saved term appears when Search Term
 next opens or after **Reload Glossary** in an open search.
@@ -97,6 +97,16 @@ A **Glossary File Is Missing** dialog stays available after Finder opens, explai
 and offers **Open Extension Preferences** or **Done**. Path or Finder failures use the same recovery dialog. If
 Preferences cannot open, a second dialog explains how to find the setting manually. Reveal never creates folders
 or files and never changes glossary contents.
+
+## Opening the glossary file in another app
+
+**Open With…** uses Raycast's native installed-app picker for the exact effective Glossary File. It is available from
+Search Term results, the full-definition reader, Add/Edit forms, empty and no-match views, and recoverable load-error
+views when the file exists. The action also supports a retained direct `.yaml` preference and the default support
+directory file. It does not appear while the file is missing; use Add Term to create it, Reveal to locate its folder,
+or Preferences to select another Glossary Location. Choosing an app does not change the search query or selected term.
+GlossaryGo does not read, create, rewrite, or transmit the file as part of this action. The chosen app controls what
+happens after it opens the file.
 
 ## Searching and actions
 
@@ -130,11 +140,11 @@ spacing and line breaks. Active CommonMark image syntax and raw HTML tags are sh
 cannot fetch resources; `![[...]]` remains literal inert text because it is not a CommonMark image. Ordinary Markdown
 links remain links and require user activation. Term names stay literal. **View Full
 Definition** opens a full-width scrollable reader titled with term. Reader offers **Copy Definition**, **Copy Term**,
-**Reveal Glossary in Finder**. Copy Definition and Edit retain the exact original definition, including whitespace.
+**Reveal Glossary in Finder**, and **Open With…** when the file exists. Copy Definition and Edit retain the exact original definition, including whitespace.
 Successful copies in either view update Recent Terms. Go back to same query.
 
 Selected-result action order: **Copy Definition**, **Copy Term**, **View Full Definition**, **Add Term**, **Edit Term**,
-**Delete Term**, **Reload Glossary**, **Reveal Glossary in Finder**. Copy does not close command.
+**Delete Term**, **Reload Glossary**, **Reveal Glossary in Finder**, **Open With…** when the file exists. Copy does not close command.
 
 With a selected result, keyboard shortcuts appear beside actions: **View Full Definition** uses **⌘⇧V**, **Add Term** uses **⌘N**,
 **Edit Term** uses **⌘E**, and **Delete Term** uses **⌃X**. **Return** still copies the definition; **⌘Return**
@@ -214,7 +224,7 @@ context within the 32 KiB UTF-8 limit, plus static grounding instructions. Overs
 Glossary does not persist questions, answers, or acknowledgement; it does not write the Glossary File, cache/history,
 logs, or telemetry.
 
-Search, Add, Edit, Delete, Copy, Reload, and Reveal do not send Glossary content over a network. Explicit valid first
+Search, Add, Edit, Delete, Copy, Reload, Reveal, and Open With do not send Glossary content over a network. Explicit valid first
 Add may create the effective file; later changes use a restricted sibling temporary copy. Normal failures remove files
 created by the failed operation. A crash or cleanup failure may leave an incomplete first file or temporary copy for
 manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
