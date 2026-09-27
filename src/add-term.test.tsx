@@ -89,17 +89,17 @@ describe("standalone Add Term folder creation", () => {
   });
 });
 
-describe("standalone Add Term command", () => {
+describe("standalone Add Term Open With action", () => {
   test("offers Open With for the effective Glossary File from the form", async () => {
     mocks.glossaryTarget.path = await writeGlossary("terms: []\n", "legacy.yaml");
 
     render(<Command />);
 
-    expect(screen.getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(
-      mocks.glossaryTarget.path,
-    );
+    expect(screen.getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.glossaryTarget.path);
   });
+});
 
+describe("standalone Add Term command", () => {
   test("shows saved values, supports Done, and starts another pristine focused form", async () => {
     mocks.saveGlossaryChange.mockResolvedValue();
     render(<Command />);

@@ -12,5 +12,6 @@ export const OpenGlossaryFileAction = ({ glossaryFile }: Readonly<{ glossaryFile
     return null;
   }
 
+  // eslint-disable-next-line @raycast/prefer-title-case -- The macOS Open With label includes an ellipsis.
   return <Action.OpenWith title="Open With…" path={glossaryFile} />;
 };

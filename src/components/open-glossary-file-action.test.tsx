@@ -19,8 +19,8 @@ describe("Open Glossary File action", () => {
     render(<OpenGlossaryFileAction glossaryFile={path} />);
 
     const openWith = screen.getByRole("button", { name: "Open With…" });
-    expect(openWith.getAttribute("data-path")).toBe(path);
-    expect(openWith.getAttribute("data-native-open-with")).toBe("true");
+    expect(openWith.dataset.path).toBe(path);
+    expect(openWith.dataset.nativeOpenWith).toBe("true");
   });
 
   test("does not offer Open With when the effective Glossary File is missing", async () => {

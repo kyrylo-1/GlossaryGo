@@ -116,27 +116,29 @@ const fieldValue = (id: string): string => {
   return field.value;
 };
 
-describe("Open With across Search Term views", () => {
+describe("Open With preserves Glossary state", () => {
   test("does not change the Glossary File, query, selection, or invoke save or AI", async () => {
     mocks.path = await writeGlossary("terms:\n  - term: Alpha\n    definition: Synthetic definition\n", "custom.yaml");
     const before = await readFile(mocks.path);
     render(<Command />);
     const result = within(await screen.findByRole("article", { name: "Alpha" }));
     search("Al");
-    const selectedId = screen.getByRole("main").getAttribute("data-selected-item-id");
+    const selectedId = screen.getByRole("main").dataset.selectedItemId;
 
     fireEvent.click(result.getByRole("button", { name: "Open With…" }));
 
     const query = screen.getByRole("textbox", { name: "Search terms" });
     expect(query instanceof globalThis.HTMLInputElement && query.value).toBe("Al");
-    expect(screen.getByRole("main").getAttribute("data-selected-item-id")).toBe(selectedId);
+    expect(screen.getByRole("main").dataset.selectedItemId).toBe(selectedId);
     expect(await readFile(mocks.path)).toEqual(before);
     expect(mocks.save).not.toHaveBeenCalled();
     expect(raycastApiMocks.copy).not.toHaveBeenCalled();
     expect(raycastApiMocks.showInFinder).not.toHaveBeenCalled();
     expect(AI.ask).not.toHaveBeenCalled();
   });
+});
 
+describe("Open With missing-file recovery", () => {
   test("keeps creation and recovery actions without offering Open With for a missing file", async () => {
     mocks.path = await createTemporaryPath("glossary.yaml");
     mocks.load.mockRejectedValue(new GlossaryError("missing", "Missing synthetic glossary."));
@@ -159,24 +161,22 @@ describe("Open With across Search Term views", () => {
     expect(addForm && within(addForm).queryByRole("button", { name: "Open With…" })).toBeNull();
     await expect(stat(mocks.path)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
   });
+});
 
+describe("Open With across Search Term views", () => {
   test("offers the effective file from a result, full definition, and Add and Edit forms", async () => {
     mocks.path = await writeGlossary("terms: []\n", "custom.yaml");
     render(<Command />);
     const result = within(await screen.findByRole("article", { name: "Alpha" }));
-    expect(result.getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(mocks.path);
+    expect(result.getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.path);
 
     fireEvent.click(result.getByRole("button", { name: "View Full Definition" }));
     const reader = screen.getByRole("heading", { level: 1, name: "Alpha" }).closest("section");
-    expect(reader && within(reader).getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(
-      mocks.path,
-    );
+    expect(reader && within(reader).getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.path);
 
     fireEvent.click(result.getByRole("button", { name: "Add Term" }));
     const addForm = screen.getByTestId("term").closest("section");
-    expect(addForm && within(addForm).getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(
-      mocks.path,
-    );
+    expect(addForm && within(addForm).getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.path);
     if (!addForm?.parentElement) {
       throw new Error("Missing Add Term action container.");
     }
@@ -184,9 +184,7 @@ describe("Open With across Search Term views", () => {
 
     fireEvent.click(result.getByRole("button", { name: "Edit Term" }));
     const editForm = screen.getByTestId("term").closest("section");
-    expect(editForm && within(editForm).getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(
-      mocks.path,
-    );
+    expect(editForm && within(editForm).getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.path);
   });
 
   test.each([
@@ -206,7 +204,7 @@ describe("Open With across Search Term views", () => {
       search(query);
     }
     const view = (await screen.findByRole("heading", { name: title })).closest("section");
-    expect(view && within(view).getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(mocks.path);
+    expect(view && within(view).getByRole("button", { name: "Open With…" }).dataset.path).toBe(mocks.path);
   });
 });
 
