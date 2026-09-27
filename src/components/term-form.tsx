@@ -4,6 +4,7 @@ import { useRef, useState, type ReactElement } from "react";
 
 import { saveGlossaryChange } from "../glossary/save-glossary-change";
 import type { Term } from "../utils/types";
+import { OpenGlossaryFileAction } from "./open-glossary-file-action";
 import { RevealGlossaryFileAction } from "./reveal-glossary-file-action";
 import {
   getInitialTerm,
@@ -140,6 +141,7 @@ export const TermForm = (props: TermFormProps): ReactElement => {
           />
           <ActionPanel.Section>
             <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
+            <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
           </ActionPanel.Section>
         </ActionPanel>
       }

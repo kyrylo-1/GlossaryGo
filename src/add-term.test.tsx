@@ -13,7 +13,7 @@ import Command from "./add-term";
 import { TermForm } from "./components/term-form";
 import { GlossaryError, loadGlossary } from "./glossary/glossary";
 import type { GlossaryChange } from "./glossary/apply-glossary-change";
-import { createTemporaryPath, removeTemporaryDirectories } from "./glossary/glossary-test-utils";
+import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
 import { raycastApiMocks } from "./test/raycast-api-stub";
 
 const mocks = vi.hoisted(() => ({
@@ -90,6 +90,16 @@ describe("standalone Add Term folder creation", () => {
 });
 
 describe("standalone Add Term command", () => {
+  test("offers Open With for the effective Glossary File from the form", async () => {
+    mocks.glossaryTarget.path = await writeGlossary("terms: []\n", "legacy.yaml");
+
+    render(<Command />);
+
+    expect(screen.getByRole("button", { name: "Open With…" }).getAttribute("data-path")).toBe(
+      mocks.glossaryTarget.path,
+    );
+  });
+
   test("shows saved values, supports Done, and starts another pristine focused form", async () => {
     mocks.saveGlossaryChange.mockResolvedValue();
     render(<Command />);

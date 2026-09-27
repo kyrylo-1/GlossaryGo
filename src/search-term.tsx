@@ -16,6 +16,7 @@ import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from 
 
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
+import { OpenGlossaryFileAction } from "./components/open-glossary-file-action";
 import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-action";
 import { TermForm } from "./components/term-form";
 import { getEntryIdentity } from "./glossary/entry-identity";
@@ -61,6 +62,7 @@ const RecoveryActions = ({
     <ActionPanel>
       <ReloadAction onReload={onReload} />
       <RevealGlossaryFileAction glossaryFile={glossaryFile} />
+      <OpenGlossaryFileAction glossaryFile={glossaryFile} />
       <OpenPreferencesAction />
     </ActionPanel>
   );
@@ -181,6 +183,7 @@ const EmptyGlossaryActions = (props: SearchActionsProps): ReactElement => {
       <ActionPanel.Section>
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
+        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
         <OpenPreferencesAction />
       </ActionPanel.Section>
     </ActionPanel>
@@ -194,6 +197,7 @@ const NoMatchActions = (props: SearchActionsProps): ReactElement => {
       <ActionPanel.Section>
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
+        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
       </ActionPanel.Section>
     </ActionPanel>
   );
@@ -242,6 +246,7 @@ const FullDefinition = ({
         <ActionPanel>
           <CopyTermActions onTermUsed={onTermUsed} term={term} />
           <RevealGlossaryFileAction glossaryFile={glossaryFile} />
+          <OpenGlossaryFileAction glossaryFile={glossaryFile} />
         </ActionPanel>
       }
     />
@@ -276,6 +281,7 @@ const TermActions = ({ term, ...props }: TermActionsProps): ReactElement => {
         <DeleteTermAction glossaryFile={props.glossaryFile} onReload={props.onReload} term={term} />
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
+        <OpenGlossaryFileAction glossaryFile={props.glossaryFile} />
       </ActionPanel.Section>
     </ActionPanel>
   );
