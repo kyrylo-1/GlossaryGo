@@ -4,7 +4,13 @@ import { createElement, useEffect, useRef, useState, type ReactElement, type Rea
 import { vi } from "vitest";
 import type { KeyboardShortcut } from "@raycast/api";
 
-type ActionProps = Readonly<{ onAction?: () => void; path?: string; shortcut?: KeyboardShortcut; title: string }>;
+type ActionProps = Readonly<{
+  nativeOpenWith?: boolean;
+  onAction?: () => void;
+  path?: string;
+  shortcut?: KeyboardShortcut;
+  title: string;
+}>;
 type ContainerProps = Readonly<{
   actions?: ReactNode;
   children?: ReactNode;
@@ -34,10 +40,11 @@ export const raycastApiMocks = {
   showToast: vi.fn<(options: unknown) => Promise<void>>().mockResolvedValue(),
 };
 
-const action = ({ onAction, path, shortcut, title }: ActionProps): ReactElement =>
+const action = ({ nativeOpenWith, onAction, path, shortcut, title }: ActionProps): ReactElement =>
   createElement(
     "button",
     {
+      "data-native-open-with": nativeOpenWith ? "true" : null,
       "data-path": path,
       "data-shortcut": shortcut ? JSON.stringify(shortcut) : null,
       onClick: onAction,
@@ -113,7 +120,7 @@ export const Keyboard = {
 };
 
 export const Action = Object.assign(action, {
-  OpenWith: action,
+  OpenWith: (props: ActionProps): ReactElement => action({ ...props, nativeOpenWith: true }),
   Push: PushAction,
   Style: { Destructive: "destructive" },
   SubmitForm: submitForm,
