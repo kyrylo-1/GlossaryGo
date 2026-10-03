@@ -8,6 +8,7 @@ import Command from "./reveal-glossary-file";
 
 const api = vi.hoisted(() => ({
   Alert: { ActionStyle: { Default: "default" } },
+  LocalStorage: { getItem: vi.fn<() => Promise<string | undefined>>() },
   confirmAlert: vi.fn<(options: unknown) => Promise<boolean>>(),
   environment: { supportPath: "" },
   getPreferenceValues: vi.fn<() => { glossaryFile?: string }>(),

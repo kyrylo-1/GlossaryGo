@@ -26,7 +26,7 @@ const showSuccess = async (): Promise<void> => {
 export default async function Command(props: LaunchProps<{ arguments: QuickAddTermArguments }>): Promise<void> {
   await runQuickAddTerm({
     arguments: props.arguments,
-    glossaryTarget: getGlossaryTarget(),
+    glossaryTarget: await getGlossaryTarget(),
     onFailure: showFailure,
     onSuccess: showSuccess,
     saveChange: saveGlossaryChange,

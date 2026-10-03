@@ -29,7 +29,7 @@ vi.mock("@raycast/utils", async (importOriginal) => ({
   showFailureToast: vi.fn<(...args: unknown[]) => void>(),
 }));
 vi.mock("./glossary/get-glossary-target", () => ({
-  getGlossaryTarget: (): { createParent: boolean; path: string } => mocks.glossaryTarget,
+  getGlossaryTarget: (): Promise<{ createParent: boolean; path: string }> => Promise.resolve(mocks.glossaryTarget),
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.saveGlossaryChange }));
 vi.mock("./components/is-existing-glossary-file", async (importOriginal) => {
@@ -76,6 +76,7 @@ describe("standalone Add Term folder creation", () => {
     mocks.saveGlossaryChange.mockImplementation(actual.saveGlossaryChange);
 
     render(<Command />);
+    await screen.findByTestId("term");
     await expect(stat(glossaryFile)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));
 
     fireEvent.change(screen.getByTestId("term"), { target: { value: " " } });
@@ -102,6 +103,7 @@ describe("standalone Add Term Open With action", () => {
     mocks.glossaryTarget.path = await writeGlossary("terms: []\n", "legacy.yaml");
 
     render(<Command />);
+    await screen.findByTestId("term");
 
     expect(screen.getByRole("button", { name: "Open Glossary With…" }).dataset.path).toBe(mocks.glossaryTarget.path);
   });
@@ -110,6 +112,7 @@ describe("standalone Add Term Open With action", () => {
     mocks.glossaryTarget.path = await writeGlossary("terms: []\n", "legacy.yaml");
 
     render(<Command />);
+    await screen.findByTestId("term");
     expect(isExistingGlossaryFile).toHaveBeenCalledTimes(1);
 
     fireEvent.change(screen.getByTestId("term"), { target: { value: "Synthetic term" } });
@@ -124,6 +127,7 @@ describe("standalone Add Term command", () => {
   test("shows saved values, supports Done, and starts another pristine focused form", async () => {
     mocks.saveGlossaryChange.mockResolvedValue();
     render(<Command />);
+    await screen.findByTestId("term");
     const initialTermField = expectPristineForm();
 
     fireEvent.blur(initialTermField);
@@ -148,6 +152,7 @@ describe("standalone Add Term command", () => {
   test("keeps both entered values and shows an actionable error when saving fails", async () => {
     mocks.saveGlossaryChange.mockRejectedValue(new Error("write failed"));
     render(<Command />);
+    await screen.findByTestId("term");
 
     fireEvent.change(screen.getByTestId("term"), { target: { value: "Retained Term" } });
     fireEvent.change(screen.getByTestId("definition"), { target: { value: "Retained definition" } });
@@ -170,6 +175,7 @@ describe("standalone Add Term command", () => {
 describe("Add Term validation", () => {
   test("focuses the first invalid field and keeps whitespace errors until valid correction", async () => {
     render(<Command />);
+    await screen.findByTestId("term");
     fireEvent.change(screen.getByTestId("term"), { target: { value: "  " } });
     fireEvent.change(screen.getByTestId("definition"), { target: { value: "\t" } });
     screen.getByTestId("definition").focus();
@@ -193,6 +199,7 @@ describe("Add Term validation", () => {
     );
     mocks.saveGlossaryChange.mockResolvedValueOnce();
     render(<Command />);
+    await screen.findByTestId("term");
     fireEvent.change(screen.getByTestId("term"), { target: { value: "Duplicate" } });
     fireEvent.change(screen.getByTestId("definition"), { target: { value: " Literal\nDefinition " } });
     fireEvent.click(screen.getByRole("button", { name: "Save Term" }));

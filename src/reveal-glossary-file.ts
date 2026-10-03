@@ -29,7 +29,7 @@ export default async function Command(): Promise<void> {
   let glossaryFile: string;
   let revealPath: string;
   try {
-    glossaryFile = getGlossaryTarget().path;
+    glossaryFile = (await getGlossaryTarget()).path;
     revealPath = resolveRevealGlossaryPath(glossaryFile);
   } catch {
     await showRecovery(

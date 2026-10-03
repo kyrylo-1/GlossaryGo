@@ -22,7 +22,7 @@ import { RevealGlossaryFileAction } from "./components/reveal-glossary-file-acti
 import { TermForm } from "./components/term-form";
 import { getEntryIdentity } from "./glossary/entry-identity";
 import { areTermsEquivalent } from "./glossary/term-matching";
-import { getGlossaryTarget } from "./glossary/get-glossary-target";
+import { GlossaryTargetView } from "./components/glossary-target-view";
 import type { GlossaryTarget } from "./glossary/glossary-target";
 import { saveGlossaryChange } from "./glossary/save-glossary-change";
 import type { SearchResult } from "./hooks/search";
@@ -526,6 +526,5 @@ const SearchTermCommand = ({ target }: Readonly<{ target: GlossaryTarget }>): Re
 };
 
 export default function Command(): ReactElement {
-  const target = getGlossaryTarget();
-  return <SearchTermCommand key={target.path} target={target} />;
+  return <GlossaryTargetView>{(target) => <SearchTermCommand key={target.path} target={target} />}</GlossaryTargetView>;
 }

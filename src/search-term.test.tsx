@@ -7,7 +7,7 @@ import { dirname } from "node:path";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { AI, confirmAlert } from "@raycast/api";
+import { AI, confirmAlert, getPreferenceValues } from "@raycast/api";
 
 import { getEntryIdentity } from "./glossary/entry-identity";
 import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
@@ -40,7 +40,8 @@ vi.mock("./glossary/glossary", async (importOriginal) => ({
   },
 }));
 vi.mock("./glossary/get-glossary-target", () => ({
-  getGlossaryTarget: (): { createParent: boolean; path: string } => ({ createParent: false, path: mocks.path }),
+  getGlossaryTarget: (): Promise<{ createParent: boolean; path: string }> =>
+    Promise.resolve({ createParent: false, path: mocks.path }),
 }));
 vi.mock("./glossary/save-glossary-change", () => ({ saveGlossaryChange: mocks.save }));
 vi.mock("./utils/prepare-markdown-for-display", async (importOriginal) => {
@@ -97,6 +98,7 @@ beforeEach(() => {
   mocks.load.mockReset();
   mocks.save.mockReset();
   mocks.path = "/tmp/first.yaml";
+  vi.mocked(getPreferenceValues).mockReturnValue({});
   mocks.load.mockResolvedValue(terms);
   mocks.save.mockResolvedValue();
   vi.mocked(confirmAlert).mockResolvedValue(false);
@@ -649,6 +651,7 @@ describe("Search Term history lifecycle", () => {
     await copy("Zulu");
     await waitFor(() => expect(names()).toEqual(["Zulu", "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]));
     mocks.path = "/tmp/second.yaml";
+    vi.mocked(getPreferenceValues).mockReturnValue({ glossaryFile: mocks.path });
     view.rerender(<Command />);
     await screen.findByRole("article", { name: "Alpha" });
     expect(names()).toEqual(["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Zulu"]);
