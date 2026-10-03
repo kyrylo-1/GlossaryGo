@@ -14,6 +14,12 @@ afterEach(async () => {
 });
 
 describe("saveGlossaryChange validation", () => {
+  test("saves to a custom .yml file", async () => {
+    const path = await writeGlossary("terms: []\n", "vocabulary.yml");
+    await saveGlossaryChange(path, { term: { definition: "First", term: "Alpha" }, type: "add" });
+    await expect(loadGlossary(path)).resolves.toEqual([{ definition: "First", term: "Alpha" }]);
+  });
+
   test("sorts added and existing terms and leaves no temporary file", async () => {
     const path = await writeGlossary("terms:\n  - term: API\n    definition: Application Programming Interface\n");
 
@@ -30,12 +36,12 @@ describe("saveGlossaryChange validation", () => {
   });
 
   test("rejects a wrong extension before changing the selected file", async () => {
-    const path = await writeGlossary("terms: []\n", "glossary.yml");
+    const path = await writeGlossary("terms: []\n", "glossary.txt");
     const original = await readFile(path);
 
     await expect(
       saveGlossaryChange(path, { term: { definition: "Application Programming Interface", term: "API" }, type: "add" }),
-    ).rejects.toEqual(new GlossaryError("invalid-extension", "Choose a file with the .yaml extension."));
+    ).rejects.toEqual(new GlossaryError("invalid-extension", "Choose a file with the .yaml or .yml extension."));
     await expect(readFile(path)).resolves.toEqual(original);
   });
 
