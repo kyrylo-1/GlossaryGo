@@ -1,5 +1,11 @@
 # GlossaryGo Changelog
 
+## [Select Existing Glossary Files] - {PR_MERGE_DATE}
+
+- Replaced Create Glossary File with Select Glossary File for existing `.yaml` and `.yml` files with any basename.
+- Validate locally before explicit activation; share the selected path across commands without changing file contents.
+- Preserve the active glossary on cancellation, invalid files, or access failures, with file-selection recovery actions.
+
 ## [Initial Version] - {PR_MERGE_DATE}
 
 - Added the **Search Term** command for case-insensitive prefix search across a user-selected local YAML glossary.

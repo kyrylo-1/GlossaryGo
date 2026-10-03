@@ -36,11 +36,12 @@ Keep glossary content local and in memory for every command except Ask Glossary.
 in-session disclosure confirmation, Ask Glossary may send the question and complete decoded term/definition context
 within its limit to Raycast AI with static grounding instructions. Refuse over-limit context in full; exclude paths,
 YAML source, comments, and metadata. Persist, log, and cache none of the question, answer, or context.
-Only permitted glossary persistence: explicit Add Term, Edit Term, or Delete Term through the glossary save service to
-the effective Glossary File, or explicit Create Glossary File after confirmation through its exclusive-create service.
-The effective file is `glossary.yaml` inside the user-selected Glossary Location, preserving a legacy
-user-selected `.yaml` file preference, otherwise `glossary.yaml` under Raycast's `environment.supportPath`.
-Use synthetic test data.
+Glossary content may be persisted only by explicit Add Term, Edit Term, or Delete Term through the save service.
+Select Glossary File validates a candidate in memory and persists only its exact path in Raycast LocalStorage after
+explicit activation. Cancel and failures preserve the previous active path. Never store glossary contents there.
+The effective file is the activated `.yaml` or `.yml` path. Before the first activation, preserve a legacy folder or
+file preference, otherwise use `glossary.yaml` under Raycast's `environment.supportPath`. Never fall back after an
+active file becomes missing or invalid. Use synthetic test data.
 
 Preserve unrelated worktree changes. DSG hook blocks file deletion: provide deletion commands instead.
 When committing, delegate creation to separate Luna agent with low reasoning.
