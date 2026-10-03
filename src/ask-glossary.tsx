@@ -168,7 +168,7 @@ export default function Command(): ReactElement {
             primaryAction: { title: "Send to Raycast AI" },
             title: "Send to Raycast AI?",
           }),
-        loadTerms: () => loadGlossary(getGlossaryTarget().path),
+        loadTerms: async () => loadGlossary((await getGlossaryTarget()).path),
       }}
     />
   );

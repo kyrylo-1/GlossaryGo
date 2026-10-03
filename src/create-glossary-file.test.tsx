@@ -1,138 +1,105 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 
+import { open, writeFile, type FileHandle } from "node:fs/promises";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { confirmAlert } from "@raycast/api";
+import { LocalStorage } from "@raycast/api";
 
+import { glossaryReadFileSystem } from "./glossary/glossary-file";
 import Command from "./create-glossary-file";
-import { GlossaryError } from "./glossary/glossary-error";
-import { raycastApiMocks } from "./test/raycast-api-stub";
+import { getSelectedGlossaryFile, selectGlossaryFile } from "./glossary/select-glossary-file";
+import { removeTemporaryDirectories, writeGlossary } from "./glossary/glossary-test-utils";
 
-const mocks = vi.hoisted(() => ({
-  createGlossaryFile:
-    vi.fn<(_directory: string, _terms: ReadonlyArray<{ definition: string; term: string }>) => Promise<string>>(),
-}));
-
-vi.mock("./glossary/create-glossary-file", () => ({ createGlossaryFile: mocks.createGlossaryFile }));
-
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
-  mocks.createGlossaryFile.mockResolvedValue("/tmp/selected/glossary.yaml");
-  vi.mocked(confirmAlert).mockResolvedValue(true);
-  raycastApiMocks.showToast.mockResolvedValue();
+  await LocalStorage.clear();
 });
 
-afterEach(() => cleanup());
+afterEach(async () => {
+  cleanup();
+  vi.restoreAllMocks();
+  await removeTemporaryDirectories();
+});
 
-// eslint-disable-next-line max-lines-per-function
-describe("Create Glossary File command", () => {
-  test("opening, missing folder, and canceled confirmation create nothing", async () => {
+describe("Select Glossary File command", () => {
+  test.each(["team-notes.yaml", "vocabulary.yml"])("validates and explicitly activates %s", async (filename) => {
+    const path = await writeGlossary("terms:\n  - term: Alpha\n    definition: First\n", filename);
     render(<Command />);
-    expect(mocks.createGlossaryFile).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: path } });
+    expect(await screen.findByText("Valid glossary: 1 term. Choose Use This Glossary to activate it.")).toBeTruthy();
+    await expect(getSelectedGlossaryFile()).resolves.toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Use This Glossary" }));
+    expect(await screen.findByRole("heading", { name: "Glossary File Selected" })).toBeTruthy();
+    await expect(getSelectedGlossaryFile()).resolves.toBe(path);
+    expect(LocalStorage.setItem).toHaveBeenCalledExactlyOnceWith("selected-glossary-file", path);
+  });
+});
 
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-    expect((await screen.findByRole("alert")).textContent).toBe("Choose an existing folder.");
-    expect(confirmAlert).not.toHaveBeenCalled();
-
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    vi.mocked(confirmAlert).mockResolvedValue(false);
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-    await waitFor(() => expect(confirmAlert).toHaveBeenCalledOnce());
-    expect(mocks.createGlossaryFile).not.toHaveBeenCalled();
+describe("Glossary selection recovery", () => {
+  test("canceling a picked file retains the active glossary", async () => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const candidate = await writeGlossary("terms: []\n", "candidate.yml");
+    const view = render(<Command />);
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: candidate } });
+    await screen.findByText("Valid glossary: 0 terms. Choose Use This Glossary to activate it.");
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: "" } });
+    view.unmount();
+    expect(await getSelectedGlossaryFile()).toBe(active);
   });
 
-  test("validates every initial term before confirmation and retains entered values", async () => {
+  test("invalid YAML keeps the active glossary and allows a corrected selection", async () => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const invalid = await writeGlossary("terms: [invalid\n", "invalid.yml");
     render(<Command />);
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add Initial Term" }));
-    fireEvent.change(screen.getByTestId("term-0"), { target: { value: "API" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-
-    expect((await screen.findByRole("alert")).textContent).toBe("Definition must contain non-whitespace text.");
-    expect(screen.getByTestId("term-0")).toHaveProperty("value", "API");
-    expect(confirmAlert).not.toHaveBeenCalled();
-    expect(mocks.createGlossaryFile).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: invalid } });
+    expect((await screen.findByRole("alert")).textContent).toContain("Choose another existing YAML glossary file");
+    expect(await getSelectedGlossaryFile()).toBe(active);
+    const valid = await writeGlossary("terms: []\n", "repaired.yml");
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: valid } });
+    await screen.findByText("Valid glossary: 0 terms. Choose Use This Glossary to activate it.");
+    fireEvent.click(screen.getByRole("button", { name: "Use This Glossary" }));
+    await screen.findByRole("heading", { name: "Glossary File Selected" });
+    expect(await getSelectedGlossaryFile()).toBe(valid);
   });
 
-  test("confirms and creates multiple normalized terms at the selected path", async () => {
+  test("revalidates a file changed after the picker preview", async () => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const candidate = await writeGlossary("terms: []\n", "candidate.yml");
     render(<Command />);
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add Initial Term" }));
-    fireEvent.change(screen.getByTestId("term-0"), { target: { value: "  Zulu  " } });
-    fireEvent.change(screen.getByTestId("definition-0"), { target: { value: "Last" } });
-    fireEvent.click(screen.getByRole("button", { name: "Add Initial Term" }));
-    fireEvent.change(screen.getByTestId("term-1"), { target: { value: "Alpha" } });
-    fireEvent.change(screen.getByTestId("definition-1"), { target: { value: "First" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-
-    await waitFor(() =>
-      expect(mocks.createGlossaryFile).toHaveBeenCalledWith("/tmp/selected", [
-        { definition: "Last", term: "Zulu" },
-        { definition: "First", term: "Alpha" },
-      ]),
-    );
-    expect(confirmAlert).toHaveBeenCalledWith(expect.objectContaining({ title: "Create Glossary File?" }));
-    expect(await screen.findByRole("heading", { name: "Glossary File Created" })).toBeTruthy();
-    expect(screen.getByText(/&#47;tmp&#47;selected&#47;glossary&#46;yaml/)).toBeTruthy();
-    expect(screen.getByText(/shared Glossary Location preference/)).toBeTruthy();
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: candidate } });
+    await screen.findByText("Valid glossary: 0 terms. Choose Use This Glossary to activate it.");
+    await writeFile(candidate, "terms: [broken\n");
+    fireEvent.click(screen.getByRole("button", { name: "Use This Glossary" }));
+    await screen.findByRole("alert");
+    expect(await getSelectedGlossaryFile()).toBe(active);
+    expect(screen.queryByRole("heading", { name: "Glossary File Selected" })).toBeNull();
   });
+});
 
-  test("shows a literal path when folder punctuation resembles Markdown", async () => {
-    mocks.createGlossaryFile.mockResolvedValueOnce("/tmp/[linked](https://example.com)/glossary.yaml");
-    render(<Command />);
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-
-    const result = await screen.findByRole("heading", { name: "Glossary File Created" });
-    expect(result.parentElement?.textContent).toContain(
-      "&#91;linked&#93;&#40;https&#58;&#47;&#47;example&#46;com&#41;",
-    );
-    expect(result.parentElement?.textContent).not.toContain("[linked](https://example.com)");
-  });
-
-  test("reports Finder failure without losing the created path", async () => {
-    raycastApiMocks.showInFinder.mockRejectedValueOnce(new Error("Finder unavailable"));
-    render(<Command />);
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-    await screen.findByRole("heading", { name: "Glossary File Created" });
-    fireEvent.click(screen.getByRole("button", { name: "Reveal Glossary in Finder" }));
-
-    await waitFor(() =>
-      expect(raycastApiMocks.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "Could Not Reveal Glossary File" }),
-      ),
-    );
-    expect(screen.getByText(/&#47;tmp&#47;selected&#47;glossary&#46;yaml/)).toBeTruthy();
-  });
-
-  test("creates an empty glossary only after confirmation", async () => {
-    render(<Command />);
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-
-    await waitFor(() => expect(mocks.createGlossaryFile).toHaveBeenCalledWith("/tmp/selected", []));
-    expect(await screen.findByRole("heading", { name: "Glossary File Created" })).toBeTruthy();
-  });
-
-  test("shows collision errors and keeps the chosen folder for correction", async () => {
-    mocks.createGlossaryFile.mockRejectedValueOnce(
-      new GlossaryError("already-exists", "A glossary.yaml already exists in that folder. Choose another folder."),
-    );
-    render(<Command />);
-    fireEvent.change(screen.getByTestId("directory"), { target: { value: "/tmp/selected" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review and Create" }));
-
-    await waitFor(() =>
-      expect(raycastApiMocks.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "A glossary.yaml already exists in that folder. Choose another folder.",
-          title: "Could Not Create Glossary File",
-        }),
-      ),
-    );
-    expect(screen.getByTestId("directory")).toHaveProperty("value", "/tmp/selected");
-    expect(screen.queryByRole("heading", { name: "Glossary File Created" })).toBeNull();
+describe("closing during activation", () => {
+  test("cancels a pending validation without activating the candidate", async () => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const candidate = await writeGlossary("terms: []\n", "candidate.yml");
+    const view = render(<Command />);
+    fireEvent.change(screen.getByTestId("glossary-file"), { target: { value: candidate } });
+    await screen.findByText("Valid glossary: 0 terms. Choose Use This Glossary to activate it.");
+    let release!: (handle: FileHandle) => void;
+    // Delay the filesystem boundary while the user closes the command.
+    // eslint-disable-next-line promise/avoid-new
+    const pending = new Promise<FileHandle>((resolve) => {
+      release = resolve;
+    });
+    vi.spyOn(glossaryReadFileSystem, "open").mockReturnValueOnce(pending);
+    fireEvent.click(screen.getByRole("button", { name: "Use This Glossary" }));
+    view.unmount();
+    const handle = await open(candidate, "r");
+    release(handle);
+    await waitFor(() => expect(handle.fd).toBe(-1));
+    expect(await getSelectedGlossaryFile()).toBe(active);
   });
 });

@@ -8,11 +8,11 @@ import {
   startAnotherStandaloneTerm,
 } from "./components/standalone-add-term-state";
 import { TermForm } from "./components/term-form";
-import { getGlossaryTarget } from "./glossary/get-glossary-target";
+import { GlossaryTargetView } from "./components/glossary-target-view";
+import type { GlossaryTarget } from "./glossary/glossary-target";
 import type { Term } from "./utils/types";
 
-export default function Command(): ReactElement {
-  const glossaryTarget = getGlossaryTarget();
+const AddTermCommand = ({ glossaryTarget }: Readonly<{ glossaryTarget: GlossaryTarget }>): ReactElement => {
   const [state, setState] = useState(createStandaloneAddTermState);
   // A new form can follow a first save that created the file.
   const openWithAvailable = useMemo(
@@ -47,5 +47,11 @@ export default function Command(): ReactElement {
       onSaved={handleSaved}
       submitTitle="Save Term"
     />
+  );
+};
+
+export default function Command(): ReactElement {
+  return (
+    <GlossaryTargetView>{(target) => <AddTermCommand key={target.path} glossaryTarget={target} />}</GlossaryTargetView>
   );
 }

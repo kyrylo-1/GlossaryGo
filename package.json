@@ -36,8 +36,8 @@
     },
     {
       "name": "create-glossary-file",
-      "title": "Create Glossary File",
-      "description": "Create a new glossary in a selected local folder",
+      "title": "Select Glossary File",
+      "description": "Select and validate an existing local YAML glossary file",
       "mode": "view"
     },
     {
@@ -71,7 +71,7 @@
     {
       "name": "glossaryFile",
       "title": "Glossary Location",
-      "description": "Choose a folder for glossary.yaml. The file is created on the first valid Add Term or Quick Add Term. YAML format and example: https://github.com/kyrylo-1/GlossaryGo#glossary-format",
+      "description": "Legacy location used until you activate a file with Select Glossary File. Existing folders use glossary.yaml; retained YAML file paths stay direct.",
       "type": "directory",
       "required": false
     }

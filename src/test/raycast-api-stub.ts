@@ -176,12 +176,29 @@ export const Form = Object.assign(
   },
 );
 export const Icon = { Checkmark: "checkmark", Document: "document", Finder: "finder", Pencil: "pencil", Plus: "plus" };
+export const launchCommand = vi.fn<(options: unknown) => Promise<void>>().mockResolvedValue();
+export const LaunchType = { UserInitiated: "userInitiated" };
 export const Toast = { Style: { Failure: "failure", Success: "success" } };
 export const closeMainWindow = raycastApiMocks.closeMainWindow;
 export const getPreferenceValues = vi.fn<() => { glossaryFile?: string }>().mockReturnValue({});
 export const openExtensionPreferences = vi.fn<() => Promise<void>>().mockResolvedValue();
 export const showInFinder = raycastApiMocks.showInFinder;
 export const showToast = raycastApiMocks.showToast;
+
+const localStorage = new Map<string, string>();
+export const LocalStorage = {
+  clear: vi.fn<() => Promise<void>>().mockImplementation(() => {
+    localStorage.clear();
+    return Promise.resolve();
+  }),
+  getItem: vi
+    .fn<(key: string) => Promise<string | undefined>>()
+    .mockImplementation((key) => Promise.resolve(localStorage.get(key))),
+  setItem: vi.fn<(key: string, value: string) => Promise<void>>().mockImplementation((key, value) => {
+    localStorage.set(key, value);
+    return Promise.resolve();
+  }),
+};
 
 export const Clipboard = { copy: raycastApiMocks.copy };
 export const Alert = { ActionStyle: { Cancel: "cancel", Destructive: "destructive" } };

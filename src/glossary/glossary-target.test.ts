@@ -9,10 +9,10 @@ import { resolveGlossaryTarget } from "./glossary-target";
 afterEach(removeTemporaryDirectories);
 
 describe("resolveGlossaryTarget", () => {
-  test("preserves a missing legacy .yaml preference", () => {
-    expect(resolveGlossaryTarget("/Users/test/support", "/Users/test/custom.yaml")).toEqual({
+  test.each(["custom.yaml", "vocabulary.yml"])("preserves a missing %s file preference", (filename) => {
+    expect(resolveGlossaryTarget("/Users/test/support", `/Users/test/${filename}`)).toEqual({
       createParent: false,
-      path: "/Users/test/custom.yaml",
+      path: `/Users/test/${filename}`,
     });
   });
 

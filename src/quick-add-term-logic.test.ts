@@ -175,7 +175,7 @@ describe("runQuickAddTerm save failures", () => {
   });
 
   test("reports a save failure without creating the invalid target", async () => {
-    const glossaryFile = await createTemporaryPath("glossary.yml");
+    const glossaryFile = await createTemporaryPath("glossary.txt");
     const onFailure = vi.fn<(failure: QuickAddTermFailure) => Promise<void>>().mockResolvedValue();
     const onSuccess = vi.fn<() => Promise<void>>().mockResolvedValue();
 
@@ -189,7 +189,7 @@ describe("runQuickAddTerm save failures", () => {
 
     expect(onFailure).toHaveBeenCalledWith({
       kind: "save",
-      message: "Choose a file with the .yaml extension.",
+      message: "Choose a file with the .yaml or .yml extension.",
     });
     expect(onSuccess).not.toHaveBeenCalled();
     await expect(stat(glossaryFile)).rejects.toEqual(expect.objectContaining({ code: "ENOENT" }));

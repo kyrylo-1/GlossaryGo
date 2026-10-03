@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 
-import { GLOSSARY_FILE_EXTENSION } from "../constants";
+import { hasGlossaryExtension } from "./has-glossary-extension";
 
 export type GlossaryTarget = Readonly<{
   createParent: boolean;
@@ -22,9 +22,7 @@ export const resolveGlossaryTarget = (supportPath: string, glossaryLocation?: st
     // The preference key previously held file-picker values, including files that may now be missing.
     return {
       createParent: false,
-      path: glossaryLocation.endsWith(GLOSSARY_FILE_EXTENSION)
-        ? glossaryLocation
-        : join(glossaryLocation, "glossary.yaml"),
+      path: hasGlossaryExtension(glossaryLocation) ? glossaryLocation : join(glossaryLocation, "glossary.yaml"),
     };
   }
 };

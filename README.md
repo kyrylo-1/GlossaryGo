@@ -1,47 +1,35 @@
 # GlossaryGo
 
-Search and update private local YAML glossary in Raycast. **Search Term** finds prefixes; **Add Term** opens reusable
-form; **Quick Add Term** saves from root search; **Create Glossary File** creates a new file in a chosen folder;
+Search and update a private local YAML glossary in Raycast. **Search Term** finds prefixes; **Add Term** opens a reusable
+form; **Quick Add Term** saves from root search; **Select Glossary File** activates an existing file;
 **Reveal Glossary File** locates storage in Finder.
 
-## Setup
+## Setup and file selection
 
-Open any command. No file setup required. Without the optional **Glossary Location** preference, all commands use
-`glossary.yaml` in Raycast's extension-specific Application Support directory. First valid Add Term or Quick Add Term
-creates the file and default support directory. Opening commands, choosing a location, canceling forms, or submitting
-invalid fields creates nothing.
+Open **Select Glossary File** and use **Glossary File / Select File** to choose one existing `.yaml` or `.yml` file.
+Any basename works, including `team-notes.yaml` and `vocabulary.yml`. The file is loaded and validated locally using the
+normal glossary rules. **Use This Glossary** revalidates it and activates its exact path for Search Term, Add Term,
+Quick Add Term, Ask Glossary, Reveal, and Open With the next time those commands open. Reopen an already-open command
+to use a newly selected file.
 
-Select an existing folder in the shared **Glossary Location** preference for custom storage. Every command then uses
-`glossary.yaml` inside that folder. First valid Add Term or Quick Add Term creates only that file; GlossaryGo never
-creates a selected custom folder. An existing `glossary.yaml` is loaded and validated through the normal command flow
-and is never overwritten as setup.
+Picking a file only previews validation. Canceling the picker, closing the command, invalid YAML, unsupported extensions,
+missing files, and access errors keep the active glossary unchanged. Correct the file or choose another existing file;
+activation reports success only after the selected path is saved. Selection never creates, copies, renames, formats, or
+overwrites the selected file. Only its activated path is kept in Raycast's local extension storage; glossary contents,
+validation previews, and drafts are never persisted there. Selection sends nothing over the network.
 
-An existing stored preference from an earlier GlossaryGo version that points directly to an existing or missing
-`.yaml` file remains a direct Glossary File path. GlossaryGo does not move, rename, or delete it. Reselect a folder in
-**Glossary Location** to opt into folder-based storage.
+This replaces **Create Glossary File**. To create a glossary, make a YAML file with `terms: []` in your editor and select
+it. With no activated file, existing installations keep their **Glossary Location** preference: a folder resolves to
+its `glossary.yaml`, and a retained direct `.yaml` or `.yml` path stays direct. Without either a selection or preference,
+commands use `glossary.yaml` in Raycast's extension support directory. The first valid Add Term or Quick Add Term can
+create that missing file. Only default storage may create its support directory; custom parent folders must exist.
+Once a file is activated, it takes precedence over the legacy preference. Use **Select Glossary File** to switch files.
+A missing or invalid active file produces recovery instead of silently falling back to another glossary.
 
-## Creating a Glossary File
-
-Open **Create Glossary File** and select an existing local folder. The form shows the destination
-`<selected folder>/glossary.yaml`. Initial terms are optional: create a valid empty `terms: []` file, or use **Add Initial
-Term** to enter one or more term and definition pairs. Each pair follows Add Term's trimming and non-whitespace rules;
-invalid input stays in the form and writes nothing. The saved entries use Add Term's deterministic name order.
-
-Choose **Review and Create**, then explicitly confirm **Create Glossary File**. Opening the command, selecting a folder,
-editing fields, canceling, and failed validation create nothing. Confirmation makes one exclusive file creation with
-private `0600` permissions and writes all initial terms together. Existing files, folders, and symbolic links named
-`glossary.yaml` are never overwritten. Missing or unwritable folders and I/O failures show a recovery error; a failed
-write, flush, or close leaves the path untouched for inspection. It may contain an incomplete file or a replacement
-from another process. Inspect it before retrying or choosing another folder.
-
-Success shows the complete created path and **Reveal Glossary in Finder**. Creation does not change the active Glossary
-File used by Search Term or the shared **Glossary Location** preference. To use the new file across commands, select its
-folder in that preference.
-
-macOS only. Existing file must be readable, contain one YAML document, and not exceed 5 MiB. Writes require writable
-ordinary file with exactly one filesystem link. Symbolic links and multiply hard-linked files support search only:
-replacement could change link semantics. `.yml` is unsupported. Raycast may remove default file on uninstall;
-choose a custom folder for storage beyond installation.
+macOS only. Existing files must be readable, contain one YAML document, and not exceed 5 MiB. Writes require a writable
+ordinary file with exactly one filesystem link. Symbolic links and multiply hard-linked files support search and
+selection only: replacement could change link semantics. Raycast may remove the default file and selected-path setting
+on uninstall; choose a custom file for storage beyond installation.
 
 ## Glossary format
 
@@ -94,7 +82,7 @@ After save, **Term Added** keeps saved fields visible. **Add Another Term** open
 **Done** closes command. Failed saves retain both inputs and show actionable error. No saved drafts.
 Form shows effective Glossary File path, **Reveal Glossary in Finder**, and **Open Glossary With…** when the file exists.
 
-Standalone Add uses same safe save service and shared preference as Search Term. Saved term appears when Search Term
+Standalone Add uses same safe save service and effective Glossary File as Search Term. Saved term appears when Search Term
 next opens or after **Reload Glossary** in an open search.
 
 ## Quick adding terms
@@ -106,24 +94,21 @@ successive entries.
 
 ## Revealing the glossary file
 
-Open **Reveal Glossary File** from Raycast root search to select the effective Glossary File in Finder. A selected
-folder resolves to its `glossary.yaml`; a retained legacy direct-file preference remains direct. Without a preference,
-Reveal uses the default support-directory file. It needs no search result and works with invalid YAML, an empty
+Open **Reveal Glossary File** from Raycast root search to select the effective file in Finder. It uses the activated
+path, retained legacy target, or default support file. It needs no search result and works with invalid YAML, an empty
 glossary, or a blank file without reading or validating its contents.
 
-If the file is missing, Finder reveals the nearest existing folder, including when intermediate folders are absent.
-A **Glossary File Is Missing** dialog stays available after Finder opens, explains how to create the file or select a folder,
-and offers **Open Extension Preferences** or **Done**. Path or Finder failures use the same recovery dialog. If
-Preferences cannot open, a second dialog explains how to find the setting manually. Reveal never creates folders
-or files and never changes glossary contents.
+If the file is missing, Finder reveals the nearest existing folder. A **Glossary File Is Missing** dialog offers
+**Select Glossary File** or **Done**. Path and Finder failures provide the same recovery. Selecting another file requires
+successful validation and explicit activation; Reveal itself never creates files or folders or changes the active path.
 
 ## Opening the glossary file in another app
 
 **Open Glossary With…** uses Raycast's native installed-app picker for the exact effective Glossary File. It is available from
 Search Term results, the full-definition reader, Add/Edit forms, empty and no-match views, and recoverable load-error
-views when the file exists. The action also supports a retained direct `.yaml` preference and the default support
+views when the file exists. The action also supports a retained direct `.yaml` or `.yml` preference and the default support
 directory file. It does not appear while the file is missing; use Add Term to create it, Reveal to locate its folder,
-or Preferences to select another Glossary Location. Choosing an app does not change the search query or selected term.
+or Select Glossary File to activate another existing file. Choosing an app does not change the search query or selected term.
 GlossaryGo does not read, create, rewrite, or transmit the file as part of this action. The chosen app controls what
 happens after it opens the file.
 
@@ -188,7 +173,7 @@ Edit/Delete capture the selected entry and the source snapshot in memory. Any so
 comments, sequence shifts, reordering, or byte-order-mark changes, causes safe conflict refusal; reload before retrying. Conflicted edit retains input and offers
 user-triggered reload without query change. Conflicted delete reloads once; retry from current result.
 Load errors expose only file recovery until valid. Missing-file view shows effective path plus Add Term, reload,
-Reveal in Finder, Preferences for creation or replacement.
+Reveal in Finder, and Select Glossary File for replacement.
 
 After external edits, choose **Reload Glossary** to reread and validate. No automatic file watching.
 Failed reload shows error and hides stale results.
@@ -236,36 +221,29 @@ See [Testing GlossaryGo](TESTING.md) for Raycast setup, automated checks, manual
 
 ## Privacy
 
-Commands read only the effective Glossary File, except Create Glossary File writes a new file only after explicit
-confirmation. Existing content, form input, and inline arguments stay on device and
-in memory while the command is open, except when a user explicitly submits a question to Ask Glossary after its
-disclosure confirmation. That single Raycast AI request contains the question and complete decoded term-and-definition
-context within the 32 KiB UTF-8 limit, plus static grounding instructions. Oversized context is refused in full. Ask
-Glossary does not persist questions, answers, or acknowledgement; it does not write the Glossary File, cache/history,
-logs, or telemetry.
+Commands read only the effective Glossary File, except Select Glossary File reads a user-picked candidate for validation.
+File contents and command input stay on device and in memory, except an explicitly confirmed Ask Glossary request as
+described above. The activated file path is the only selection state persisted in Raycast local storage.
 
-Search, Add, Edit, Delete, Create Glossary File, Copy, Reload, Reveal, and Open With do not send Glossary
-content over a network. Explicit valid first
-Add may create the effective file; later changes use a restricted sibling temporary copy. Normal failures remove files
-created by a failed Add, Edit, or Delete operation. A failed Create Glossary File operation leaves its path untouched
-for manual inspection because another process may have replaced the new file. A crash or cleanup failure may leave an
-incomplete first file or temporary copy for manual recovery. Explicit copy actions send the selected value to the clipboard, and Reveal opens the effective target
-in Finder.
+Search, Add, Edit, Delete, Select Glossary File, Copy, Reload, Reveal, and Open With do not send glossary content over a
+network. Explicit valid first Add may create a missing effective file; later mutations use a restricted sibling
+temporary copy. Normal failures remove files created by a failed Add, Edit, or Delete operation. A crash or cleanup
+failure may leave an incomplete first file or temporary copy for manual recovery. Explicit copy actions put selected
+content on the clipboard; Reveal opens the effective target in Finder.
 
 ## Troubleshooting
 
-- **No location selected:** Add the first term for default storage or select an existing custom folder in extension preferences.
+- **No file selected:** Use Select Glossary File for an existing YAML file, or Add Term for default storage.
 - **Custom glossary cannot be created:** Ensure the selected folder still exists and is writable. Missing custom folders
   are not created.
-- **Load fails:** Require the effective Glossary File to be readable, valid UTF-8, and at most 5 MiB. Select another
-  existing folder in preferences if needed.
+- **Load fails:** Require the effective Glossary File to be readable, valid UTF-8, and at most 5 MiB. Use Select Glossary File to activate another existing file if needed.
 - **Validation fails:** Require one document, only `terms` root, only non-empty `term`/`definition` per entry.
   Remove anchors, aliases, merge keys, custom tags. Same-name entries are valid.
 - **No terms:** `terms: []` is valid. Otherwise fix validation error and **Reload Glossary**.
 - **No matches:** Use term-name prefix; shorten/correct query. Definitions and middle-of-name text are not searched.
 - **External edits missing:** Choose **Reload Glossary**. No automatic reload.
 - **Add/Edit fails:** Correct form errors. Failure toast offers **Reload Glossary** for conflicts;
-  otherwise **Open Extension Preferences** to choose an existing writable Glossary Location folder. A retained legacy
-  file must remain an ordinary `.yaml` file with exactly one filesystem link.
+  otherwise **Select Glossary File** to choose an existing writable YAML file. Writes require an ordinary `.yaml` or
+  `.yml` file with exactly one filesystem link.
 - **Delete fails:** Resolve external edits; retry refreshed result. No writes to symbolic links, multiply hard-linked
   files, or stale selections.

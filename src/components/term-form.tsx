@@ -1,7 +1,8 @@
-import { Action, ActionPanel, Form, Icon, openExtensionPreferences, showToast, Toast } from "@raycast/api";
+import { Action, ActionPanel, Form, Icon, showToast, Toast } from "@raycast/api";
 import { useForm } from "@raycast/utils";
 import { useRef, useState, type ReactElement } from "react";
 
+import { openGlossarySelection } from "../utils/open-glossary-selection";
 import { saveGlossaryChange } from "../glossary/save-glossary-change";
 import type { Term } from "../utils/types";
 import { OpenGlossaryFileAction } from "./open-glossary-file-action";
@@ -30,14 +31,14 @@ export type TermFormProps = Readonly<{
     | Readonly<{ mode: "edit"; onReload: () => Promise<void>; original: Term }>
   );
 
-const openPreferences = (): void => {
-  openExtensionPreferences().catch(() => null);
+const openSelection = (): void => {
+  openGlossarySelection().catch(() => null);
 };
 
 const showSaveFailure = async (message: string): Promise<void> => {
   await showToast({
     message,
-    primaryAction: { onAction: openPreferences, title: "Open Extension Preferences" },
+    primaryAction: { onAction: openSelection, title: "Select Glossary File" },
     style: Toast.Style.Failure,
     title: "Could Not Save Term",
   });

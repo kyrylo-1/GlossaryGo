@@ -7,6 +7,11 @@ import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "
 afterEach(removeTemporaryDirectories);
 
 describe("loadGlossary file selection", () => {
+  test.each(["team-notes.yaml", "vocabulary.yml"])("loads an existing %s glossary", async (filename) => {
+    const path = await writeGlossary("terms:\n  - term: Alpha\n    definition: First\n", filename);
+    await expect(loadGlossary(path)).resolves.toEqual([{ definition: "First", term: "Alpha" }]);
+  });
+
   test("loads a valid glossary without changing definition content", async () => {
     const path = await writeGlossary(`
 # Product language
@@ -28,11 +33,11 @@ terms:
     ]);
   });
 
-  test("rejects files that do not use the .yaml extension", async () => {
-    const path = await writeGlossary("terms: []\n", "glossary.yml");
+  test("rejects files that do not use a YAML extension", async () => {
+    const path = await writeGlossary("terms: []\n", "glossary.txt");
 
     await expect(loadGlossary(path)).rejects.toEqual(
-      new GlossaryError("invalid-extension", "Choose a file with the .yaml extension."),
+      new GlossaryError("invalid-extension", "Choose a file with the .yaml or .yml extension."),
     );
   });
 });
