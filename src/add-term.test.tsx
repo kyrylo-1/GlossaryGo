@@ -162,7 +162,7 @@ describe("standalone Add Term command", () => {
       expect(raycastApiMocks.showToast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "The glossary file could not be saved. Try again.",
-          primaryAction: expect.objectContaining({ title: "Open Extension Preferences" }),
+          primaryAction: expect.objectContaining({ title: "Select Glossary File" }),
           title: "Could Not Save Term",
         }),
       ),

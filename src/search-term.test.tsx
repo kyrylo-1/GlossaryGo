@@ -154,7 +154,7 @@ describe("Open With missing-file recovery", () => {
     expect(actions.queryByRole("button", { name: "Open Glossary With…" })).toBeNull();
     expect(actions.getByRole("button", { name: "Add Term" })).toBeTruthy();
     expect(actions.getByRole("button", { name: "Reveal Glossary in Finder" })).toBeTruthy();
-    expect(actions.getByRole("button", { name: "Open Extension Preferences" })).toBeTruthy();
+    expect(actions.getByRole("button", { name: "Select Glossary File" })).toBeTruthy();
 
     fireEvent.click(actions.getByRole("button", { name: "Reveal Glossary in Finder" }));
     await waitFor(() => expect(raycastApiMocks.showInFinder).toHaveBeenCalledWith(dirname(mocks.path)));

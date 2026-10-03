@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /// <reference lib="dom" />
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { LaunchType, LocalStorage, getPreferenceValues } from "@raycast/api";
+import { LaunchType, LocalStorage, getPreferenceValues, launchCommand } from "@raycast/api";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import AddTerm from "./add-term";
@@ -55,4 +55,45 @@ describe("selected Glossary File across commands", () => {
       expect(await readFile(legacy, "utf8")).toBe("terms: []\n");
     },
   );
+});
+
+describe("selection storage recovery", () => {
+  test("Quick Add reports selection read failure without writing to the fallback", async () => {
+    const fallback = await writeGlossary("terms: []\n", "legacy.yaml");
+    vi.mocked(getPreferenceValues).mockReturnValue({ glossaryFile: fallback });
+    vi.mocked(LocalStorage.getItem).mockRejectedValueOnce(new Error("Storage unavailable"));
+    await QuickAddTerm({ arguments: { definition: "First", term: "Alpha" }, launchType: LaunchType.UserInitiated });
+    expect(raycastApiMocks.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: "Could not read the active Glossary File. Retry or use Select Glossary File.",
+        title: "Could Not Add Term",
+      }),
+    );
+    expect(await readFile(fallback, "utf8")).toBe("terms: []\n");
+  });
+});
+
+describe("Search Term selection recovery", () => {
+  test("retries the selected path without opening a fallback after storage failure", async () => {
+    const path = await writeGlossary("terms:\n  - term: Selected\n    definition: Current file\n", "vocabulary.yml");
+    await selectGlossaryFile(path);
+    vi.mocked(LocalStorage.getItem).mockRejectedValueOnce(new Error("Storage unavailable"));
+    render(<SearchTerm />);
+    await screen.findByText(/Could Not Read Glossary Selection/u);
+    expect(screen.queryAllByRole("article")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("article", { name: "Selected" })).toBeTruthy();
+  });
+});
+
+describe("invalid active-file recovery", () => {
+  test("opens file selection from Search Term when the selected file becomes invalid", async () => {
+    const path = await writeGlossary("terms: []\n", "vocabulary.yml");
+    await selectGlossaryFile(path);
+    await writeFile(path, "terms: [broken\n");
+    render(<SearchTerm />);
+    const action = await screen.findByRole("button", { name: "Select Glossary File" });
+    fireEvent.click(action);
+    expect(launchCommand).toHaveBeenCalledWith({ name: "create-glossary-file", type: LaunchType.UserInitiated });
+  });
 });

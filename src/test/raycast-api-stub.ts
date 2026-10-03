@@ -176,6 +176,7 @@ export const Form = Object.assign(
   },
 );
 export const Icon = { Checkmark: "checkmark", Document: "document", Finder: "finder", Pencil: "pencil", Plus: "plus" };
+export const launchCommand = vi.fn<(options: unknown) => Promise<void>>().mockResolvedValue();
 export const LaunchType = { UserInitiated: "userInitiated" };
 export const Toast = { Style: { Failure: "failure", Success: "success" } };
 export const closeMainWindow = raycastApiMocks.closeMainWindow;

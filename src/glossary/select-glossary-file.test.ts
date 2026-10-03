@@ -4,10 +4,10 @@ import { AI, LocalStorage } from "@raycast/api";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { loadGlossary } from "./glossary";
-import { removeTemporaryDirectories, writeGlossary } from "./glossary-test-utils";
+import { createTemporaryPath, removeTemporaryDirectories, writeGlossary } from "./glossary-test-utils";
 import { getGlossaryTarget } from "./get-glossary-target";
 import { saveGlossaryChange } from "./save-glossary-change";
-import { selectGlossaryFile } from "./select-glossary-file";
+import { getSelectedGlossaryFile, selectGlossaryFile } from "./select-glossary-file";
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -56,5 +56,44 @@ describe("Glossary File selection safety", () => {
       saveGlossaryChange(target.path, { term: { definition: "First", term: "Alpha" }, type: "add" }),
     ).rejects.toMatchObject({ code: "unsupported-write-target" });
     expect(await readFile(source, "utf8")).toBe("terms: []\n");
+  });
+});
+
+describe("Glossary File selection failures", () => {
+  test.each([
+    ["wrong extension", "notes.txt", "terms: []\n", "invalid-extension"],
+    ["invalid YAML", "broken.yml", "terms: [bad\n", "invalid-yaml"],
+    ["invalid schema", "other.yaml", "entries: []\n", "invalid-schema"],
+  ])("retains the active glossary for %s", async (_name, filename, source, code) => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const candidate = await writeGlossary(source, filename);
+    await expect(selectGlossaryFile(candidate)).rejects.toMatchObject({ code });
+    expect(await getSelectedGlossaryFile()).toBe(active);
+    expect(await readFile(candidate, "utf8")).toBe(source);
+  });
+
+  test("refuses missing or inaccessible files without changing the active glossary", async () => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const missing = await createTemporaryPath("missing.yml");
+    await expect(selectGlossaryFile(missing)).rejects.toMatchObject({ code: "missing" });
+    await expect(stat(missing)).rejects.toMatchObject({ code: "ENOENT" });
+    const unreadable = await writeGlossary("terms: []\n", "unreadable.yml");
+    await chmod(unreadable, 0o000);
+    await expect(selectGlossaryFile(unreadable)).rejects.toMatchObject({ code: "unreadable" });
+    expect(await getSelectedGlossaryFile()).toBe(active);
+  });
+
+  test("does not activate a cancelled request or a failed path-storage write", async () => {
+    const active = await writeGlossary("terms: []\n", "active.yaml");
+    await selectGlossaryFile(active);
+    const candidate = await writeGlossary("terms: []\n", "candidate.yml");
+    const controller = new AbortController();
+    controller.abort();
+    await expect(selectGlossaryFile(candidate, controller.signal)).rejects.toMatchObject({ name: "AbortError" });
+    vi.mocked(LocalStorage.setItem).mockRejectedValueOnce(new Error("Storage unavailable"));
+    await expect(selectGlossaryFile(candidate)).rejects.toThrow("Storage unavailable");
+    expect(await getSelectedGlossaryFile()).toBe(active);
   });
 });

@@ -7,13 +7,13 @@ import {
   Icon,
   Keyboard,
   List,
-  openExtensionPreferences,
   showToast,
   Toast,
   useNavigation,
 } from "@raycast/api";
 import { memo, useCallback, useMemo, useRef, useState, type ReactElement } from "react";
 
+import { openGlossarySelection } from "./utils/open-glossary-selection";
 import { showFailureToast } from "@raycast/utils";
 import { runDeleteTerm } from "./components/delete-term-logic";
 import { isExistingGlossaryFile } from "./components/is-existing-glossary-file";
@@ -45,12 +45,12 @@ const ReloadAction = ({ onReload }: Readonly<{ onReload: () => Promise<void> }>)
   );
 };
 
-const OpenPreferencesAction = (): ReactElement => {
+const SelectGlossaryAction = (): ReactElement => {
   return (
     <Action
-      title="Open Extension Preferences"
+      title="Select Glossary File"
       icon={Icon.Gear}
-      onAction={() => runAction(openExtensionPreferences, "Failed to Open Extension Preferences")}
+      onAction={() => runAction(openGlossarySelection, "Failed to Select Glossary File")}
     />
   );
 };
@@ -65,7 +65,7 @@ const RecoveryActions = ({
       <ReloadAction onReload={onReload} />
       <RevealGlossaryFileAction glossaryFile={glossaryFile} />
       <OpenGlossaryFileAction glossaryFile={glossaryFile} isAvailable={openWithAvailable} />
-      <OpenPreferencesAction />
+      <SelectGlossaryAction />
     </ActionPanel>
   );
 };
@@ -208,7 +208,7 @@ const EmptyGlossaryActions = (props: SearchActionsProps): ReactElement => {
         <ReloadAction onReload={props.onReload} />
         <RevealGlossaryFileAction glossaryFile={props.glossaryFile} />
         <OpenGlossaryFileAction glossaryFile={props.glossaryFile} isAvailable={props.openWithAvailable} />
-        <OpenPreferencesAction />
+        <SelectGlossaryAction />
       </ActionPanel.Section>
     </ActionPanel>
   );
